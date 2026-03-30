@@ -1,4 +1,7 @@
-# daily_rebalance.py (updated with missed-day recovery)
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.config.config_loader import load_config
 from src.utils.market_data import MarketData
@@ -54,9 +57,10 @@ def main():
     trades_engine = TradeEngine()
 
     today = datetime.today().date()
+    last_run_date_raw = state.get("last_run_date")
     last_run_date = (
-        datetime.fromisoformat(state["last_run_date"]).date()
-        if state["last_run_date"]
+        datetime.fromisoformat(last_run_date_raw).date()
+        if last_run_date_raw
         else today - timedelta(days=1)
     )
 
