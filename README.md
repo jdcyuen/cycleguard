@@ -1,7 +1,8 @@
 
+E:\CycleGuard
 
-
-
+Github repository
+https://github.com/jdcyuen/cycleguard.git
 
 
 
@@ -150,3 +151,227 @@ A missed daily run doesn’t break the portfolio, but it can delay crash/recover
 
 #Run tests via:
 python -m unittest tests/test_crash_manager.py
+
+
+
+🧭 🧠 How to Read Your CycleGuard Dashboard
+📊 1. Portfolio Overview
+What you see:
+● Ticker (FZROX, SCHD, NVDA, etc.)
+● Dollar value
+● % of portfolio
+
+How to interpret:
+● High % = concentration risk
+	● If something like NVDA or SMH creeps too high → risk is increasing
+● Cash / short-term bonds (SGOV, VUSB) = dry powder
+	● This is what fuels your crash buying
+	
+What to do:
+● Normally → do nothing
+● Only act if:
+	● A single position exceeds your limits (rare due to automation)
+
+--------
+
+📈 2. Market Data & Drawdown
+What you see:
+	● Current price of S&P 500 Index
+	● Cycle peak
+	● Drawdown (% drop from peak)
+
+--------
+
+🧠 This is the MOST IMPORTANT section
+Example:
+	Cycle Peak: 5800
+	Current:    5200
+	Drawdown:  -10.3%
+
+How to interpret:
+Drawdown	Meaning
+0% to -10%	Normal volatility
+-10%		⚠️ Level 1 trigger
+-20%		🚨 Level 2 (real correction)
+-30%		💥 Bear market
+-40%+		🔥 Panic / capitulation
+
+--------
+
+What to do:
+
+👉 You don’t decide anything manually
+
+● The system uses this to:
+	● Trigger buys during crashes
+	● Trigger sells during recovery
+
+--------
+
+⚠️ 3. Crash Signal
+What you see:
+Current Crash Signal: Level 1 / Level 2 / None
+
+--------
+
+How to interpret:
+Signal	Meaning	Action
+None	Market normal	Do nothing
+Level 1	Mild drop	Small deployment
+Level 2	Correction	Bigger buys
+Level 3	Bear market	Aggressive buying
+Level 4	Panic	Maximum deployment
+
+--------
+
+
+Important:
+	👉 This is NOT predictive
+	👉 It is reactive and rules-based
+--------
+
+What to do:
+	● If automation is running → nothing
+	● If running manually → verify trades executed
+
+
+⚡ 4. Missed Crash Levels
+What you see:
+
+	Level 1, Level 2
+
+--------
+
+How to interpret:
+
+👉 These are levels that:
+
+	● SHOULD have triggered earlier
+	● Were executed later due to missed runs
+
+--------
+
+What to do:
+● Just verify trades happened
+● No manual correction needed
+
+
+📋 5. Trade Log
+What you see:
+● Date
+● BUY / SELL
+● Asset
+● Amount
+● Reason (Level 1, Recovery, etc.)
+
+--------
+
+How to interpret:
+Example:
+	SELL SGOV 30000  Level 2
+	BUY  FZROX 22500 Level 2
+
+👉 Means:
+
+● Cash was deployed
+● Risk assets were bought
+
+--------
+
+What to look for:
+✅ Trades align with crash levels
+✅ No duplicate executions
+✅ No unexpected assets
+
+--------
+
+What to do:
+● Weekly review is enough
+● No daily intervention required
+
+
+🛠️ 6. Recovery Management
+What you see:
+	● Adjusted portfolio after recovery trimming
+
+--------
+
+How to interpret:
+
+👉 This shows what happens when:
+	● Market rebounds +20% from bottom
+	● System:
+		● Sells some risk assets
+		● Rebuilds cash (SGOV)
+
+--------
+
+Why this matters:
+
+This is how you:
+
+👉 Avoid riding gains all the way back down
+
+--------
+
+What to do:
+	● Usually nothing
+	● Just confirm trimming is happening logically
+
+--------
+
+🧠 🧩 Big Picture (How It All Works Together)
+Crash Phase:
+	● Drawdown increases
+	● System buys progressively
+	● Cash → equities
+
+--------
+
+Bottom:
+	● Max deployment
+	● Portfolio most aggressive
+
+--------
+
+Recovery Phase:
+	● Market rebounds
+	● System trims risk
+	● Rebuilds cash
+
+--------
+
+🚦 When YOU Should Actually Act
+🟢 Do Nothing (most of the time)
+	● Dashboard looks normal
+	● Trades executing
+	● Drawdown progressing logically
+
+--------
+
+🟡 Investigate
+	● No trades during large drawdown
+	● Missing data / dashboard errors
+	● Portfolio not updating
+
+--------
+
+🔴 Intervene
+	● Script not running
+	● Wrong trades executed
+	● Config changes needed
+
+--------
+
+🧠 Final Mental Model
+
+Think of your dashboard as:
+
+👉 An airplane cockpit
+	● You’re the pilot
+	● CycleGuard is the autopilot
+
+You:
+	● Monitor
+	● Verify
+	● Override only if necessary
