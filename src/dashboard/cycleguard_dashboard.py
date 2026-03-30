@@ -1,5 +1,13 @@
 # cycleguard_dashboard.py
 
+import sys
+import os
+
+# Add project root to sys.path
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
 import streamlit as st
 import pandas as pd
 import json
@@ -36,12 +44,28 @@ def load_portfolio():
 def load_trade_log():
     try:
         df = pd.read_csv(TRADE_LOG)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["date"] = pd.to_datetime(df["date"])
         return df
     except FileNotFoundError:
-        return pd.DataFrame(
-            columns=["timestamp", "action", "ticker", "shares", "price"]
-        )
+        return pd.DataFrame(columns=["date", "type", "asset", "amount", "reason"])
+
+
+@st.cache_data
+def load_rebalance_state():
+    try:
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"last_run_date": None, "executed_levels": []}
+
+
+@st.cache_data
+def load_recovery_state():
+    try:
+        with open(RECOVERY_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"bottom": None, "recovered": False}
 
 
 @st.cache_data
@@ -91,10 +115,97 @@ trades_engine = TradeEngine()
 signal = crash_manager.get_signal(market_snapshot["drawdown"])
 st.write(f"**Crash Signal:** {signal if signal else 'No crash signal'}")
 
+
+# =========================
+# WHAT SHOULD I DO PANEL
+# =========================
+st.subheader("🧠 What Should I Do Today?")
+
+total_value = sum(portfolio.values())
+signal = crash_manager.get_signal(latest_market["drawdown"])
+
+action_text = ""
+details = []
+
+# -------------------------
+# CRASH ACTIONS
+# -------------------------
+if signal:
+    deploy_pct = config["deployment"]["levels"][signal]
+    deploy_amount = total_value * deploy_pct
+
+    action_text = f"⚠️ {signal} Triggered"
+
+    # Funding sources
+    funding = config["funding"]["priority"]
+
+    details.append(f"Deploy approximately **${deploy_amount:,.0f}** into equities")
+    details.append(f"Sell from: {', '.join(funding[:2])}")
+
+    # Buy targets
+    buy_targets = config["buy_targets"][signal]
+    top_targets = list(buy_targets.keys())[:3]
+    details.append(f"Buy priority: {', '.join(top_targets)}")
+
+# -------------------------
+# RECOVERY ACTIONS
+# -------------------------
+else:
+    recovery_state = load_recovery_state()
+
+    # Simple recovery check
+    rebound_threshold = config["recovery"]["rebound_threshold"]
+    bottom = recovery_state.get("bottom")
+
+    if bottom:
+        rebound = (latest_market["close"] - bottom) / bottom
+
+        if rebound >= rebound_threshold:
+            action_text = "📈 Recovery Phase"
+
+            trim_targets = config["recovery"]["trim_targets"]
+            for asset, pct in trim_targets.items():
+                details.append(f"Trim {asset} by {int(pct * 100)}%")
+
+            details.append(f"Move proceeds to {config['recovery']['rebuild_cash_to']}")
+        else:
+            action_text = "🟢 No Action Needed"
+
+    else:
+        action_text = "🟢 No Action Needed"
+
+# -------------------------
+# DISPLAY
+# -------------------------
+st.markdown(f"### {action_text}")
+
+for d in details:
+    st.write(f"• {d}")
+
+
+# =========================
+# MISSED CRASH LEVELS
+# =========================
+st.subheader("⚡ Missed Crash Levels")
+
+state = load_rebalance_state()
+
+executed_levels = state.get("executed_levels", [])
+
+if executed_levels:
+    st.warning(
+        "The following crash levels were triggered and executed (including catch-up from missed days):"
+    )
+    for level in executed_levels:
+        st.write(f"• {level}")
+else:
+    st.success("No crash levels have been triggered yet.")
+
+
 # Trade Log
 st.subheader("📋 Executed Trades")
 trade_log_df = load_trade_log()
-st.dataframe(trade_log_df.sort_values("timestamp", ascending=False))
+st.dataframe(trade_log_df.sort_values("date", ascending=False))
 
 # Recovery Recommendations
 st.subheader("🛠️ Recovery Management")
