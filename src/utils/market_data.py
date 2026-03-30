@@ -50,6 +50,22 @@ class MarketData:
         return df
 
     # =========================
+    # GET SNAPSHOT FOR SPECIFIC DATE
+    # =========================
+    def get_snapshot_for_date(self, date) -> dict:
+        df = self.run()
+        # Find the closest date before or equal to the requested date
+        date_str = date.strftime("%Y-%m-%d")
+        if date_str in df.index.strftime("%Y-%m-%d"):
+            snapshot = df.loc[df.index.strftime("%Y-%m-%d") == date_str].iloc[-1]
+            return {
+                "price": snapshot["close"],
+                "cycle_peak": snapshot["cycle_peak"],
+                "drawdown": snapshot["drawdown"],
+            }
+        return None
+
+    # =========================
     # GET LATEST MARKET SNAPSHOT
     # =========================
     def latest(self) -> dict:
