@@ -78,6 +78,7 @@ You may need to intervene if:
 
 7️⃣ Maintenance Checklist
 Task	                            Frequency
+-----                               ----------
 Run daily_rebalance.py	            Daily
 Check dashboard	                    Daily / On-demand
 Review trade log	                Weekly / Monthly
