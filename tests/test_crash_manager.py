@@ -6,7 +6,23 @@ from src.engine.crash_manager import CrashManager
 
 class TestCrashManager(unittest.TestCase):
     def setUp(self):
-        self.cm = CrashManager()
+        # Mock Config
+        self.mock_config = {
+            "market": {
+                "ticker": "^GSPC",
+                "start_date": "2015-01-01",
+                "recovery_threshold": 0.95,
+            },
+            "deployment": {
+                "levels": {
+                    "Level 1": 0.03,
+                    "Level 2": 0.05,
+                    "Level 3": 0.08,
+                    "Level 4": 0.09
+                }
+            }
+        }
+        self.cm = CrashManager(self.mock_config)
 
     def test_no_crash_below_level1(self):
         # Drawdowns below 10% (e.g., drops of 3%, 0%) should return None
