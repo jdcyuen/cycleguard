@@ -112,10 +112,10 @@ class TradeEngine:
                 writer.writerow(
                     [
                         datetime.now().strftime("%Y-%m-%d"),
-                        trade_type,
-                        asset,
-                        round(amt, 2),
-                        reason,
+                        asset,          # symbol
+                        trade_type,     # action
+                        round(amt, 2),  # amount
+                        reason,         # signal type
                     ]
                 )
 
