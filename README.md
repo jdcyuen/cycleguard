@@ -376,3 +376,245 @@ You:
 	● Monitor
 	● Verify
 	● Override only if necessary
+
+
+Purpose of Drift Analysis
+
+**Drift Analysis** is the "Sanity Check" of your entire CycleGuard system. It bridge the gap between what the **System** thinks you own and what you **Actually** own in your brokerage account.
+
+In a perfect world, these two would always be identical. In the real world, they "drift" apart for several reasons.
+
+### **The Two Sources of Truth**
+1.  **System Portfolio**: This is the local data stored in `portfolio_state.json`. CycleGuard uses this to calculate rebalancing, crash protection, and recovery moves.
+2.  **Fidelity Portfolio**: This is your real-world brokerage data. This is "Reality."
+
+### **Why Does Drift Happen?**
+*   **Dividends**: Your Fidelity account might automatically reinvest dividends, increasing your share count in a way CycleGuard hasn't tracked yet.
+*   **Manual Trades**: If you buy or sell a stock directly in the Fidelity app without logging it in CycleGuard, the system won't know.
+*   **Asset Transfers**: Moving cash or stock into or out of your account.
+
+### **Why is Drift Analysis Important?**
+1.  **Accuracy of Recommendations**: CycleGuard's rebalancing calculations (e.g., "Sell $2,000 of SMH") are only as good as the underlying data. If your system data is "drifting" by 5% or 10%, the recommendations will be incorrect.
+2.  **Verification Before Syncing**: The Drift Analysis table lets you review exactly what will change *before* you click the "Sync" button. It highlights:
+    *   **⚠️ Significant Drift**: Positions that are off by more than 5%.
+    *   **🆕 New Positions**: Assets you bought that the system didn't know about.
+    *   **❌ Missing Positions**: Assets you sold that are still lingering in your system data.
+3.  **Audit Trail**: It helps you catch errors in your manual trade logging or unexpected corporate actions (like stock splits).
+
+**In short: Drift Analysis ensures that CycleGuard is making decisions based on your actual bank account balance, not just a theoretical model!**	
+
+
+The **Crash/Recovery Signals** subpanel is the command center for your strategy. It takes the raw market data (price and drawdown) and translates it into specific, actionable investment phases.
+
+Here is how to use it and interpret what it tells you:
+
+**1. What Information is Displayed?**
+
+This panel shows the **Current Signal** dictated by your strategy’s "Engine." There are three primary types of signals:
+
+● **Crash Levels** (Level 1, 2, 3, or 4): These appear during a market decline. They indicate that the S&P 500 has dropped past specific percentage milestones (e.g., -10%, -20%, -30%).
+● **Recovery Signal**: This appears when the market is bouncing back from a crash and has hit your **Recovery Threshold** (e.g., 95% of the previous peak).
+● **None**: This is the "All Clear" signal. It means the market is either trending normally or the drawdown isn't significant enough to warrant a move.
+
+**2. How to Interpret the Signals**
+
+📉 If you see a "Level" Signal (e.g., Level 1, 2, 3, 4)
+
+● **Meaning**: The market is in a "Buy the Dip" zone.
+● **Action**: This signal tells you it's time to Deploy Cash. You should check the Portfolio Recommendations below to see how much of your safe-haven asset (e.g., SGOV) you should move into your growth ETFs (e.g., SMH, SCHG).
+● **Strategy**: Level 1 is a "nibble," while Level 4 is a "max deployment" during a major crash.
+
+📈 **If you see "Recovery Triggered"**
+
+● **Meaning**: The system believes the crash is over and the market has effectively bottomed and recovered.
+● **Action**: This is time to Protect Profits. The system will recommend rotating a portion of your growth stock gains back into your safe-haven asset (SGOV).
+● **Strategy**: This ensures you reload your "dry powder" (cash) so you are ready for the next market cycle.
+
+✅ **If you see "None"**
+
+● **Meaning**: The market is behaving within normal parameters.
+● **Action: Do nothing**. Your portfolio is already in its optimal "steady state" for the current market environment.
+
+**3. Pro Tip: Using it with the Trade Preview**
+
+The Signal panel tells you **"What"** state the market is in. You should immediately look down at the **Trade Preview** and **Recommendations** panels to see exactly **"How Much"** you need to buy or sell to satisfy that signal.
+
+TIP
+
+If a signal appears, your first step should be to **Sync with Fidelity** to ensure the recommendations are based on your most recent real-world balances!
+
+
+The **Trade Preview** subpanel is the most practical part of the CycleGuard dashboard. While other panels explain **"Why"** the market is crashing or **"How Much"** your portfolio has drifted, this panel tells you exactly **"What to Click"** in your brokerage account today.
+
+Here is how to use it and interpret the information:
+
+**1. What Information is Displayed?**
+
+The **Trade Preview** shows a proposed list of transactions to align your real-world portfolio with the CycleGuard strategy. It typically includes:
+
+* **Ticker**: The stock/ETF symbol (e.g., SGOV, SMH, SCHG).
+* **Action**: Either BUY (in green) or SELL (in red).
+* **Current Value ($)**: What you currently own in that asset.
+* **Trade Amount ($)**: The dollar value of the transaction you need to place.
+* **New Value ($)**: What your position total will be after the trade is complete.
+
+**2. How to Interpret the Information**
+
+⚖️ The "Balance" Rule
+In almost all cases, the Trade Preview is Cash-Neutral. This means the total dollar amount of your SELLS will roughly equal the total dollar amount of your BUYS.
+
+* **Interpretation**: You aren't "spending" new money or "withdrawing" cash to the bank; you are simply rotating your existing capital from "Safe" to "Growth" (or vice-versa).
+
+🛡️ **The SGOV Rotation
+Pay close attention to SGOV (or your cash-equivalent).
+
+* **During a Crash**: You will see a large SELL recommendation for SGOV and a corresponding BUY for growth stocks. This is the system "firing" your dry powder into the market.
+* **During a Recovery**: You will see a SELL for growth stocks and a BUY for SGOV. This is the system "locking in" profits.
+
+📝 **Trade Execution**
+The "Trade Amount ($)" is your **Order Size**.
+
+* **Interpretation**: When you go to Fidelity, you would open a trade ticket, select "Dollar Amount" instead of "Shares," and type in the exact number shown in this column.
+
+**3. Workflow Example**
+
+1. **Check Signal: You see "Level 1" in the Signals panel.
+2. View Preview: The Trade Preview shows:
+	● **SELL SGOV: $5,000**
+	● **BUY SMH: $2,500**
+	● **BUY SCHG: $2,500**
+3. **Execute**: You go to Fidelity and place those three trades.
+4. **Confirm**: Once done, you come back to CycleGuard and hit the **"Confirm Trades & Log"** button in the Action panel to update your local records.
+
+**IMPORTANT**
+
+Always verify that your **Fidelity Sync** is fresh before following the Trade Preview! If your system data is out of date, the preview will recommend trades based on "old" values.
+
+
+The **Missed Crash Levels** section is the "Catch-Up" mechanism of your strategy. Market crashes aren't always smooth; sometimes the market drops so fast (e.g., a "gap down" over a weekend) that it skips over your early price targets entirely.
+
+Here is how to use and interpret this information:
+
+1. **What Information is Displayed?
+This panel shows a checklist of the four Crash Levels (Level 1 through Level 4).
+
+* **"Completed"**: You successfully caught this level and logged the trade.
+* **"Missed"**: The market is currently deeper than this level, but you haven't executed the trade for it yet.
+* **"Pending": The market hasn't reached this depth yet.
+
+**2. How to Interpret "Missed" Levels
+🏃 The "Catch-Up" Logic
+If you see one or more levels marked as "Missed," don't panic. CycleGuard is designed to be "Aggressive on Gaps."
+
+* **Interpretation**: The system will automatically **Add Up the dollar amounts of all missed levels and include them in your current **Trade Preview.
+NOTE
+
+Example: If Level 1 requires a $5,000 buy and Level 2 requires a $5,000 buy, and you were away on vacation when both hit—the system will show a single $10,000 BUY recommendation today.
+
+⏱️ **Timing is Everything**
+
+* **Interpretation**: If you see a missed level, it means the market is currently "cheaper" than your original target. The system is telling you to execute the trade now to stay on schedule with your total capital deployment plan.
+
+**3. Why This Matters for Your Strategy**
+The goal of CycleGuard is to ensure a specific percentage of your cash is moved into the market at specific crash depths.
+
+* **If you skip a level**: You would end up under-exposed when the recovery starts.
+* **The Solution**: This panel ensures that no matter when you open the dashboard, you are always given a recommendation that brings your portfolio up to the **Exact Exposure Level** required for the current market drawdown.
+
+**In short: If you see "Missed" levels, simply follow the Trade Preview below—it has already done the math to "bundle" your missing trades into one easy transaction!**
+
+
+
+The **Recovery State** subpanel is the final stage of your market cycle. Where the "Missed Crash Levels" panel focuses on **Buying the Dip**, the Recovery State subpanel focuses on **Locking in Gains** as the market returns to its previous high.
+
+Here is how to use and interpret this information:
+
+**1. What Information is Displayed?**
+
+This panel tracks the state of your "Profit Rotation" mechanism. It typically includes:
+
+* **Recovery Threshold**: This is your target (default 95%). It means "Once the market is within 5% of its previous all-time high, I want to take profits."
+* **Current State**:
+    * **"Crashed"**: The system is waiting for the market to bounce back. No recovery moves yet.
+    * **"Triggered"**: The market has successfully hit your threshold. Profit rotation is now active.
+    * **"Complete"**: You have already rotated your profits for this cycle and are back in your "Safe Mode."
+* **Rotation Log**: A simple list showing if you have already rebalanced your Growth (SMH/SCHG) stocks back into Cash (SGOV) for this recovery cycle.
+
+**2. How to Interpret the State**
+
+🎯 **"Triggered" (The Selling Signal)**
+
+* **Interpretation**: This is the most exciting state! It means your "Buy the Dip" strategy worked, the market has recovered, and it's time to cash out your extra growth shares.
+* **Strategy**: This is when the **Trade Preview** will recommend **SELLING** your winners (SMH, SCHG) and **BUYING** your cash-haven (SGOV).
+
+⏳ **"Crashed" (The Waiting Game)**
+* **Interpretation**: The market is still in a drawdown. CycleGuard is keeping your money in Growth Stocks to catch the full bounce-back.
+* **Strategy**: No actions required here except patience.
+
+✅ **"Complete" (The Reset)**
+
+* **Interpretation**: You have successfully executed your rotation. You are now back to your "Base" portfolio (e.g., 60% Cash, 40% Growth).
+* **Strategy**: You are now perfectly positioned with "Dry Powder" (cash) to wait for the next market crash.
+
+**3. Why This Matters for Your Strategy**
+
+Most investors fail because they buy during a crash but **forget** to sell during the recovery, leading them to be over-exposed when the next crash happens.
+
+This panel provides the **Discipline** to take your winnings off the table and move them back to a safe asset like SGOV. This ensures that the profit from one market cycle is locked in and ready to be used to "Buy the Dip" in the next one.
+
+**In short: When this panel says "Triggered," it’s your signal to take chips off the table and prepare for the next cycle!**
+
+
+The **Executed Trades** subpanel is your portfolio's "Strategic Memory." It provides a historical audit trail of every move that CycleGuard has recommended and that you have confirmed.
+
+Here is how to use it and interpret your past performance:
+
+**1. What Information is Displayed?**
+
+This panel is an interactive table showing the contents of your trade_log.csv. It typically displays:
+
+* **Date**: The exact timestamp when you clicked "Confirm Trades" in the dashboard.
+* **Symbol**: The stock/ETF traded (e.g., SMH, SGOV, SCHG).
+* **Action**: Whether it was a BUY or SELL.
+* **Amount ($)**: The dollar value of the trade at the time it occurred.
+* **Signal Type**: The reason for the trade (e.g., "Crash Level 1" or "Recovery Rotation").
+
+
+
+**2. How to Interpret the History**
+
+🕰️ Seeing the Strategy in Motion
+If you scroll back through your history, you should see distinct "Cycles" appearing:
+
+* **During Crashes:** You will see a cluster of BUY entries for growth stocks (SMH, SCHG). This proves you were buying when everyone else was fearful.
+* **During Recoveries:** You will see a cluster of SELL entries for those same stocks. This proves you were taking profits when the market felt "safe" again.
+
+📊 **Auditing Your Deployment**
+
+* **Interpretation:** If you see multiple "BUY" entries for SMH but only one "SELL" entry, it means you are currently in a deployed state and catching the ride back up.
+* **Strategy:** If the market is at a new all-time high but you don't see any "Recovery Rotation" trades in your log, you might have forgotten to hit the confirm button after your last recovery move!
+
+📑 **Tax & Review**
+
+* **Interpretation:** This table is a quick "Cheat Sheet" for your tax year. While you should always use your official Fidelity 1099 for taxes, this log tells you exactly which months were your most active from a strategic rotation standpoint.
+
+**3. Why This Matters for Your Strategy**
+The Executed Trades panel creates **Confidence**. Following a strategy like CycleGuard requires discipline during scary market drops. Looking back at this log and seeing "BUY SMH: -$10,000" during a 20% crash—and then seeing the market higher today—is a powerful psychological tool to help you stay the course during the next crash.
+
+**In short: This isn't just a receipt list—it’s a visual representation of your discipline and your ability to "Buy Low and Sell High" systematically!**
+
+1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
