@@ -1,15 +1,15 @@
 # src/data/market_data.py
 # 👉 Lightweight wrapper for the MarketData engine to return a clean dictionary
 
-from src.utils.market_data import MarketData
+from src.engine.crash_manager import CrashManager
 from src.config.config_loader import load_config
 
 def get_market_data():
     config = load_config()
-    market = MarketData(config)
+    manager = CrashManager(config)
     
-    # Get latest snapshot
-    snapshot = market.latest()
+    # Get latest snapshot from the crash manager engine
+    snapshot = manager.run()
     
     # Return dictionary with predictable keys used by the dashboard:
     # 'close' (from dashboard) matches 'price' (from engine)
