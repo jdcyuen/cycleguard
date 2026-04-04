@@ -125,8 +125,9 @@ render_sync_fidelity(portfolio, PORTFOLIO_FILE)
 # MARKET DATA
 # =========================
 with st.container(border=True):
-    st.subheader("📈 Market Data")
+    st.subheader("📈 Market Data & Drawdown")
     st.write(f"Current Price: {latest_market['close']}")
+    st.write(f"Cycle Peak: {latest_market['cycle_peak']}")
     st.write(f"Drawdown: {latest_market['drawdown']:.2%}")
 
 
