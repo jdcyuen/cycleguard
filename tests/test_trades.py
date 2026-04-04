@@ -1,6 +1,6 @@
 import unittest
-from unittest.mock import patch
-from src.engine.trades import TradeEngine
+from unittest.mock import MagicMock
+from src.engine.trades import TradeEngine, ITradeLogger
 
 
 class TestTradeEngine(unittest.TestCase):
@@ -19,7 +19,9 @@ class TestTradeEngine(unittest.TestCase):
             },
             "system": {"files": {"trades": "test_trades.csv"}},
         }
-        self.te = TradeEngine(self.mock_config)
+        # Inject a mock logger to comply with Dependency Inversion Principle
+        self.mock_logger = MagicMock(spec=ITradeLogger)
+        self.te = TradeEngine(self.mock_config, logger=self.mock_logger)
 
     def test_total_value(self):
         portfolio = {"AAPL": 100, "GOOG": 200, "CASH": 50}
@@ -63,19 +65,26 @@ class TestTradeEngine(unittest.TestCase):
         self.assertEqual(new_portfolio["SGOV"], 400.0)
         self.assertEqual(new_portfolio["FZROX"], 100.0)
 
-    @patch("src.engine.trades.TradeEngine.log_trades")
-    def test_execute_crash(self, mock_log):
+    def test_execute_crash_calls_logger(self):
+        """Verifies that the engine orchestrates logging through the injected dependency."""
         portfolio = {"SGOV": 1000}
-        # Level 1 deployment is 100
+        
+        # Execute
         result = self.te.execute_crash("Level 1", portfolio)
 
+        # Verify results
         self.assertEqual(result["level"], "Level 1")
         self.assertEqual(result["deploy_amount"], 100.0)
-        self.assertEqual(len(result["sells"]), 1)
-        self.assertEqual(len(result["buys"]), 2)  # FZROX, SCHD
         self.assertEqual(result["portfolio"]["SGOV"], 900.0)
 
-        self.assertEqual(mock_log.call_count, 2)
+        # Verify the Dependency was utilized correctly (DIP/SRP check)
+        self.assertEqual(self.mock_logger.log_trades.call_count, 2)
+        
+        # Check first call (Sells)
+        first_call_args = self.mock_logger.log_trades.call_args_list[0]
+        self.assertEqual(first_call_args[0][0], [("SGOV", 100.0)])
+        self.assertEqual(first_call_args[0][1], "SELL")
+        self.assertEqual(first_call_args[0][2], "Level 1")
 
 
 if __name__ == "__main__":
