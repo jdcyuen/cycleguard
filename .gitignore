@@ -1,0 +1,52 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+env/
+ENV/
+
+# =====================
+# IDE / Editor
+# =====================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+
+# =====================
+# OS files
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# Logs and outputs
+# =====================
+*.log
+trade_log.csv
+
+# =====================
+# Portfolio & state files
+# =====================
+portfolio_state.json
+rebalance_state.json
+recovery_state.json
+
+# =====================
+# Streamlit
+# =====================
+.streamlit/
+*.db
+*.sqlite
+
+# =====================
+# Jupyter Notebook
+# =====================
+.ipynb_checkpoints/
