@@ -18,6 +18,7 @@ import json
 from src.dashboard.components.sync_fidelity import render_sync_fidelity
 from src.dashboard.components.action_panel import render_action_panel
 from src.dashboard.components.trade_preview import render_trade_preview
+from src.dashboard.components.portfolio_view import render_portfolio_view
 
 from src.engine.crash_manager import CrashManager
 from src.engine.recovery_manager import RecoveryManager
@@ -107,12 +108,7 @@ st.title("📉 CycleGuard Dashboard")
 # =========================
 # PORTFOLIO OVERVIEW
 # =========================
-with st.container(border=True):
-    st.subheader("📊 Portfolio Overview")
-    total_value = sum(portfolio.values())
-    for ticker, value in portfolio.items():
-        pct = (value / total_value) if total_value else 0
-        st.write(f"{ticker}: ${value:,.2f} ({pct:.2%})")
+render_portfolio_view(portfolio)
 
 
 # =========================
