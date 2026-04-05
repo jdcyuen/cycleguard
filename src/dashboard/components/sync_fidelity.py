@@ -2,78 +2,17 @@
 # 👉 Lets you upload your real Fidelity CSV and auto-detects drift
 
 import streamlit as st
-import pandas as pd
 import json
 
 from src.dashboard.components.drift_analysis import analyze_drift, render_drift_analysis
-
-
-def parse_fidelity_csv(file):
-    try:
-        # Fidelity CSVs often have metadata at the top.
-        # We need to find the header row containing 'Symbol' and 'Current Value'.
-        file.seek(0)
-        lines = file.readlines()
-
-        header_index = -1
-        for i, line in enumerate(lines):
-            # Normalizing to help with detection
-            decoded_line = (
-                line.decode("utf-8").lower()
-                if isinstance(line, bytes)
-                else line.lower()
-            )
-            if "symbol" in decoded_line and "current value" in decoded_line:
-                header_index = i
-                break
-
-        if header_index == -1:
-            st.error("No valid 'Symbol' and 'Current Value' headers found in CSV.")
-            return None
-
-        # Rewind and read with header offset
-        # We use sep=None to auto-detect the separator (comma vs. tab)
-        # and engine='python' for more flexible parsing.
-        file.seek(0)
-        df = pd.read_csv(
-            file, skiprows=header_index, sep=None, on_bad_lines="skip", engine="python"
-        )
-
-        # Normalize column names
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-
-        if "symbol" not in df.columns or "current_value" not in df.columns:
-            st.error("CSV must contain 'Symbol' and 'Current Value'")
-            return None
-
-        # Clean symbols (remove whitespace/non-ticker text)
-        df["symbol"] = df["symbol"].astype(str).str.strip()
-
-        # Clean current_value (remove $, commas, and non-numeric characters)
-        if df["current_value"].dtype == "object":
-            df["current_value"] = (
-                df["current_value"]
-                .astype(str)
-                .str.replace("$", "", regex=False)
-                .str.replace(",", "", regex=False)
-                .str.extract(r"(\d+\.?\d*)")
-                .astype(float)
-            )
-
-        # Filter out rows without valid symbols or values
-        df = df.dropna(subset=["symbol", "current_value"])
-
-        # Group by symbol in case of duplicate entries
-        portfolio = df.groupby("symbol")["current_value"].sum().to_dict()
-
-        return portfolio
-
-    except Exception as e:
-        st.error(f"Failed to parse CSV: {e}")
-        return None
+from src.engine.portfolio_parser import FidelityParser
 
 
 def render_sync_fidelity(portfolio, portfolio_file):
+    # -------------------------
+    # INITIALIZE PARSER
+    # -------------------------
+    parser = FidelityParser()
     # -------------------------
     # INITIALIZE SESSION STATE
     # -------------------------
@@ -92,10 +31,12 @@ def render_sync_fidelity(portfolio, portfolio_file):
 
         # Update session state if a new file is uploaded
         if uploaded_file:
-            fidelity_portfolio = parse_fidelity_csv(uploaded_file)
+            fidelity_portfolio = parser.parse(uploaded_file)
             if fidelity_portfolio is not None:
                 st.session_state.fidelity_portfolio = fidelity_portfolio
                 st.success("✅ Fidelity data updated successfully!")
+            else:
+                st.error("❌ Failed to parse Fidelity CSV. Please ensure you are uploading the correct 'Positions' export.")
 
         # -------------------------
         # PERSISTENT DATA RENDERING
