@@ -1,8 +1,8 @@
 # portfolio_parser.py
 
-import pandas as pd
 from abc import ABC, abstractmethod
 import io
+import csv
 
 
 # -------------------------
@@ -23,61 +23,50 @@ class FidelityParser(IPortfolioParser):
     """Responsible ONLY for parsing and cleaning Fidelity CSV exports."""
     def parse(self, file) -> dict:
         try:
-            # Handle both bytes (Streamlit) and strings
             file.seek(0)
-            lines = file.readlines()
-
-            header_index = -1
-            for i, line in enumerate(lines):
-                decoded_line = (
-                    line.decode("utf-8").lower()
-                    if isinstance(line, bytes)
-                    else line.lower()
-                )
-                if "symbol" in decoded_line and "current value" in decoded_line:
-                    header_index = i
-                    break
-
-            if header_index == -1:
-                return None
-
-            # Rewind and read with header offset
-            file.seek(0)
-            df = pd.read_csv(
-                file, 
-                skiprows=header_index, 
-                sep=None, 
-                on_bad_lines="skip", 
-                engine="python"
-            )
-
-            # Normalize column names
-            df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-
-            if "symbol" not in df.columns or "current_value" not in df.columns:
-                return None
-
-            # Clean symbols (remove whitespace/non-ticker text)
-            df["symbol"] = df["symbol"].astype(str).str.strip()
-
-            # Clean current_value (remove $, commas, and non-numeric characters)
-            if df["current_value"].dtype == "object":
-                df["current_value"] = (
-                    df["current_value"]
-                    .astype(str)
-                    .str.replace("$", "", regex=False)
-                    .str.replace(",", "", regex=False)
-                    .str.extract(r"(\d+\.?\d*)")
-                    .astype(float)
-                )
-
-            # Filter out rows without valid symbols or values
-            df = df.dropna(subset=["symbol", "current_value"])
-
-            # Group by symbol in case of duplicate entries
-            portfolio = df.groupby("symbol")["current_value"].sum().to_dict()
-
+            
+            # Handle both bytes (Streamlit) and strings robustly
+            if isinstance(file.read(0), bytes):
+                wrapper = io.TextIOWrapper(file, encoding='utf-8', errors='replace')
+            else:
+                wrapper = file
+                
+            wrapper.seek(0)
+            reader = csv.reader(wrapper)
+            
+            # Based on user confirmation:
+            # Column C (index 2) = Symbol
+            # Column H (index 7) = Current Value
+            symbol_idx = 2
+            val_idx = 7
+            
+            portfolio = {}
+            
+            # Extract data
+            for row in reader:
+                if len(row) <= max(symbol_idx, val_idx):
+                    continue
+                    
+                sym = row[symbol_idx].strip()
+                val_str = row[val_idx].strip()
+                
+                # Skip meaningless or empty symbols, or the header row itself
+                if not sym or "pending" in sym.lower() or "core" in sym.lower() or "symbol" in sym.lower():
+                    continue
+                    
+                # Clean current value
+                val_str = val_str.replace('$', '').replace(',', '')
+                try:
+                    val = float(val_str)
+                    
+                    # Strip asterisks (e.g. FDRXX**)
+                    clean_sym = sym.replace("*", "")
+                    
+                    portfolio[clean_sym] = portfolio.get(clean_sym, 0.0) + val
+                except ValueError:
+                    continue
+                    
             return portfolio
-
+            
         except Exception:
             return None

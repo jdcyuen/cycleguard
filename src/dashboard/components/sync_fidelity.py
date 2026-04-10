@@ -38,6 +38,10 @@ def render_sync_fidelity(portfolio, portfolio_file):
             else:
                 st.error("❌ Failed to parse Fidelity CSV. Please ensure you are uploading the correct 'Positions' export.")
 
+        if st.session_state.get("sync_success"):
+            st.success("✅ Portfolio successfully synced! Dashboard refreshed.")
+            st.session_state.sync_success = False
+
         # -------------------------
         # PERSISTENT DATA RENDERING
         # -------------------------
@@ -67,7 +71,9 @@ def render_sync_fidelity(portfolio, portfolio_file):
                 if st.button("🔄 Sync Portfolio to Fidelity", width="stretch"):
                     with open(portfolio_file, "w") as f:
                         json.dump(fidelity_portfolio, f, indent=2)
-                    st.success("✅ Portfolio successfully synced!")
+                    st.cache_data.clear()
+                    st.session_state.sync_success = True
+                    st.rerun()
 
             with col_clear:
                 if st.button("🗑️ Clear Cached Fidelity Data", width="stretch"):
