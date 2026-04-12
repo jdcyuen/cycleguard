@@ -129,6 +129,35 @@ recovery:
 
 
 # =========================
+# REGIME SYSTEM
+# =========================
+regime_system:
+  signals:
+    trend:
+      proxy: "SPY"
+    breadth:
+      proxy: "SP500_50DMA_PCT"
+      thresholds:
+        strong: 65
+        weak: 50
+    volatility:
+      proxy: "^VIX"
+      thresholds:
+        calm: 18
+        risk_off: 25
+    leadership:
+      proxies: ["SMH", "QQQ"]
+
+  regimes:
+    - name: "RISK_ON"
+      description: "Aggressive growth allocation."
+    - name: "TRANSITION"
+      description: "Neutral/shifting allocation."
+    - name: "DEFENSIVE"
+      description: "Capital preservation allocation."
+
+
+# =========================
 # SYSTEM FILE PATHS
 # =========================
 system:
