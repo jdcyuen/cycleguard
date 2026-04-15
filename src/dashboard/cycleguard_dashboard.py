@@ -95,6 +95,7 @@ if simulate_crash:
         "breadth": {"status": "Weak", "value": 15.5},
         "volatility": {"status": "Risk-off", "value": 45.2},
         "leadership": {"status": "Weak", "value": 0},
+        "credit": {"status": "Stressed", "value": 0.05},
         "regime": "DEFENSIVE",
         "score": 0
     }
@@ -134,7 +135,7 @@ with st.container(border=True):
     phase = phase_data.get("regime", "UNKNOWN")
     icon = phase_colors.get(phase, "⚪")
     
-    st.subheader(f"{icon} Market Phase: {phase} (Score: {phase_data.get('score', 0)}/8)")
+    st.subheader(f"{icon} Market Phase: {phase} (Score: {phase_data.get('score', 0)}/10)")
     
     phase_descriptions = {
         "RISK_ON": "Strong positive momentum across Trend and Breadth. Ideal environment for allocating capital to growth and risk assets.",
@@ -143,7 +144,7 @@ with st.container(border=True):
     }
     st.info(phase_descriptions.get(phase, "Evaluating market conditions..."))
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         trend = phase_data.get("trend", {})
         st.metric("📈 Trend (SPY)", trend.get("status", "Unknown"))
@@ -156,6 +157,9 @@ with st.container(border=True):
     with col4:
         leadership = phase_data.get("leadership", {})
         st.metric("🚀 Leadership", leadership.get("status", "Unknown"))
+    with col5:
+        credit = phase_data.get("credit", {})
+        st.metric("💳 Credit Stress", credit.get("status", "Unknown"))
         
     with st.expander("🔍 View Raw Signal Data"):
         st.json(phase_data)

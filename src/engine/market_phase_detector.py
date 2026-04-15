@@ -101,16 +101,25 @@ class MarketPhaseDetector:
         else:
             return "Mixed"
 
+    def get_credit_signal(self, jnk_price: float, shy_price: float, jnk_50: float, shy_50: float) -> str:
+        current_ratio = jnk_price / shy_price if shy_price > 0 else 0
+        ratio_50 = jnk_50 / shy_50 if shy_50 > 0 else 0
+        if current_ratio > ratio_50:
+            return "Healthy"
+        else:
+            return "Stressed"
+
     def run(self) -> dict:
         """
-        Executes the 4-input signal stack and aggregates a score to determine the Regime.
+        Executes the 5-input signal stack and aggregates a score to determine the Regime.
         """
         # Determine all tickers needed to fetch at once
         spy = self.signals.get("trend", {}).get("proxy", "SPY")
         vix = self.signals.get("volatility", {}).get("proxy", "^VIX")
         leaders = self.signals.get("leadership", {}).get("proxies", ["SMH", "QQQ"])
+        credit = self.signals.get("credit", {}).get("proxies", ["JNK", "SHY"])
 
-        all_tickers = list(set([spy, vix] + leaders + self.sector_etfs))
+        all_tickers = list(set([spy, vix] + leaders + credit + self.sector_etfs))
 
         # 1. Fetch Data
         closes = self._fetch_daily_closes(all_tickers, period="1y")
@@ -121,6 +130,7 @@ class MarketPhaseDetector:
             "breadth": {"status": "Unknown", "value": 0},
             "volatility": {"status": "Unknown", "value": 0},
             "leadership": {"status": "Unknown", "value": 0},
+            "credit": {"status": "Unknown", "value": 0},
             "regime": "TRANSITION",
             "score": 0,
         }
@@ -176,12 +186,19 @@ class MarketPhaseDetector:
                 latest[qqq], dma50[qqq], latest[smh], dma50[smh]
             )
 
-        # 6. Regime Scoring Logic
+        # 6. Evaluate Credit
+        if "JNK" in closes.columns and "SHY" in closes.columns:
+            results["credit"]["status"] = self.get_credit_signal(
+                latest["JNK"], latest["SHY"], dma50["JNK"], dma50["SHY"]
+            )
+
+        # 7. Regime Scoring Logic
         # Calculate strictness: we assign points to signals.
         # Trend: Bullish=2, Neutral=1, Bearish=0
         # Breadth: Strong=2, Improving=1, Weak=0
         # Volatility: Calm=2, Neutral=1, Risk-off=0
         # Leadership: Strong=2, Mixed=1, Weak=0
+        # Credit: Healthy=2, Stressed=0
 
         points = 0
         if results["trend"]["status"] == "Bullish":
@@ -203,17 +220,20 @@ class MarketPhaseDetector:
             points += 2
         elif results["leadership"]["status"] == "Mixed":
             points += 1
+            
+        if results["credit"]["status"] == "Healthy":
+            points += 2
 
         results["score"] = points
 
-        # Max 8 points
-        # Risk-On: >= 6 points (e.g. 3 strong signals, or mostly strong/improving)
-        # Defensive: <= 2 points (e.g. mostly weak/risk-off)
-        # Transition: 3 to 5 points
+        # Max 10 points
+        # Risk-On: >= 7 points
+        # Defensive: <= 3 points
+        # Transition: 4 to 6 points
 
-        if points >= 6:
+        if points >= 7:
             results["regime"] = "RISK_ON"
-        elif points <= 2:
+        elif points <= 3:
             results["regime"] = "DEFENSIVE"
         else:
             results["regime"] = "TRANSITION"

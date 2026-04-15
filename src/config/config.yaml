@@ -147,6 +147,8 @@ regime_system:
         risk_off: 25
     leadership:
       proxies: ["SMH", "QQQ"]
+    credit:
+      proxies: ["JNK", "SHY"]
 
   regimes:
     - name: "RISK_ON"
