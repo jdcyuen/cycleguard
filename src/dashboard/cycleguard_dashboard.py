@@ -92,14 +92,46 @@ simulate_crash = st.sidebar.checkbox("🚨 Simulate Market Crash")
 if simulate_crash:
     phase_data = {
         "trend": {"status": "Bearish", "value": 410.0, "dma200": 480.0, "dma50": 460.0},
-        "breadth": {"status": "Weak", "value": 15.5},
+        "breadth": {
+            "status": "Weak",
+            "value": 0.0,
+            "passing": [],
+            "failing": [
+                "XLK",
+                "XLF",
+                "XLV",
+                "XLY",
+                "XLP",
+                "XLE",
+                "XLI",
+                "XLB",
+                "XLU",
+                "XLRE",
+                "XLC",
+            ],
+            "valid_total": 11,
+        },
         "volatility": {"status": "Risk-off", "value": 45.2},
-        "leadership": {"status": "Weak", "value": 0},
-        "credit": {"status": "Stressed", "value": 0.05},
+        "leadership": {
+            "status": "Weak",
+            "value": 0,
+            "qqq": 375.0,
+            "qqq_50": 402.0,
+            "smh": 180.0,
+            "smh_50": 195.0,
+        },
+        "credit": {
+            "status": "Stressed",
+            "value": 0.05,
+            "jnk": 90.0,
+            "shy": 85.0,
+            "ratio_current": 1.058,
+            "ratio_50": 1.074,
+        },
         "regime": "DEFENSIVE",
-        "score": 0
+        "score": 0,
     }
-    
+
     # Also fake the crash manager signal
     latest_market["drawdown"] = -0.35
 
@@ -134,16 +166,18 @@ with st.container(border=True):
     phase_colors = {"DEFENSIVE": "🔴", "TRANSITION": "🟡", "RISK_ON": "🟢"}
     phase = phase_data.get("regime", "UNKNOWN")
     icon = phase_colors.get(phase, "⚪")
-    
-    st.subheader(f"{icon} Market Phase: {phase} (Score: {phase_data.get('score', 0)}/10)")
-    
+
+    st.subheader(
+        f"{icon} Market Phase: {phase} (Score: {phase_data.get('score', 0)}/10)"
+    )
+
     phase_descriptions = {
         "RISK_ON": "Strong positive momentum across Trend and Breadth. Ideal environment for allocating capital to growth and risk assets.",
         "TRANSITION": "Mixed market signals. Elevated Volatility or failing Breadth suggests caution. Maintain current exposures but avoid heavy new risk allocations.",
-        "DEFENSIVE": "Hostile, bearish conditions. Capital preservation is the absolute priority. Cash and defensive allocations should be protected until the Trend recovers."
+        "DEFENSIVE": "Hostile, bearish conditions. Capital preservation is the absolute priority. Cash and defensive allocations should be protected until the Trend recovers.",
     }
     st.info(phase_descriptions.get(phase, "Evaluating market conditions..."))
-    
+
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         trend = phase_data.get("trend", {})
@@ -160,8 +194,53 @@ with st.container(border=True):
     with col5:
         credit = phase_data.get("credit", {})
         st.metric("💳 Credit Stress", credit.get("status", "Unknown"))
+
+    with st.expander("🔍 Signal Logic & Raw Data"):
+        breadth = phase_data.get("breadth", {})
+        b_pass = len(breadth.get("passing", []))
+        b_tot = breadth.get("valid_total", 11)
+        b_fail = breadth.get("failing", [])
+
+        if b_pass == b_tot:
+            fail_str = " (All are healthy)"
+        elif b_pass == 0:
+            fail_str = " (All are crashing)"
+        else:
+            fail_str = f", {', '.join(b_fail)} are not"
+
+        breadth_live = (
+            f"{b_pass}/{b_tot} Select Sector SPDR ETFs are above their 50DMA{fail_str}"
+        )
+        leader = phase_data.get("leadership", {})
+        credit = phase_data.get("credit", {})
+
+        st.markdown(
+            f"""
+        ### 10-Point Grading System Breakdowns
+        **1. 📈 Trend (SPY):** {"🟩 SPY > 50DMA and 200DMA (+2 pts)" if trend.get("status") == "Bullish" else ("🟨 SPY > 200DMA but < 50DMA (+1 pt)" if trend.get("status") == "Neutral" else "🟥 SPY < 200DMA (0 pts)")}.<br>
+        Live Reading: SPY=${trend.get("value", 0):.2f} | 50DMA=${trend.get("dma50", 0):.2f} | 200DMA=${trend.get("dma200", 0):.2f}
         
-    with st.expander("🔍 View Raw Signal Data"):
+        **2. 📊 Breadth (Sectors):** {"🟩 > 60% of Sectors > 50DMA (+2 pts)" if breadth.get("status") == "Strong" else ("🟨 40-60% of Sectors > 50DMA (+1 pt)" if breadth.get("status") == "Improving" else "🟥 < 40% of Sectors > 50DMA (0 pts)")}.<br>
+        Live Reading: {breadth_live}
+        
+        **3. 🌪 Volatility (VIX):** {"🟩 VIX < 18 (+2 pts)" if vol.get("status") == "Calm" else ("🟨 VIX 18-25 (+1 pt)" if vol.get("status") == "Neutral" else "🟥 VIX > 25 (0 pts)")}.<br>
+        Live Reading: {vol.get("value", 0):.2f}
+        
+        **4. 🚀 Leadership (SMH & QQQ):** {"🟩 Both SMH & QQQ > 50DMA (+2 pts)" if leader.get("status") == "Strong" else ("🟨 One > 50DMA (+1 pt)" if leader.get("status") == "Mixed" else "🟥 Both < 50DMA (0 pts)")}.<br>
+        Live Reading: QQQ=${leader.get("qqq", 0):.2f} (50DMA=${leader.get("qqq_50", 0):.2f}) | SMH=${leader.get("smh", 0):.2f} (50DMA=${leader.get("smh_50", 0):.2f})
+        
+        **5. 💳 Credit Stress (JNK/SHY):** {"🟩 Ratio > 50DMA (+2 pts)" if credit.get("status") == "Healthy" else "🟥 Ratio < 50DMA (0 pts)"}.<br>
+        Live Reading: JNK=${credit.get("jnk", 0):.2f} | SHY=${credit.get("shy", 0):.2f} | Current Ratio={credit.get("ratio_current", 0):.3f} (50DMA={credit.get("ratio_50", 0):.3f})
+
+        
+        ---
+        **Total Current Score:** {phase_data.get("score", 0)} / 10
+        *(RISK_ON: >= 7 | TRANSITION: 4-6 | DEFENSIVE: <= 3)*
+        """,
+            unsafe_allow_html=True,
+        )
+
+        # Keep the raw dictionary dump at the bottom for true developers
         st.json(phase_data)
 
 
@@ -187,7 +266,6 @@ with st.container(border=True):
     st.write(f"Drawdown: {latest_market['drawdown']:.2%}")
 
 
-
 # =========================
 # CRASH SIGNALS
 # =========================
@@ -195,13 +273,13 @@ with st.container(border=True):
     st.subheader("⚠️ Crash / Recovery Signals")
     signal = crash_manager.get_signal(latest_market["drawdown"])
     st.write(f"Current Signal: **{signal if signal else 'None'}**")
-    
+
     if signal:
         descriptions = {
             "Level 1": "A Level 1 signal represents a mild market correction scenario where the broad market (S&P 500) has drawn down -10% from its cycle peak.",
             "Level 2": "A Level 2 signal represents a meaningful market pullback scenario where the broad market (S&P 500) has drawn down -20% from its cycle peak.",
             "Level 3": "A Level 3 signal represents a severe market crash scenario where the broad market (S&P 500) has drawn down -30% from its cycle peak.",
-            "Level 4": "A Level 4 signal represents a catastrophic market collapse scenario where the broad market (S&P 500) has drawn down -40% from its cycle peak."
+            "Level 4": "A Level 4 signal represents a catastrophic market collapse scenario where the broad market (S&P 500) has drawn down -40% from its cycle peak.",
         }
         st.info(descriptions.get(signal, "Deploying cash into the market discount."))
 

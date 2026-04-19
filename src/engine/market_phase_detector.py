@@ -127,7 +127,7 @@ class MarketPhaseDetector:
         # Prepare signal results log
         results = {
             "trend": {"status": "Unknown", "value": 0, "dma200": 0, "dma50": 0},
-            "breadth": {"status": "Unknown", "value": 0},
+            "breadth": {"status": "Unknown", "value": 0, "passing": [], "failing": [], "valid_total": 0},
             "volatility": {"status": "Unknown", "value": 0},
             "leadership": {"status": "Unknown", "value": 0},
             "credit": {"status": "Unknown", "value": 0},
@@ -156,7 +156,8 @@ class MarketPhaseDetector:
             )
 
         # 3. Evaluate Breadth (Sector proxy: % of 11 sectors above 50DMA)
-        sectors_above_50 = 0
+        passing_sectors = []
+        failing_sectors = []
         valid_sectors = 0
         for sec in self.sector_etfs:
             if (
@@ -166,12 +167,17 @@ class MarketPhaseDetector:
             ):
                 valid_sectors += 1
                 if latest[sec] > dma50[sec]:
-                    sectors_above_50 += 1
+                    passing_sectors.append(sec)
+                else:
+                    failing_sectors.append(sec)
 
         if valid_sectors > 0:
-            pct_above_50 = (sectors_above_50 / valid_sectors) * 100
+            pct_above_50 = (len(passing_sectors) / valid_sectors) * 100
             results["breadth"]["value"] = pct_above_50
             results["breadth"]["status"] = self.get_breadth_signal(pct_above_50)
+            results["breadth"]["passing"] = passing_sectors
+            results["breadth"]["failing"] = failing_sectors
+            results["breadth"]["valid_total"] = valid_sectors
 
         # 4. Evaluate Volatility
         if vix in closes.columns:
@@ -182,14 +188,28 @@ class MarketPhaseDetector:
         smh = "SMH"
         qqq = "QQQ"
         if smh in closes.columns and qqq in closes.columns:
+            results["leadership"]["qqq"] = latest[qqq]
+            results["leadership"]["qqq_50"] = dma50[qqq]
+            results["leadership"]["smh"] = latest[smh]
+            results["leadership"]["smh_50"] = dma50[smh]
             results["leadership"]["status"] = self.get_leadership_signal(
                 latest[qqq], dma50[qqq], latest[smh], dma50[smh]
             )
 
         # 6. Evaluate Credit
         if "JNK" in closes.columns and "SHY" in closes.columns:
+            jnk_price = latest["JNK"]
+            shy_price = latest["SHY"]
+            jnk_50 = dma50["JNK"]
+            shy_50 = dma50["SHY"]
+            
+            results["credit"]["jnk"] = jnk_price
+            results["credit"]["shy"] = shy_price
+            results["credit"]["ratio_current"] = jnk_price / shy_price if shy_price > 0 else 0
+            results["credit"]["ratio_50"] = jnk_50 / shy_50 if shy_50 > 0 else 0
+            
             results["credit"]["status"] = self.get_credit_signal(
-                latest["JNK"], latest["SHY"], dma50["JNK"], dma50["SHY"]
+                jnk_price, shy_price, jnk_50, shy_50
             )
 
         # 7. Regime Scoring Logic

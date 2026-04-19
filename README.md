@@ -18,6 +18,8 @@ How to run:
 
     cd E:\CycleGuard
     python scripts\daily_rebalance.py
+or
+	streamlit run src/dashboard/cycleguard_dashboard.py
 
 ● This will:
 1. Fetch latest S&P 500 / market data
@@ -26,6 +28,12 @@ How to run:
 4. Update portfolio state (portfolio_state.json)
 5. Update trade log (trade_log.csv)
 6. Apply recovery trims if conditions are met
+
+
+#Run tests via:
+python -m unittest tests/test_crash_manager.py
+
+
 
 2️⃣ Automating Daily Execution
 
@@ -143,15 +151,13 @@ A missed daily run doesn’t break the portfolio, but it can delay crash/recover
 
 
 ⚡ Usage
-    streamlit run src/dashboard/cycleguard_dashboard.py
+    
+	
 
 ● Missed crash levels will appear in yellow / highlighted section for quick operator review.
 ● Dashboard updates every time you refresh or run Streamlit.
 
 
-
-#Run tests via:
-python -m unittest tests/test_crash_manager.py
 
 
 
