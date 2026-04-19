@@ -25,8 +25,6 @@ def render_sync_fidelity(portfolio, portfolio_file):
     with st.container(border=True):
         st.subheader("📤 Sync with Fidelity")
 
-        show_drift = st.checkbox("Show Drift Analysis Table", value=True)
-
         uploaded_file = st.file_uploader("Upload Fidelity Positions CSV", type=["csv"])
 
         # Update session state if a new file is uploaded
@@ -51,8 +49,7 @@ def render_sync_fidelity(portfolio, portfolio_file):
             # --- DRIFT ANALYSIS ---
             drift_df = analyze_drift(portfolio, fidelity_portfolio)
 
-            if show_drift:
-                render_drift_analysis(drift_df)
+            render_drift_analysis(drift_df)
             
             with st.expander("🔍 View Raw Comparison Data (Debug)"):
                 col1, col2 = st.columns(2)
