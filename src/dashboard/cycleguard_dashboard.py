@@ -218,7 +218,7 @@ with st.container(border=True):
             f"""
         ### 10-Point Grading System Breakdowns
         **1. 📈 Trend (SPY):** {"🟩 SPY > 50DMA and 200DMA (+2 pts)" if trend.get("status") == "Bullish" else ("🟨 SPY > 200DMA but < 50DMA (+1 pt)" if trend.get("status") == "Neutral" else "🟥 SPY < 200DMA (0 pts)")}.<br>
-        Live Reading: SPY=${trend.get("value", 0):.2f} | 50DMA=${trend.get("dma50", 0):.2f} | 200DMA=${trend.get("dma200", 0):.2f}
+        Live Reading: SPY=\${trend.get("value", 0):.2f} | 50DMA=\${trend.get("dma50", 0):.2f} | 200DMA=\${trend.get("dma200", 0):.2f}
         
         **2. 📊 Breadth (Sectors):** {"🟩 > 60% of Sectors > 50DMA (+2 pts)" if breadth.get("status") == "Strong" else ("🟨 40-60% of Sectors > 50DMA (+1 pt)" if breadth.get("status") == "Improving" else "🟥 < 40% of Sectors > 50DMA (0 pts)")}.<br>
         Live Reading: {breadth_live}
@@ -227,10 +227,10 @@ with st.container(border=True):
         Live Reading: {vol.get("value", 0):.2f}
         
         **4. 🚀 Leadership (SMH & QQQ):** {"🟩 Both SMH & QQQ > 50DMA (+2 pts)" if leader.get("status") == "Strong" else ("🟨 One > 50DMA (+1 pt)" if leader.get("status") == "Mixed" else "🟥 Both < 50DMA (0 pts)")}.<br>
-        Live Reading: QQQ=${leader.get("qqq", 0):.2f} (50DMA=${leader.get("qqq_50", 0):.2f}) | SMH=${leader.get("smh", 0):.2f} (50DMA=${leader.get("smh_50", 0):.2f})
+        Live Reading: QQQ=\${leader.get("qqq", 0):.2f} (50DMA=\${leader.get("qqq_50", 0):.2f}) | SMH=\${leader.get("smh", 0):.2f} (50DMA=\${leader.get("smh_50", 0):.2f})
         
         **5. 💳 Credit Stress (JNK/SHY):** {"🟩 Ratio > 50DMA (+2 pts)" if credit.get("status") == "Healthy" else "🟥 Ratio < 50DMA (0 pts)"}.<br>
-        Live Reading: JNK=${credit.get("jnk", 0):.2f} | SHY=${credit.get("shy", 0):.2f} | Current Ratio={credit.get("ratio_current", 0):.3f} (50DMA={credit.get("ratio_50", 0):.3f})
+        Live Reading: JNK=\${credit.get("jnk", 0):.2f} | SHY=\${credit.get("shy", 0):.2f} | Current Ratio={credit.get("ratio_current", 0):.3f} (50DMA={credit.get("ratio_50", 0):.3f})
 
         
         ---
@@ -294,6 +294,7 @@ render_action_panel(
     recovery_manager,
     config,
     load_rebalance_state,
+    phase_data,
 )
 
 
