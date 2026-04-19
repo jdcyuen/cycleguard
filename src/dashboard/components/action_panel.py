@@ -12,6 +12,7 @@ def render_action_panel(
     recovery_manager,
     config,
     load_rebalance_state,
+    phase_data,
 ):
     # -------------------------
     # PANEL STYLING & CONTAINER
@@ -22,6 +23,12 @@ def render_action_panel(
         total_value = sum(portfolio.values())
         drawdown = latest_market.get("drawdown", 0)
         current_price = latest_market.get("close", 0)
+        
+        # Cash Drag Global Variables
+        funding_priority = config.get("funding", {}).get("priority", [])
+        discretionary_cash = sum(portfolio.get(ticker, 0) for ticker in funding_priority)
+        target_cash_limit = 0.15 * total_value
+        surplus = max(0, discretionary_cash - target_cash_limit)
 
         signal = crash_manager.get_signal(drawdown)
 
@@ -84,8 +91,45 @@ def render_action_panel(
                     details.append(f"Rebound from bottom: {rebound:.2%} (below threshold)")
 
             else:
-                action_text = "🟢 No Action Needed"
-                details.append("No market bottom detected yet")
+                regime = phase_data.get("regime", "UNKNOWN")
+                if regime == "RISK_ON":
+                    action_text = "🟢 Optimal Growth Climate"
+                    details.append("Macro environment is highly favorable. Maintain core equity exposure.")
+                    
+                    # Cash Drag Redeployment Logic
+                    if discretionary_cash > target_cash_limit:
+                        details.append(f"⚠️ **Cash Drag Warning:** You hold **\${discretionary_cash:,.0f}** in discretionary defensive assets ({(discretionary_cash/total_value):.1%}).")
+                        
+                        sell_orders = {}
+                        remaining_surplus = surplus
+                        for ticker in funding_priority:
+                            amount_held = portfolio.get(ticker, 0)
+                            if amount_held > 0:
+                                sell_amt = min(remaining_surplus, amount_held)
+                                sell_orders[ticker] = sell_amt
+                                remaining_surplus -= sell_amt
+                                if remaining_surplus <= 0:
+                                    break
+                                    
+                        sell_str = " | ".join([f"Sell {t}: \${amt:,.0f}" for t, amt in sell_orders.items()])
+                        details.append(f"**Recommended Action:** Systematically redeploy your **\${surplus:,.0f}** surplus into core equities over the next 4-8 weeks.")
+                        details.append(f"**Funding Order:** {sell_str}")
+                        
+                        # Generate Buy targets using Level 1 core weights as default
+                        buy_targets = config.get("buy_targets", {}).get("Level 1", {})
+                        if buy_targets:
+                            buy_str = " | ".join([f"Buy {t}: \${(surplus * weight):,.0f}" for t, weight in buy_targets.items()])
+                            details.append(f"**Deployment Targets:** {buy_str}")
+                    else:
+                        details.append(f"✅ Discretionary cash is perfectly optimized at {(discretionary_cash/total_value):.1%} (${discretionary_cash:,.0f}).")
+                elif regime == "DEFENSIVE":
+                    action_text = "🛡️ Capital Protection Phase"
+                    details.append("Bearish metrics detected. Avoid massive new equity purchases.")
+                    details.append(f"Hold Cash and wait for deep discounts or Trend recovery. (Score: {phase_data.get('score', 0)}/10)")
+                else:
+                    action_text = "🟡 Transition Phase"
+                    details.append("Market signals are currently mixed.")
+                    details.append(f"Maintain current positions. Proceed with caution on new capital. (Score: {phase_data.get('score', 0)}/10)")
 
         # -------------------------
         # DISPLAY
@@ -102,3 +146,9 @@ def render_action_panel(
             st.write(f"Total Portfolio Value: ${total_value:,.2f}")
             st.write(f"Drawdown: {drawdown:.2%}")
             st.write(f"Signal: {signal}")
+            st.write("---")
+            st.write(f"**Funding Priority Accounts:** {', '.join(funding_priority)}")
+            cash_breakdown = " + ".join([f"{t}: \${portfolio.get(t,0):,.0f}" for t in funding_priority if portfolio.get(t,0) > 0])
+            st.write(f"**Discretionary Cash Amount:** \${discretionary_cash:,.2f} &nbsp;&nbsp; *( Breakdown: {cash_breakdown} )*")
+            st.write(f"**Target 15% Cash Limit:** \${target_cash_limit:,.2f} &nbsp;&nbsp; *( 15% × Total Portfolio Value of \${total_value:,.0f} )*")
+            st.write(f"**Calculated Cash Surplus:** \${surplus:,.2f} &nbsp;&nbsp; *( \${discretionary_cash:,.2f} - \${target_cash_limit:,.2f} )*")
