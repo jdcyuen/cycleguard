@@ -33,8 +33,8 @@ def analyze_drift(system_portfolio, fidelity_portfolio):
                 "Ticker": ticker,
                 "Selected Anchor ($)": system_value,
                 "Fidelity ($)": fidelity_value,
-                "Difference ($)": diff,
-                "Diff (%/$)": pct_diff,
+                "Diff ($)": diff,
+                "Diff (%)": pct_diff,
             }
         )
 
@@ -128,18 +128,20 @@ def render_drift_analysis(portfolio, comparison_portfolio, portfolio_file):
         }
         """)
 
-        # Format Compound Diff Column (Sorted via underlying percentage!)
-        diff_formatter = JsCode("""
+        pct_formatter = JsCode("""
         function(params) {
             if (params.value === null || params.value === undefined) return '';
             const pct = (params.value * 100).toFixed(2);
             const pctSign = params.value > 0 ? '+' : '';
-            const rawDiff = params.data['Difference ($)'] || 0;
-            let moneyStr = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(rawDiff);
-            if (rawDiff > 0) {
-                moneyStr = '+' + moneyStr;
-            }
-            return pctSign + pct + '% / ' + moneyStr;
+            return pctSign + pct + '%';
+        }
+        """)
+
+        signed_currency_formatter = JsCode("""
+        function(params) {
+            if (params.value === null || params.value === undefined) return '';
+            let moneyStr = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(params.value));
+            return params.value > 0 ? '+' + moneyStr : (params.value < 0 ? '-' + moneyStr : moneyStr);
         }
         """)
 
@@ -153,17 +155,17 @@ def render_drift_analysis(portfolio, comparison_portfolio, portfolio_file):
             valueFormatter=currency_formatter,
             type=["numericColumn", "numberColumnFilter"],
         )
-
-        # We sort by Diff (%/$) natively because the Python column natively outputs the raw Float pct_diff to the client
         gb.configure_column(
-            "Diff (%/$)",
-            valueFormatter=diff_formatter,
+            "Diff ($)",
+            valueFormatter=signed_currency_formatter,
+            type=["numericColumn", "numberColumnFilter"],
+        )
+        gb.configure_column(
+            "Diff (%)",
+            valueFormatter=pct_formatter,
             type=["numericColumn", "numberColumnFilter"],
             sort="desc",
         )
-
-        # Hide the raw dollar diff column from the UI
-        gb.configure_column("Difference ($)", hide=True)
 
         gridOptions = gb.build()
 
@@ -176,7 +178,7 @@ def render_drift_analysis(portfolio, comparison_portfolio, portfolio_file):
         )
 
         # Significant drift
-        large_drift = drift_df[drift_df["Diff (%/$)"].abs() > 0.05]
+        large_drift = drift_df[drift_df["Diff (%)"].abs() > 0.05]
         large_drift_tickers = large_drift["Ticker"].tolist()
 
         if not large_drift.empty:
