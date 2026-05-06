@@ -48,6 +48,53 @@ portfolio:
 
 
 # =========================
+# ASSET CLASS BUCKETS
+# =========================
+asset_buckets:
+  defensive:
+    - FDRXX
+    - SGOV
+  core_equity:
+    - FZROX
+  equity_income:
+    - SCHD
+    - JEPQ
+    - JEPI
+  equity_growth:
+    - SCHG
+    - FTEC
+  stocks:
+    - AAPL
+    - GOOG
+    - COST
+  high_beta:
+    - NVDA
+    - MU
+    - WDC
+    - SNDK
+    - CLS
+    - SMH
+    - FBTC
+  foreign_equity:
+    - FZILX
+    - IEMG
+    - VYMI
+  fixed_income:
+    - FXNAX
+    - VUSB
+    - BINC
+    - IBID
+    - IBIC
+    - IBIE
+    - IBIF
+    - IBIG
+    - ICVT
+  alternatives:
+    - IAUM
+    - DBMF
+
+
+# =========================
 # CRASH DEPLOYMENT SYSTEM
 # =========================
 deployment:
