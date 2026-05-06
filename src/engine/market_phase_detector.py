@@ -36,7 +36,7 @@ class MarketPhaseDetector:
         if not tickers:
             return pd.DataFrame()
 
-        df = yf.download(tickers, period=period, progress=False)
+        df = yf.download(tickers, period=period, progress=False, auto_adjust=False)
 
         if df.empty:
             return pd.DataFrame()

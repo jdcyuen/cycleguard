@@ -3,6 +3,10 @@
 
 import streamlit as st
 import json
+import os
+import shutil
+import glob
+from datetime import datetime, timedelta
 
 from src.dashboard.components.drift_analysis import analyze_drift, render_drift_analysis
 from src.engine.portfolio_parser import FidelityParser
@@ -41,31 +45,28 @@ def render_sync_fidelity(portfolio, portfolio_file):
             st.session_state.sync_success = False
 
         # -------------------------
-        # PERSISTENT DATA RENDERING
+        # DRIFT ANALYSIS DELEGATION
         # -------------------------
+        comparison_portfolio = st.session_state.fidelity_portfolio if st.session_state.fidelity_portfolio is not None else portfolio
+        render_drift_analysis(portfolio, comparison_portfolio, portfolio_file)
+
         if st.session_state.fidelity_portfolio is not None:
             fidelity_portfolio = st.session_state.fidelity_portfolio
-            
-            # --- DRIFT ANALYSIS ---
-            drift_df = analyze_drift(portfolio, fidelity_portfolio)
-
-            render_drift_analysis(drift_df)
-            
-            with st.expander("🔍 View Raw Comparison Data (Debug)"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Fidelity Data (CSV):**")
-                    st.json(fidelity_portfolio)
-                with col2:
-                    st.write("**System Data (Current):**")
-                    st.json(portfolio)
-
             # --- SYNC ACTION ---
             st.markdown("### ⚙️ Sync Actions")
             col_sync, col_clear = st.columns(2)
 
             with col_sync:
                 if st.button("🔄 Sync Portfolio to Fidelity", width="stretch"):
+                    # 1. Archive current state to ledger
+                    history_dir = os.path.join(os.path.dirname(portfolio_file), "history")
+                    os.makedirs(history_dir, exist_ok=True)
+                    if os.path.exists(portfolio_file):
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        archive_path = os.path.join(history_dir, f"portfolio_{timestamp}.json")
+                        shutil.copy2(portfolio_file, archive_path)
+
+                    # 2. Save new state
                     with open(portfolio_file, "w") as f:
                         json.dump(fidelity_portfolio, f, indent=2)
                     st.cache_data.clear()

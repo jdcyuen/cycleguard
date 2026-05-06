@@ -22,7 +22,7 @@ class IMarketDataProvider(ABC):
 class YFinanceDataProvider(IMarketDataProvider):
     """Responsible ONLY for fetching data from yfinance."""
     def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
-        df = yf.download(ticker, start=start_date, progress=False)
+        df = yf.download(ticker, start=start_date, progress=False, auto_adjust=False)
         
         if df.empty:
             return pd.DataFrame(columns=["close"])

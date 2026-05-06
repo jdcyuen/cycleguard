@@ -13,6 +13,9 @@ if root_path not in sys.path:
     sys.path.insert(0, root_path)
 
 import streamlit as st
+
+st.set_page_config(page_title="CycleGuard Dashboard", page_icon="📉", layout="wide")
+
 import json
 
 from src.dashboard.components.sync_fidelity import render_sync_fidelity
@@ -139,7 +142,6 @@ if simulate_crash:
 # -------------------------
 # UI START
 # -------------------------
-st.set_page_config(page_title="CycleGuard Dashboard", page_icon="📉", layout="wide")
 
 # CSS to reduce top padding
 st.markdown(
@@ -261,9 +263,9 @@ render_sync_fidelity(portfolio, PORTFOLIO_FILE)
 # =========================
 with st.container(border=True):
     st.subheader("📈 Market Data & Drawdown")
-    st.write(f"Current Price: {latest_market['close']}")
-    st.write(f"Cycle Peak: {latest_market['cycle_peak']}")
-    st.write(f"Drawdown: {latest_market['drawdown']:.2%}")
+    st.write(f"S&P 500 Current Price: {latest_market['close']}")
+    st.write(f"S&P 500 Cycle Peak: {latest_market['cycle_peak']}")
+    st.write(f"S&P 500 Drawdown: {latest_market['drawdown']:.2%}")
 
 
 # =========================
@@ -301,7 +303,7 @@ render_action_panel(
 # =========================
 # TRADE PREVIEW
 # =========================
-render_trade_preview(portfolio, latest_market, crash_manager, config)
+render_trade_preview(portfolio, latest_market, crash_manager, config, phase_data)
 
 
 # =========================
