@@ -3,7 +3,7 @@
 import yfinance as yf
 import pandas as pd
 from abc import ABC, abstractmethod
-from src.config.config_loader import load_config
+from src.config.config_loader import ConfigLoader
 
 
 # -------------------------
@@ -11,6 +11,7 @@ from src.config.config_loader import load_config
 # -------------------------
 class IMarketDataProvider(ABC):
     """Abstract interface for market data sources."""
+
     @abstractmethod
     def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
         pass
@@ -21,12 +22,13 @@ class IMarketDataProvider(ABC):
 # -------------------------
 class YFinanceDataProvider(IMarketDataProvider):
     """Responsible ONLY for fetching data from yfinance."""
+
     def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
         df = yf.download(ticker, start=start_date, progress=False, auto_adjust=False)
-        
+
         if df.empty:
             return pd.DataFrame(columns=["close"])
-            
+
         df = df[["Close"]].dropna()
         df.columns = ["close"]
         return df
@@ -37,19 +39,20 @@ class YFinanceDataProvider(IMarketDataProvider):
 # -------------------------
 class CrashManager:
     """Responsible ONLY for calculating drawdown and crash signals."""
+
     def __init__(self, config=None, data_provider: IMarketDataProvider = None):
-        self.config = config if config else load_config()
+        self.config = config if config else ConfigLoader().load()
         self.ticker = self.config["market"]["ticker"]
         self.recovery_threshold = self.config["market"]["recovery_threshold"]
         self.levels = self.config["deployment"]["levels"]
-        
+
         # Dependency Injection (DIP)
         self.data_provider = data_provider if data_provider else YFinanceDataProvider()
 
     def detect_cycle_peak(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
             return df
-            
+
         peak = df["close"].iloc[0]
         peaks = []
 
@@ -90,10 +93,9 @@ class CrashManager:
         """Orchestrates the pipeline using the injected data provider."""
         # DIP: Calling the injected provider instead of yfinance directly
         df = self.data_provider.fetch_data(
-            self.ticker, 
-            self.config["market"]["start_date"]
+            self.ticker, self.config["market"]["start_date"]
         )
-        
+
         df = self.detect_cycle_peak(df)
         df = self.calculate_drawdown(df)
 
@@ -109,7 +111,7 @@ class CrashManager:
         signal = self.get_signal(latest["drawdown"])
 
         return {
-            "price": latest["close"],
+            "close": latest["close"],
             "cycle_peak": latest["cycle_peak"],
             "drawdown": latest["drawdown"],
             "signal": signal,

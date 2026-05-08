@@ -3,7 +3,7 @@
 import json
 import os
 from abc import ABC, abstractmethod
-from src.config.config_loader import load_config
+from src.config.config_loader import ConfigLoader
 
 
 # -------------------------
@@ -11,6 +11,7 @@ from src.config.config_loader import load_config
 # -------------------------
 class IRecoveryStateStore(ABC):
     """Abstract interface for recovery state persistence."""
+
     @abstractmethod
     def load(self) -> dict:
         pass
@@ -25,6 +26,7 @@ class IRecoveryStateStore(ABC):
 # -------------------------
 class JSONRecoveryStateStore(IRecoveryStateStore):
     """Responsible ONLY for loading/saving state to a JSON file."""
+
     def __init__(self, state_file: str):
         self.state_file = state_file
 
@@ -48,20 +50,25 @@ class JSONRecoveryStateStore(IRecoveryStateStore):
 # -------------------------
 class RecoveryManager:
     """Responsible ONLY for recovery strategy logic and rebound detection."""
+
     def __init__(self, config=None, state_store: IRecoveryStateStore = None):
-        self.config = config if config else load_config()
+        self.config = config if config else ConfigLoader().load()
         recovery_config = self.config.get("recovery", {})
-        
+
         self.rebound_threshold = recovery_config.get("rebound_threshold", 0.20)
         self.trim_targets = recovery_config.get("trim_targets", {})
         self.rebuild_cash_to = recovery_config.get("rebuild_cash_to", "SGOV")
-        
+
         # Dependency Injection (DIP)
         if state_store:
             self.state_store = state_store
         else:
             # Default to JSON storage
-            state_file = self.config.get("system", {}).get("files", {}).get("recovery", "src/data/recovery_state.json")
+            state_file = (
+                self.config.get("system", {})
+                .get("files", {})
+                .get("recovery", "src/data/recovery_state.json")
+            )
             self.state_store = JSONRecoveryStateStore(state_file)
 
     def load_state(self):
@@ -78,11 +85,11 @@ class RecoveryManager:
         Calculates rebound from bottom and executes trims if threshold is met.
         """
         state = self.load_state()
-        current_price = market_snapshot.get("price")
-        
+        current_price = market_snapshot.get("close")
+
         if current_price is None:
             return portfolio
-            
+
         # 1. Reset if we are at a new peak (drawdown is 0 or positive)
         if market_snapshot.get("drawdown", -1) >= 0:
             if state["bottom"] is not None or state["recovered"]:
@@ -96,26 +103,28 @@ class RecoveryManager:
             state["recovered"] = False
             self.save_state(state)
             return portfolio
-            
+
         # 3. Check for recovery rebound (Take Profit phase)
         if not state["recovered"]:
             rebound_target = bottom * (1.0 + self.rebound_threshold)
-            
+
             if current_price >= rebound_target:
-                # RECOVERY TRIGGERED! 
+                # RECOVERY TRIGGERED!
                 total_cash_raised = 0.0
-                
+
                 for ticker, trim_pct in self.trim_targets.items():
                     if ticker in portfolio and portfolio[ticker] > 0:
                         trim_amount = portfolio[ticker] * trim_pct
                         portfolio[ticker] -= trim_amount
                         total_cash_raised += trim_amount
-                
+
                 # Rebuild cash position
                 if total_cash_raised > 0:
                     cash_ticker = self.rebuild_cash_to
-                    portfolio[cash_ticker] = portfolio.get(cash_ticker, 0.0) + total_cash_raised
-                
+                    portfolio[cash_ticker] = (
+                        portfolio.get(cash_ticker, 0.0) + total_cash_raised
+                    )
+
                 # Mark as recovered so we don't trigger again until next cycle
                 state["recovered"] = True
                 self.save_state(state)

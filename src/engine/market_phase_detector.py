@@ -2,7 +2,7 @@
 
 import pandas as pd
 import yfinance as yf
-from src.config.config_loader import load_config
+from src.config.config_loader import ConfigLoader
 
 
 class MarketPhaseDetector:
@@ -12,7 +12,7 @@ class MarketPhaseDetector:
     """
 
     def __init__(self, config=None):
-        self.config = config if config else load_config()
+        self.config = config if config else ConfigLoader().load()
         self.regime_config = self.config.get("regime_system", {})
         self.signals = self.regime_config.get("signals", {})
 
@@ -101,7 +101,9 @@ class MarketPhaseDetector:
         else:
             return "Mixed"
 
-    def get_credit_signal(self, jnk_price: float, shy_price: float, jnk_50: float, shy_50: float) -> str:
+    def get_credit_signal(
+        self, jnk_price: float, shy_price: float, jnk_50: float, shy_50: float
+    ) -> str:
         current_ratio = jnk_price / shy_price if shy_price > 0 else 0
         ratio_50 = jnk_50 / shy_50 if shy_50 > 0 else 0
         if current_ratio > ratio_50:
@@ -127,7 +129,13 @@ class MarketPhaseDetector:
         # Prepare signal results log
         results = {
             "trend": {"status": "Unknown", "value": 0, "dma200": 0, "dma50": 0},
-            "breadth": {"status": "Unknown", "value": 0, "passing": [], "failing": [], "valid_total": 0},
+            "breadth": {
+                "status": "Unknown",
+                "value": 0,
+                "passing": [],
+                "failing": [],
+                "valid_total": 0,
+            },
             "volatility": {"status": "Unknown", "value": 0},
             "leadership": {"status": "Unknown", "value": 0},
             "credit": {"status": "Unknown", "value": 0},
@@ -202,12 +210,14 @@ class MarketPhaseDetector:
             shy_price = latest["SHY"]
             jnk_50 = dma50["JNK"]
             shy_50 = dma50["SHY"]
-            
+
             results["credit"]["jnk"] = jnk_price
             results["credit"]["shy"] = shy_price
-            results["credit"]["ratio_current"] = jnk_price / shy_price if shy_price > 0 else 0
+            results["credit"]["ratio_current"] = (
+                jnk_price / shy_price if shy_price > 0 else 0
+            )
             results["credit"]["ratio_50"] = jnk_50 / shy_50 if shy_50 > 0 else 0
-            
+
             results["credit"]["status"] = self.get_credit_signal(
                 jnk_price, shy_price, jnk_50, shy_50
             )
@@ -240,7 +250,7 @@ class MarketPhaseDetector:
             points += 2
         elif results["leadership"]["status"] == "Mixed":
             points += 1
-            
+
         if results["credit"]["status"] == "Healthy":
             points += 2
 

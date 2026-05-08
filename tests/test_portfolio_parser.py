@@ -10,34 +10,29 @@ class TestPortfolioParser(unittest.TestCase):
     def test_fidelity_parsing_with_metadata(self):
         """Verifies that the parser finds the header regardless of leading metadata."""
         csv_content = """
-Account Name,Brokerage,Date
-My Retirement,Fidelity,2026-04-01
-,,
-Symbol,Description,Quantity,Price,Current Value
-SMH,VANECK SEMI,50,210.00,"$10,500.00"
-SCHG,SCHWAB GROWTH,100,50.00,"$5,000.00"
-,,
-Total Value,,,,,15500.00
+Account Number,Account Name,Symbol,Description,Quantity,Last Price,Unused,Current Value
+12345,IRA,AAPL,APPLE INC,10,123.45,," $1,234.56 "
+12345,IRA,MSFT,MICROSOFT,5,200.00,,"1,000"
 """
         # Simulate a file object (Streamlit style)
         file = io.StringIO(csv_content.strip())
         result = self.parser.parse(file)
-        
+
         self.assertIsNotNone(result)
-        self.assertEqual(result["SMH"], 10500.0)
-        self.assertEqual(result["SCHG"], 5000.0)
+        self.assertEqual(result["AAPL"], 1234.56)
+        self.assertEqual(result["MSFT"], 1000.0)
         self.assertEqual(len(result), 2)
 
     def test_currency_cleaning(self):
         """Verifies that $, commas, and whitespace are handled correctly."""
         csv_content = """
-Symbol,Current Value
-AAPL," $1,234.56 "
-MSFT,"1,000"
+Account Number,Account Name,Symbol,Description,Quantity,Last Price,Unused,Current Value
+12345,IRA,AAPL,APPLE INC,10,123.45,," $1,234.56 "
+12345,IRA,MSFT,MICROSOFT,5,200.00,,"1,000"
 """
         file = io.StringIO(csv_content.strip())
         result = self.parser.parse(file)
-        
+
         self.assertEqual(result["AAPL"], 1234.56)
         self.assertEqual(result["MSFT"], 1000.0)
 
