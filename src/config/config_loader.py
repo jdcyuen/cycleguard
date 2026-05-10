@@ -2,7 +2,10 @@ from pathlib import Path
 from typing import Any, Dict
 import yaml
 
-from src.config.schema_validator import SchemaValidator, ConfigError
+from src.config.schema_validator import (
+    ConfigError,
+    validate_config,
+)
 
 
 class ConfigLoader:
@@ -13,22 +16,48 @@ class ConfigLoader:
     - delegating validation
     """
 
-    def __init__(self, config_path="config/config.yaml"):
+    def __init__(self, config_path: str = "config/accounts/rollover_ira.yaml"):
         self.config_path = Path(config_path)
         self.config: Dict[str, Any] = {}
+
+    @classmethod
+    def for_account(cls, account_name: str):
+        """
+        Factory helper for loading a specific account config.
+        Example:
+            ConfigLoader.for_account("roth_ira")
+        """
+        path = Path(f"config/accounts/{account_name}.yaml")
+
+        if not path.exists():
+            raise FileNotFoundError(f"Unknown account config: {account_name}")
+
+        return cls(path)
+
+    @classmethod
+    def available_accounts(cls):
+        """
+        Dynamically discovers available account configs.
+        """
+        accounts_dir = Path("config/accounts")
+
+        if not accounts_dir.exists():
+            return []
+
+        return sorted([f.stem for f in accounts_dir.glob("*.yaml")])
 
     # =========================
     # Public API
     # =========================
     def load(self) -> Dict[str, Any]:
         """
-        Load and validate configuration.
+        Loads and validates the YAML configuration.
         """
         self._validate_file_exists()
+
         self.config = self._read_yaml()
 
-        validator = SchemaValidator(self.config)
-        validator.validate()
+        validate_config(self.config)
 
         return self.config
 
@@ -36,11 +65,11 @@ class ConfigLoader:
     # File Handling
     # =========================
     def _validate_file_exists(self) -> None:
+        """
+        Ensures the config file exists before loading.
+        """
         if not self.config_path.exists():
             raise ConfigError(f"Config file not found: {self.config_path}")
-
-        if not self.config_path.is_file():
-            raise ConfigError(f"Path is not a file: {self.config_path}")
 
     def _read_yaml(self) -> Dict[str, Any]:
         try:

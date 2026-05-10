@@ -139,3 +139,8 @@ class SchemaValidator:
             )
 
         symbol_map[symbol] = (bucket, sub_bucket)
+
+
+def validate_config(config):
+    validator = SchemaValidator(config)
+    validator.validate()

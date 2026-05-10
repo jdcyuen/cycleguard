@@ -50,3 +50,5 @@ recovery_state.json
 # Jupyter Notebook
 # =====================
 .ipynb_checkpoints/
+
+src/cycleguard.egg-info/
