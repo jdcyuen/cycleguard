@@ -1,0 +1,96 @@
+# =========================
+# CycleGuard Regime System
+# Shared across ALL accounts
+# =========================
+
+regime_system:
+
+  # =========================
+  # SIGNAL DEFINITIONS
+  # =========================
+  signals:
+
+    trend:
+      proxy: "SPY"
+      method: "price_vs_sma"
+
+      thresholds:
+        bullish: 1.00      # above long-term trend
+        neutral: 0.98
+        bearish: 0.95
+
+
+    breadth:
+      proxy: "SP500_50DMA_PCT"
+
+      thresholds:
+        strong: 65
+        neutral: 50
+        weak: 35
+
+
+    volatility:
+      proxy: "^VIX"
+
+      thresholds:
+        calm: 18
+        elevated: 25
+        stress: 35
+
+
+    leadership:
+      proxies:
+        - "SMH"
+        - "QQQ"
+      method: "relative_strength"
+
+
+    credit:
+      proxies:
+        - "JNK"
+        - "SHY"
+      method: "credit_spread_proxy"
+
+
+  # =========================
+  # REGIME DEFINITIONS
+  # =========================
+  regimes:
+
+    RISK_ON:
+      description: "Strong bullish environment with expanding risk appetite"
+
+      conditions:
+        trend: "bullish"
+        breadth: "strong"
+        volatility: "calm"
+
+
+    TRANSITION:
+      description: "Mixed signals, uncertain direction"
+
+      conditions:
+        trend: "neutral"
+        breadth: "neutral"
+
+
+    DEFENSIVE:
+      description: "Risk-off environment, capital preservation mode"
+
+      conditions:
+        trend: "bearish"
+        volatility: "elevated"
+
+
+    CRISIS:
+      description: "High stress, liquidity-driven selloffs"
+
+      conditions:
+        volatility: "stress"
+        breadth: "weak"
+
+
+  # =========================
+  # DEFAULT FALLBACK
+  # =========================
+  fallback_regime: "TRANSITION"

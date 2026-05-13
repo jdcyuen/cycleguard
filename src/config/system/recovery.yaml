@@ -1,0 +1,13 @@
+recovery:
+
+  rebound_threshold: 0.20
+
+  default_trim_targets:
+    SMH: 0.20
+    SCHG: 0.15
+
+  rebuild_cash_to: SGOV
+
+  rules:
+    require_bottom_confirmation: true
+    reset_on_new_high: true

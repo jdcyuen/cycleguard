@@ -42,9 +42,9 @@ class CrashManager:
 
     def __init__(self, config=None, data_provider: IMarketDataProvider = None):
         self.config = config if config else ConfigLoader().load()
-        self.ticker = self.config["market"]["ticker"]
-        self.recovery_threshold = self.config["market"]["recovery_threshold"]
-        self.levels = self.config["deployment"]["levels"]
+        self.ticker = self.config["system"]["market"]["benchmark_ticker"]
+        self.recovery_threshold = self.config["system"]["market"]["recovery_threshold"]
+        self.levels = self.config["system"]["deployment"]["levels"]
 
         # Dependency Injection (DIP)
         self.data_provider = data_provider if data_provider else YFinanceDataProvider()
@@ -75,7 +75,10 @@ class CrashManager:
 
     def get_signal(self, drawdown: float) -> str:
         # Sort levels by severity (largest drop first)
-        sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
+        # sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
+        sorted_levels = sorted(
+            self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=True
+        )
 
         for level_name, deploy_pct in sorted_levels:
             if level_name == "Level 4" and drawdown <= -0.40:
@@ -93,7 +96,7 @@ class CrashManager:
         """Orchestrates the pipeline using the injected data provider."""
         # DIP: Calling the injected provider instead of yfinance directly
         df = self.data_provider.fetch_data(
-            self.ticker, self.config["market"]["start_date"]
+            self.ticker, self.config["system"]["market"]["start_date"]
         )
 
         df = self.detect_cycle_peak(df)

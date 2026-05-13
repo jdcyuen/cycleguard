@@ -27,7 +27,8 @@ from src.engine.crash_manager import CrashManager
 from src.engine.recovery_manager import RecoveryManager
 from src.engine.market_phase_detector import MarketPhaseDetector
 from src.data.market_data import get_market_data
-from src.config.config_loader import load_config
+
+from src.config.config_loader import ConfigLoader
 
 
 # -------------------------
@@ -77,7 +78,9 @@ def load_rebalance_state():
 # -------------------------
 # INIT
 # -------------------------
-config = load_config()
+# config = load_config()
+# config = ConfigLoader(str(BASE_DIR / "src/config/test_config.yaml")).load()
+config = ConfigLoader(str(BASE_DIR / "src/config/config.yaml")).load()
 portfolio = load_portfolio()
 
 crash_manager = CrashManager(config)

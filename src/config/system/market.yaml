@@ -1,0 +1,52 @@
+# =========================
+# CycleGuard Market Config
+# Shared across ALL accounts
+# =========================
+
+
+# Benchmark used for regime + drawdown logic
+benchmark_ticker: "^GSPC"
+start_date: "2015-01-01"
+
+# Sticky peak logic for cycle tracking
+recovery_threshold: 0.95
+
+
+# =========================
+# PRICE / DATA SETTINGS
+# =========================
+data:
+  price_source: "yfinance"
+  adjust_prices: false
+  use_log_returns: false
+
+
+# =========================
+# MARKET STATE BEHAVIOR
+# =========================
+cycle_detection:
+  method: "sticky_peak"
+
+  # Defines how aggressively new highs reset cycle peak
+  peak_reset_threshold: 0.95
+
+  # Minimum drawdown required to confirm a cycle top
+  min_drawdown_for_peak: -0.05
+
+
+# =========================
+# VOLATILITY ASSUMPTIONS (GLOBAL DEFAULTS)
+# =========================
+volatility:
+  default_annual_vol: 0.18
+  high_vol_threshold: 0.25
+  low_vol_threshold: 0.12
+
+
+# =========================
+# TIMEFRAME SETTINGS
+# =========================
+timeframes:
+  short_term_days: 20
+  medium_term_days: 90
+  long_term_days: 252

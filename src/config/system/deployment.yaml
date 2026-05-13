@@ -1,0 +1,37 @@
+# =========================
+# CycleGuard Crash Deployment System
+# Shared execution rules across ALL accounts
+# =========================
+
+levels:
+
+  level_1:
+    drawdown: -0.10
+    deploy_pct: 0.03
+
+  level_2:
+    drawdown: -0.20
+    deploy_pct: 0.05
+
+  level_3:
+    drawdown: -0.30
+    deploy_pct: 0.08
+
+  level_4:
+    drawdown: -0.40
+    deploy_pct: 0.09
+
+
+# DEPLOYMENT BEHAVIOR RULES
+# =========================
+# =========================
+execution_rules:
+
+  prioritization:
+    - "core_equity"
+    - "equity_growth"
+    - "high_beta"
+
+  max_deployment_per_event: 0.15
+  allow_stacking: false
+  require_confirmed_cycle: true

@@ -17,27 +17,29 @@ def test_config_load_success():
     config = loader.load()
 
     assert config is not None
-    assert "portfolio" in config
-    assert "regimes" in config
+    assert "system" in config
+    assert "accounts" in config
 
 
 # -----------------------------
-# Test 2: Portfolio structure exists
+# Test 2: System has bucket
 # -----------------------------
 def test_config_has_buckets():
     loader = ConfigLoader(get_test_config_path())
     config = loader.load()
 
-    assert "buckets" in config["portfolio"]
-    assert isinstance(config["portfolio"]["buckets"], dict)
+    system = config["system"]
+
+    assert "bucket" in system or "bucket.yaml" in system
 
 
 # -----------------------------
-# Test 3: Regimes exist
+# Test 3: System has regimes
 # -----------------------------
 def test_config_has_regimes():
     loader = ConfigLoader(get_test_config_path())
     config = loader.load()
 
-    assert "risk_on" in config["regimes"]
-    assert "risk_off" in config["regimes"]
+    system = config["system"]
+
+    assert "regime" in system

@@ -1,0 +1,29 @@
+# =========================
+# CycleGuard Runtime Paths
+# Shared infrastructure paths (NOT strategy-related)
+# =========================
+
+files:
+
+  # -------------------------
+  # CORE STATE FILES
+  # -------------------------
+  portfolio_state: "src/data/portfolio_state.json"
+  recovery_state: "src/data/recovery_state.json"
+  rebalance_state: "src/data/rebalance_state.json"
+
+  # -------------------------
+  # TRADE + EXECUTION LOGS
+  # -------------------------
+  trade_log: "src/data/trade_log.csv"
+
+  # -------------------------
+  # MARKET STATE CACHE (optional future use)
+  # -------------------------
+  market_cache: "src/data/market_cache.json"
+
+  # -------------------------
+  # BACKTEST / RESEARCH OUTPUTS
+  # -------------------------
+  backtest_results: "src/data/backtest_results.json"
+  analytics_output: "src/data/analytics.json"

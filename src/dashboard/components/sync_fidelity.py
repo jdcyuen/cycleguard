@@ -38,7 +38,9 @@ def render_sync_fidelity(portfolio, portfolio_file):
                 st.session_state.fidelity_portfolio = fidelity_portfolio
                 st.success("✅ Fidelity data updated successfully!")
             else:
-                st.error("❌ Failed to parse Fidelity CSV. Please ensure you are uploading the correct 'Positions' export.")
+                st.error(
+                    "❌ Failed to parse Fidelity CSV. Please ensure you are uploading the correct 'Positions' export."
+                )
 
         if st.session_state.get("sync_success"):
             st.success("✅ Portfolio successfully synced! Dashboard refreshed.")
@@ -47,7 +49,11 @@ def render_sync_fidelity(portfolio, portfolio_file):
         # -------------------------
         # DRIFT ANALYSIS DELEGATION
         # -------------------------
-        comparison_portfolio = st.session_state.fidelity_portfolio if st.session_state.fidelity_portfolio is not None else portfolio
+        comparison_portfolio = (
+            st.session_state.fidelity_portfolio
+            if st.session_state.fidelity_portfolio is not None
+            else portfolio
+        )
         render_drift_analysis(portfolio, comparison_portfolio, portfolio_file)
 
         if st.session_state.fidelity_portfolio is not None:
@@ -57,13 +63,17 @@ def render_sync_fidelity(portfolio, portfolio_file):
             col_sync, col_clear = st.columns(2)
 
             with col_sync:
-                if st.button("🔄 Sync Portfolio to Fidelity", width="stretch"):
+                if st.button("🔄 Sync Portfolio to Fidelity", use_container_width=True):
                     # 1. Archive current state to ledger
-                    history_dir = os.path.join(os.path.dirname(portfolio_file), "history")
+                    history_dir = os.path.join(
+                        os.path.dirname(portfolio_file), "history"
+                    )
                     os.makedirs(history_dir, exist_ok=True)
                     if os.path.exists(portfolio_file):
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        archive_path = os.path.join(history_dir, f"portfolio_{timestamp}.json")
+                        archive_path = os.path.join(
+                            history_dir, f"portfolio_{timestamp}.json"
+                        )
                         shutil.copy2(portfolio_file, archive_path)
 
                     # 2. Save new state
@@ -74,6 +84,6 @@ def render_sync_fidelity(portfolio, portfolio_file):
                     st.rerun()
 
             with col_clear:
-                if st.button("🗑️ Clear Cached Fidelity Data", width="stretch"):
+                if st.button("🗑️ Clear Cached Fidelity Data", use_container_width=True):
                     st.session_state.fidelity_portfolio = None
                     st.rerun()

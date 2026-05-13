@@ -1,0 +1,60 @@
+# =========================
+# CycleGuard Liquidity Policy
+# Controls HOW cash is raised (sell-side engine)
+# =========================
+
+liquidity_policy:
+
+  # -------------------------
+  # PRIMARY FUNDING PRIORITY
+  # Order in which assets are liquidated to raise cash
+  # -------------------------
+  funding_priority:
+    - SGOV
+    - FDRXX
+    - VUSB
+    - BINC
+    - FXNAX
+    - VTIP
+    - ICVT
+
+  # -------------------------
+  # LIQUIDATION RULES
+  # -------------------------
+  rules:
+
+    # Maintain minimum cash buffer before selling equities
+    preserve_min_cash_buffer: 0.05
+
+    # Never sell core equity unless absolutely necessary
+    avoid_selling_core_equity: true
+
+    # Prefer selling high-liquidity instruments first
+    prefer_liquid_etfs: true
+
+    # Limit how aggressively a single asset can be sold in one cycle
+    max_single_liquidation_pct: 0.25
+
+    # Do not sell into illiquid or volatile stress conditions
+    avoid_selling_high_beta_under_stress: true
+
+  # -------------------------
+  # PRIORITY PROTECTION RULES
+  # (Assets that should be protected unless extreme drawdown)
+  # -------------------------
+  protection:
+
+    core_equity:
+      protected: true
+      exception_drawdown: -0.40
+
+    high_beta:
+      protected: false
+      forced_liquidation_drawdown: -0.35
+
+  # -------------------------
+  # CASH ROUTING TARGET
+  # Where raised cash is temporarily stored
+  # -------------------------
+  cash_destination:
+    default: SGOV

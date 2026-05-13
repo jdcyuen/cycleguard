@@ -1,31 +1,14 @@
 portfolio:
   buckets:
-    defensive:
-      cash_like:
-        - SGOV
-
-    core_equity:
-      - FZROX
-
-    equity_growth:
-      - SCHG
-      - SMH
-
-    high_beta:
-      - NVDA
-      - MU
+    equities: 0.6
+    bonds: 0.3
+    cash: 0.1
 
 regimes:
   risk_on:
-    defensive:
-      cash_like: 0.10
-    core_equity: 0.40
-    equity_growth: 0.30
-    high_beta: 0.20
-
+    equity_weight: 1.0
   risk_off:
-    defensive:
-      cash_like: 0.60
-    core_equity: 0.20
-    equity_growth: 0.10
-    high_beta: 0.10
+    equity_weight: 0.5
+
+accounts: {}
+system: {}

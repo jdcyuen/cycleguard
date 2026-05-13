@@ -1,217 +1,125 @@
 # =========================
-# CycleGuard Configuration
+# Account Metadata
 # =========================
-
-market:
-  ticker: "^GSPC"
-  start_date: "2015-01-01"
-  recovery_threshold: 0.95   # Sticky peak logic
+account:
+  name: "Rollover IRA"
+  type: "rollover_ira"
+  risk_profile: "conservative"
 
 
 # =========================
-# YOUR LIVE PORTFOLIO
+# CURRENT PORTFOLIO
 # =========================
 portfolio:
+
+  # -------- Defensive / Cash --------
   FDRXX: 81048.09
+  SGOV: 71996.45
+
+  # -------- Fixed Income --------
   FXNAX: 124622.43
   BINC: 55532.48
-  SGOV: 71996.45
   VUSB: 41591.60
-  VTIP: 28371.66
   ICVT: 32175.02
   VGLT: 45592.79
 
+  # -------- TIPS Ladder --------
+  IBIC: 0.00
+  IBID: 0.00
+  IBIE: 0.00
+  IBIF: 0.00
+  IBIG: 0.00
+
+  # -------- Equity Income --------
   SCHD: 99959.49
   JEPQ: 21089.13
   JEPI: 26972.54
   VYMI: 5978.95
 
+  # -------- Core Equity --------
   FZROX: 98911.40
+
+  # -------- Equity Growth --------
   SCHG: 26984.21
   FTEC: 18852.55
-  SMH: 21135.56
 
-  AAPL: 5827.47
+  # -------- High Beta --------
+  SMH: 21135.56
   NVDA: 5050.08
-  GOOG: 8811.28
-  COST: 7949.22
   MU: 1833.39
   WDC: 1836.44
   CLS: 8933.31
+  FBTC: 14354.92
 
+  # -------- Individual Stocks --------
+  AAPL: 5827.47
+  GOOG: 8811.28
+  COST: 7949.22
+
+  # -------- Foreign Equity --------
   FZILX: 10782.02
   IEMG: 5021.06
 
+  # -------- Alternatives --------
   DBMF: 37304.92
   IAUM: 26456.47
-  FBTC: 14354.92
 
 
 # =========================
-# ASSET CLASS BUCKETS
+# TARGET BUCKET WEIGHTS
+# Conservative Account Allocation Model
 # =========================
-asset_buckets:
-  defensive:
-    - FDRXX
-    - SGOV
-  core_equity:
-    - FZROX
-  equity_income:
-    - SCHD
-    - JEPQ
-    - JEPI
-  equity_growth:
-    - SCHG
-    - FTEC
-  stocks:
-    - AAPL
-    - GOOG
-    - COST
-  high_beta:
-    - NVDA
-    - MU
-    - WDC
-    - SNDK
-    - CLS
-    - SMH
-    - FBTC
-  foreign_equity:
-    - FZILX
-    - IEMG
-    - VYMI
-  fixed_income:
-    - FXNAX
-    - VUSB
-    - BINC
-    - IBID
-    - IBIC
-    - IBIE
-    - IBIF
-    - IBIG
-    - ICVT
-  alternatives:
-    - IAUM
-    - DBMF
+bucket_weights:
 
+  defensive: 0.15
 
-# =========================
-# CRASH DEPLOYMENT SYSTEM
-# =========================
-deployment:
-  levels:
-    Level 1: 0.03   # -10%
-    Level 2: 0.05   # -20%
-    Level 3: 0.08   # -30%
-    Level 4: 0.09   # -40%
+  fixed_income: 0.30
 
+  tips_ladder: 0.10
 
-# =========================
-# BUY STRATEGY
-# =========================
-buy_targets:
-  Level 1:
-    FZROX: 0.60
-    SCHD: 0.25
-    SCHG: 0.15
+  core_equity: 0.20
 
-  Level 2:
-    FZROX: 0.50
-    SCHG: 0.20
-    SCHD: 0.20
-    SMH: 0.10
+  equity_income: 0.10
 
-  Level 3:
-    FZROX: 0.40
-    SCHG: 0.25
-    SMH: 0.20
-    STOCKS: 0.15
+  equity_growth: 0.07
 
-  Level 4:
-    FZROX: 0.35
-    SCHG: 0.30
-    SMH: 0.25
-    STOCKS: 0.10
+  high_beta: 0.03
 
+  foreign_equity: 0.03
 
-# =========================
-# FUNDING (SELL ORDER)
-# =========================
-funding:
-  priority:
-    - SGOV
-    - FDRXX
-    - VUSB
-    - BINC
-    - FXNAX
+  alternatives: 0.02
 
 
 # =========================
 # POSITION LIMITS
+# Account-Level Risk Controls
 # =========================
-limits:
+position_limits:
+
   max_position_pct: 0.10
 
   overrides:
-    NVDA: 0.08
-    SMH: 0.15
+
     FZROX: 0.20
 
-  stock_bucket:
-    - AAPL
-    - NVDA
-    - GOOG
+    SMH: 0.15
+
+    SCHD: 0.15
+
+    SGOV: 0.25
+
+    FXNAX: 0.25
 
 
 # =========================
-# RECOVERY SYSTEM
+# ACCOUNT-SPECIFIC SETTINGS
 # =========================
-recovery:
-  rebound_threshold: 0.20   # Trigger at +20% from bottom
+settings:
 
-  trim_targets:
-    SMH: 0.20
-    SCHG: 0.15
+  rebalance_frequency: "monthly"
 
-  rebuild_cash_to: SGOV
+  allow_fractional_shares: true
 
+  enable_recovery_trims: true
 
-# =========================
-# REGIME SYSTEM
-# =========================
-regime_system:
-  signals:
-    trend:
-      proxy: "SPY"
-    breadth:
-      proxy: "SP500_50DMA_PCT"
-      thresholds:
-        strong: 65
-        weak: 50
-    volatility:
-      proxy: "^VIX"
-      thresholds:
-        calm: 18
-        risk_off: 25
-    leadership:
-      proxies: ["SMH", "QQQ"]
-    credit:
-      proxies: ["JNK", "SHY"]
-
-  regimes:
-    - name: "RISK_ON"
-      description: "Aggressive growth allocation."
-    - name: "TRANSITION"
-      description: "Neutral/shifting allocation."
-    - name: "DEFENSIVE"
-      description: "Capital preservation allocation."
-
-
-# =========================
-# SYSTEM FILE PATHS
-# =========================
-system:
-  files:
-    portfolio: "src/data/portfolio_state.json"
-    rebalance: "src/data/rebalance_state.json"
-    recovery: "src/data/recovery_state.json"
-    trades: "src/data/trade_log.csv"
+  enable_dynamic_deployment: true
