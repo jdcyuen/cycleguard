@@ -3,7 +3,9 @@
 import yfinance as yf
 import pandas as pd
 from abc import ABC, abstractmethod
-from src.config.config_loader import ConfigLoader
+
+# from src.config.config_loader import ConfigLoader
+from src.config.settings import get_config
 
 
 # -------------------------
@@ -41,7 +43,7 @@ class CrashManager:
     """Responsible ONLY for calculating drawdown and crash signals."""
 
     def __init__(self, config=None, data_provider: IMarketDataProvider = None):
-        self.config = config if config else ConfigLoader().load()
+        self.config = config if config else get_config()
         self.ticker = self.config["system"]["market"]["benchmark_ticker"]
         self.recovery_threshold = self.config["system"]["market"]["recovery_threshold"]
         self.levels = self.config["system"]["deployment"]["levels"]

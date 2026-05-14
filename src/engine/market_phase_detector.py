@@ -2,7 +2,9 @@
 
 import pandas as pd
 import yfinance as yf
-from src.config.config_loader import ConfigLoader
+
+# from src.config.config_loader import ConfigLoader
+from src.config.settings import get_config
 
 
 class MarketPhaseDetector:
@@ -12,7 +14,7 @@ class MarketPhaseDetector:
     """
 
     def __init__(self, config=None):
-        self.config = config if config else ConfigLoader().load()
+        self.config = config if config else get_config()
         self.regime_config = self.config.get("regime_system", {})
         self.signals = self.regime_config.get("signals", {})
 

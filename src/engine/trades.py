@@ -3,7 +3,9 @@
 import csv
 from datetime import datetime
 from abc import ABC, abstractmethod
-from src.config.config_loader import ConfigLoader
+
+# from src.config.config_loader import ConfigLoader
+from src.config.settings import get_config
 
 
 # -------------------------
@@ -49,7 +51,8 @@ class TradeEngine:
     """Responsible ONLY for calculating and orchestrating trades."""
 
     def __init__(self, config=None, logger: ITradeLogger = None):
-        self.config = config if config else ConfigLoader().load()
+        # self.config = config if config else ConfigLoader().load()
+        self.config = config if config else get_config()
         self.deployment = self.config["deployment"]["levels"]
         self.buy_targets = self.config["buy_targets"]
         self.funding_order = self.config["funding"]["priority"]

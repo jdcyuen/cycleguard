@@ -3,7 +3,9 @@
 import json
 import os
 from abc import ABC, abstractmethod
-from src.config.config_loader import ConfigLoader
+
+# from src.config.config_loader import ConfigLoader
+from src.config.settings import get_config
 
 
 # -------------------------
@@ -52,7 +54,8 @@ class RecoveryManager:
     """Responsible ONLY for recovery strategy logic and rebound detection."""
 
     def __init__(self, config=None, state_store: IRecoveryStateStore = None):
-        self.config = config if config else ConfigLoader().load()
+        # self.config = config if config else ConfigLoader().load()
+        self.config = config if config else get_config()
         recovery_config = self.config.get("recovery", {})
 
         self.rebound_threshold = recovery_config.get("rebound_threshold", 0.20)

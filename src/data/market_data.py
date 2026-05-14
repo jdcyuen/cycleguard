@@ -2,11 +2,14 @@
 # 👉 Lightweight wrapper for the MarketData engine to return a clean dictionary
 
 from src.engine.crash_manager import CrashManager
-from src.config.config_loader import ConfigLoader
+
+# from src.config.config_loader import ConfigLoader
+from src.config.settings import get_config
 
 
 def get_market_data():
-    config = ConfigLoader().load()
+    # config = ConfigLoader().load()
+    config = get_config()
     manager = CrashManager(config)
 
     # Get latest snapshot from the crash manager engine
