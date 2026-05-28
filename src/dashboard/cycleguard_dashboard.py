@@ -28,7 +28,7 @@ from src.engine.recovery_manager import RecoveryManager
 from src.engine.market_phase_detector import MarketPhaseDetector
 from src.data.market_data import get_market_data
 
-from src.config.settings import get_config
+from src.config.config_manager import get_config
 
 
 # -------------------------

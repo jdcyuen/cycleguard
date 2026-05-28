@@ -11,6 +11,10 @@ __pycache__/
 env/
 ENV/
 
+# Secrets
+.env
+.env.*
+
 # =====================
 # IDE / Editor
 # =====================
@@ -52,3 +56,4 @@ recovery_state.json
 .ipynb_checkpoints/
 
 src/cycleguard.egg-info/
+logs/

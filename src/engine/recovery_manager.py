@@ -5,7 +5,7 @@ import os
 from abc import ABC, abstractmethod
 
 # from src.config.config_loader import ConfigLoader
-from src.config.settings import get_config
+from src.config.config_manager import get_config
 
 
 # -------------------------
