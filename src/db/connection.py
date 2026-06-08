@@ -12,6 +12,7 @@ logger = get_logger(__name__)
 
 
 class DBConnection:
+
     """
     Handles PostgreSQL database connections.
     """
@@ -28,10 +29,14 @@ class DBConnection:
         # Load the configuration (this automatically resolves dev/test/prod based on the environment)
         config = get_config()
         db_config = config.get("system", {}).get("database", {})
-        # Use explicitly passed arguments, fallback to YAML config, and finally fallback to sensible defaults
-        self._host = host or db_config.get("host", "localhost")
-        self._port = port or db_config.get("port", 5432)
-        self._database = database or db_config.get("dbname", "cycleguard")
+        
+        # Use explicitly passed arguments, environment variables, fallback to YAML config, and finally fallback to sensible defaults
+        self._host = host or os.getenv("DB_HOST") or db_config.get("host", "localhost")
+        
+        env_port = os.getenv("DB_PORT")
+        self._port = port or (int(env_port) if env_port else None) or db_config.get("port", 5433)
+        
+        self._database = database or os.getenv("DB_NAME") or os.getenv("DB_DATABASE") or db_config.get("dbname", "cycleguard")
 
         # Passwords and users should come from OS environment variables!
         self._user = user or os.getenv("DB_USER", "postgres")

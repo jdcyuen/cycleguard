@@ -79,7 +79,7 @@ class CrashManager:
         # Sort levels by severity (largest drop first)
         # sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
         sorted_levels = sorted(
-            self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=True
+            self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=False
         )
 
         for level_name, deploy_pct in sorted_levels:

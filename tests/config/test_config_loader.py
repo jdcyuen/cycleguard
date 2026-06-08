@@ -6,7 +6,7 @@ from src.config.config_loader import ConfigLoader
 # Helper: get absolute path
 # -----------------------------
 def get_test_config_path():
-    return os.path.join(os.path.dirname(__file__), "test_config.yaml")
+    return os.path.join(os.path.dirname(__file__), "test.yaml")
 
 
 # -----------------------------

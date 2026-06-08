@@ -8,19 +8,21 @@ class TestCrashManager(unittest.TestCase):
     def setUp(self):
         # Mock Config
         self.mock_config = {
-            "market": {
-                "ticker": "^GSPC",
-                "start_date": "2015-01-01",
-                "recovery_threshold": 0.95,
-            },
-            "deployment": {
-                "levels": {
-                    "Level 1": 0.03,
-                    "Level 2": 0.05,
-                    "Level 3": 0.08,
-                    "Level 4": 0.09,
-                }
-            },
+            "system": {
+                "market": {
+                    "benchmark_ticker": "^GSPC",
+                    "start_date": "2015-01-01",
+                    "recovery_threshold": 0.95,
+                },
+                "deployment": {
+                    "levels": {
+                        "Level 1": {"drawdown": -0.10},
+                        "Level 2": {"drawdown": -0.20},
+                        "Level 3": {"drawdown": -0.30},
+                        "Level 4": {"drawdown": -0.40},
+                    }
+                },
+            }
         }
 
         # Inject a mock data provider to comply with DIP

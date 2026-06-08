@@ -4,12 +4,12 @@ from src.data.market_data import get_market_data
 
 
 class TestMarketData(unittest.TestCase):
-    @patch("src.data.market_data.ConfigLoader")
+    @patch("src.data.market_data.get_config")
     @patch("src.data.market_data.CrashManager")
-    def test_get_market_data(self, mock_manager, mock_loader):
+    def test_get_market_data(self, mock_manager, mock_get_config):
 
-        # Mock config loader
-        mock_loader.return_value.load.return_value = {}
+        # Mock config
+        mock_get_config.return_value = {}
 
         # Mock CrashManager output
         mock_instance = mock_manager.return_value
