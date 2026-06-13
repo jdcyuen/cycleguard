@@ -1,5 +1,5 @@
 import sys
-from src.db.connection import DBConnection
+from src.database.connection import DBConnection
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)

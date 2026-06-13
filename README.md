@@ -33,7 +33,7 @@ To run the command line for the CycleGuard portfolio ingestion pipeline, you sho
 
 The Run Command
 bash
-python -m src.ingestion.cli_ingest --file <path_to_csv> [options]
+python -m src.cli.ingest_positions --file <path_to_csv> [options]
 
 
 Command Line Arguments
@@ -48,16 +48,16 @@ If you do not explicitly provide a --snapshot-date argument, the CLI resolves th
 
 2. Fallback: If no date pattern is found in the filename, it defaults to the current date.
 
-Examples
-1. Standard manual run (will prompt for confirmation):
+    Examples
+        1. Standard manual run (will prompt for confirmation):
 
-powershell
-python -m src.ingestion.cli_ingest --file "Portfolio_Positions_Jan_15_2026.csv"
+        powershell
+        python -m src.cli.ingest_positions --file "Portfolio_Positions_Jan_15_2026.csv"
 
-2. Automated run with explicit date and confirmation bypass:
+        2. Automated run with explicit date and confirmation bypass:
 
-powershell
-python -m src.ingestion.cli_ingest --file "my_positions.csv" --snapshot-date "2026-05-28" --confirm
+        powershell
+        python -m src.cli.ingest_positions --file "my_positions.csv" --snapshot-date "2026-05-28" --confirm
 
 
 

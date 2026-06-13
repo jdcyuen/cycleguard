@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from src.ingestion.cli_ingest import resolve_snapshot_date, main
+from src.cli.ingest_positions import resolve_snapshot_date, main
 
 
 # --------------------------------------------------
@@ -40,10 +40,10 @@ def test_resolve_snapshot_date_fallback_to_today():
 # --------------------------------------------------
 
 
-@patch("src.ingestion.cli_ingest.build_service")
+@patch("src.cli.ingest_positions.build_service")
 @patch(
     "sys.argv",
-    ["cli_ingest", "--file", "Portfolio_Positions_Jan_15_2026.csv", "--confirm"],
+    ["ingest_positions", "--file", "Portfolio_Positions_Jan_15_2026.csv", "--confirm"],
 )
 def test_main_runs_ingestion(mock_build_service):
 
