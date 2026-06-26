@@ -1,9 +1,9 @@
 import pandas as pd
 
-from src.core.logger import get_logger
+from core.logger import get_logger
 
 
-class CSVLoader:
+class PositionsCSVLoader:
     """
     Load and normalize portfolio CSV data.
     """

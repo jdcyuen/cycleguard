@@ -5,6 +5,7 @@ account:
   name: "Rollover IRA"
   type: "rollover_ira"
   risk_profile: "conservative"
+  account_number: "250464524"
 
 
 # =========================
@@ -54,7 +55,6 @@ portfolio:
   # -------- Individual Stocks --------
   AAPL: 5827.47
   GOOG: 8811.28
-  COST: 7949.22
 
   # -------- Foreign Equity --------
   FZILX: 10782.02

@@ -5,8 +5,8 @@ from typing import Optional
 import psycopg2
 from psycopg2.extensions import connection
 
-from src.config.config_manager import get_config
-from src.core.logger import get_logger
+from config.config_manager import get_config
+from core.logger import get_logger
 
 logger = get_logger(__name__)
 

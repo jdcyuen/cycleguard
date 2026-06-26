@@ -1,0 +1,75 @@
+# =========================
+# Account Metadata
+# =========================
+
+account:
+  name: "Joint WROS TOD"
+  type: "joint_wros_tod"
+  risk_profile: "moderate"
+  account_number: "Z32228042"
+
+
+# =========================
+# CURRENT PORTFOLIO
+# =========================
+
+portfolio:
+
+  # Holdings imported by CycleGuard
+  # Values updated from positions imports
+
+# =========================
+# TARGET BUCKET WEIGHTS
+# =========================
+
+bucket_weights:
+
+  defensive: 0.05
+
+  fixed_income: 0.25
+
+  tips_ladder: 0.05
+
+  core_equity: 0.25
+
+  equity_income: 0.15
+
+  equity_growth: 0.10
+
+  high_beta: 0.05
+
+  foreign_equity: 0.07
+
+  alternatives: 0.03
+
+# =========================
+# POSITION LIMITS
+# =========================
+
+position_limits:
+
+  max_position_pct: 0.10
+
+  overrides:
+
+    SCHD: 0.15
+
+    JEPI: 0.10
+
+    JEPQ: 0.10
+
+    SGOV: 0.20
+
+# =========================
+# ACCOUNT-SPECIFIC SETTINGS
+# =========================
+
+settings:
+
+  rebalance_frequency: "monthly"
+
+  allow_fractional_shares: true
+
+  enable_recovery_trims: true
+
+  enable_dynamic_deployment: true

@@ -8,6 +8,7 @@ def init_db():
     schema_sql = """
     CREATE TABLE IF NOT EXISTS snapshots (
         id SERIAL PRIMARY KEY,
+        account_id INTEGER NOT NULL,
         snapshot_date DATE UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

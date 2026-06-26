@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from functools import lru_cache
 
-from src.config.config_loader import ConfigLoader
+from config.config_loader import ConfigLoader
 
 
 # =========================

@@ -1,83 +1,141 @@
 from unittest.mock import MagicMock, patch
 
-from src.cli.ingest_positions import resolve_snapshot_date, main
+from cli.ingest_positions import main
 
 
-# --------------------------------------------------
-# Snapshot date resolution tests
-# --------------------------------------------------
+@patch("cli.ingest_positions.display_results")
+@patch("cli.ingest_positions.PositionsIngestionService.build")
+@patch("cli.ingest_positions.resolve_snapshot_date")
+@patch("cli.ingest_positions.resolve_account")
+@patch("cli.ingest_positions.parse_args")
+def test_main_runs_ingestion(
+    mock_parse_args,
+    mock_resolve_account,
+    mock_resolve_snapshot_date,
+    mock_build,
+    mock_display_results,
+):
 
-
-def test_resolve_snapshot_date_from_cli_arg():
-
-    result = resolve_snapshot_date(
-        snapshot_date_arg="2026-01-15", file_path="portfolio.csv"
+    mock_parse_args.return_value = MagicMock(
+        file="positions.csv",
+        account="ROLLOVER",
+        snapshot_date=None,
+        confirm=False,
     )
 
-    assert result == "2026-01-15"
+    mock_resolve_account.return_value = "ROLLOVER"
 
+    mock_resolve_snapshot_date.return_value = "2025-12-31"
 
-def test_resolve_snapshot_date_from_filename():
-
-    result = resolve_snapshot_date(
-        snapshot_date_arg=None, file_path="Portfolio_Positions_Jan_15_2026.csv"
-    )
-
-    assert result == "2026-01-15"
-
-
-def test_resolve_snapshot_date_fallback_to_today():
-
-    result = resolve_snapshot_date(snapshot_date_arg=None, file_path="portfolio.csv")
-
-    # only validate format
-    assert len(result) == 10
-    assert result.count("-") == 2
-
-
-# --------------------------------------------------
-# CLI orchestration test
-# --------------------------------------------------
-
-
-@patch("src.cli.ingest_positions.build_service")
-@patch(
-    "sys.argv",
-    ["ingest_positions", "--file", "Portfolio_Positions_Jan_15_2026.csv", "--confirm"],
-)
-def test_main_runs_ingestion(mock_build_service):
-
-    # ----------------------------------------------
-    # Mock ingestion service
-    # ----------------------------------------------
     mock_service = MagicMock()
 
-    mock_service.run.return_value = {
-        "status": "success",
-        "snapshot_id": 1,
-        "snapshot_date": "2026-01-15",
-        "rows_processed": 2,
+    mock_service.ingest.return_value = {
+        "inserted": 10,
+        "updated": 0,
+        "skipped": 0,
     }
 
-    mock_build_service.return_value = mock_service
+    mock_build.return_value = mock_service
 
-    # ----------------------------------------------
-    # Execute CLI
-    # ----------------------------------------------
     main()
 
-    # ----------------------------------------------
-    # Validate ingestion executed
-    # ----------------------------------------------
-    mock_service.run.assert_called_once()
+    mock_resolve_account.assert_called_once_with(
+        "ROLLOVER"
+    )
 
-    # ----------------------------------------------
-    # Validate arguments passed to service
-    # ----------------------------------------------
-    kwargs = mock_service.run.call_args.kwargs
+    mock_resolve_snapshot_date.assert_called_once_with(
+        snapshot_date=None,
+        csv_file="positions.csv",
+    )
 
-    assert kwargs["file_path"] == ("Portfolio_Positions_Jan_15_2026.csv")
+    mock_build.assert_called_once()
 
-    assert kwargs["snapshot_date"] == "2026-01-15"
+    mock_service.ingest.assert_called_once_with(
+        csv_file="positions.csv",
+        account_name="ROLLOVER",
+        snapshot_date="2025-12-31",
+    )
 
-    assert kwargs["confirm"] is True
+    mock_display_results.assert_called_once_with(
+        "ROLLOVER",
+        {
+            "inserted": 10,
+            "updated": 0,
+            "skipped": 0,
+        },
+    )
+
+
+@patch("cli.ingest_positions.confirm_import")
+@patch("cli.ingest_positions.parse_args")
+def test_main_cancelled_by_user(
+    mock_parse_args,
+    mock_confirm_import,
+):
+
+    mock_parse_args.return_value = MagicMock(
+        file="positions.csv",
+        account="ROLLOVER",
+        snapshot_date=None,
+        confirm=True,
+    )
+
+    mock_confirm_import.return_value = False
+
+    with patch(
+        "cli.ingest_positions.resolve_account",
+        return_value="ROLLOVER",
+    ):
+        with patch(
+            "cli.ingest_positions.resolve_snapshot_date",
+            return_value="2025-12-31",
+        ):
+            main()
+
+    mock_confirm_import.assert_called_once_with(
+        "positions",
+        "ROLLOVER",
+    )
+
+
+@patch("cli.ingest_positions.print")
+@patch("cli.ingest_positions.PositionsIngestionService.build")
+@patch("cli.ingest_positions.resolve_snapshot_date")
+@patch("cli.ingest_positions.resolve_account")
+@patch("cli.ingest_positions.parse_args")
+def test_main_handles_exception(
+    mock_parse_args,
+    mock_resolve_account,
+    mock_resolve_snapshot_date,
+    mock_build,
+    mock_print,
+):
+
+    mock_parse_args.return_value = MagicMock(
+        file="positions.csv",
+        account="ROLLOVER",
+        snapshot_date=None,
+        confirm=False,
+    )
+
+    mock_resolve_account.return_value = "ROLLOVER"
+
+    mock_resolve_snapshot_date.return_value = "2025-12-31"
+
+    mock_service = MagicMock()
+
+    mock_service.ingest.side_effect = Exception(
+        "database error"
+    )
+
+    mock_build.return_value = mock_service
+
+    try:
+        main()
+        assert False, "Expected SystemExit"
+    except SystemExit as exc:
+        assert exc.code == 1
+
+    mock_print.assert_any_call(
+        "Positions import failed: database error"
+    )
