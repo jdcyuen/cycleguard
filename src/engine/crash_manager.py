@@ -4,8 +4,8 @@ import yfinance as yf
 import pandas as pd
 from abc import ABC, abstractmethod
 
-# from src.config.config_loader import ConfigLoader
-from src.config.config_manager import get_config
+# from config.config_loader import ConfigLoader
+from config.config_manager import get_config
 
 
 # -------------------------

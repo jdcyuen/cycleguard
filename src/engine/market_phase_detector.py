@@ -3,8 +3,8 @@
 import pandas as pd
 import yfinance as yf
 
-# from src.config.config_loader import ConfigLoader
-from src.config.config_manager import get_config
+# from config.config_loader import ConfigLoader
+from config.config_manager import get_config
 
 
 class MarketPhaseDetector:
