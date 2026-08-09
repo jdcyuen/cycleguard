@@ -20,7 +20,7 @@ def test_validate_wraps_unexpected_error():
         {
             "symbol": ["AAPL"],
             "quantity": [10],
-            "market_value": [1000],
+            "current_value": [1000],
         }
     )
 
@@ -53,7 +53,7 @@ def test_validate_success(
         {
             "symbol": ["AAPL", "MSFT"],
             "quantity": [10, 5],
-            "market_value": [2000.0, 1500.0],
+            "current_value": [2000.0, 1500.0],
         }
     )
 
@@ -82,7 +82,7 @@ def test_validate_missing_symbol_column(
     dataframe = pd.DataFrame(
         {
             "quantity": [10],
-            "market_value": [1000],
+            "current_value": [1000],
         }
     )
 
@@ -102,7 +102,7 @@ def test_validate_missing_quantity_column(
     dataframe = pd.DataFrame(
         {
             "symbol": ["AAPL"],
-            "market_value": [1000],
+            "current_value": [1000],
         }
     )
 
@@ -115,7 +115,7 @@ def test_validate_missing_quantity_column(
         )
 
 
-def test_validate_missing_market_value_column(
+def test_validate_missing_current_value_column(
     validator,
 ):
 
@@ -143,7 +143,7 @@ def test_validate_null_symbol(
         {
             "symbol": [None],
             "quantity": [10],
-            "market_value": [1000],
+            "current_value": [1000],
         }
     )
 
@@ -164,7 +164,7 @@ def test_validate_null_quantity(
         {
             "symbol": ["AAPL"],
             "quantity": [None],
-            "market_value": [1000],
+            "current_value": [1000],
         }
     )
 
@@ -177,7 +177,7 @@ def test_validate_null_quantity(
         )
 
 
-def test_validate_null_market_value(
+def test_validate_null_current_value(
     validator,
 ):
 
@@ -185,13 +185,13 @@ def test_validate_null_market_value(
         {
             "symbol": ["AAPL"],
             "quantity": [10],
-            "market_value": [None],
+            "current_value": [None],
         }
     )
 
     with pytest.raises(
         ValueError,
-        match="missing market value",
+        match="missing current value",
     ):
         validator.validate(
             dataframe

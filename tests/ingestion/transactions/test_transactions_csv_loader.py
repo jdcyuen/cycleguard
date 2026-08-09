@@ -9,7 +9,7 @@ from ingestion.transactions.transactions_csv_loader import (
 @pytest.fixture
 def loader():
 
-    return TransactionsCSVLoader()
+    return TransactionsCSVLoader(action_map=[])
 
 
 def test_load_valid_csv(

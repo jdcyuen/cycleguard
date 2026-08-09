@@ -7,23 +7,9 @@ from ingestion.transactions.transactions_validators import (
 
 
 @pytest.fixture
-def action_map():
+def validator():
 
-    return {
-        "BUY": "BUY",
-        "SELL": "SELL",
-        "DIVIDEND": "DIVIDEND",
-    }
-
-
-@pytest.fixture
-def validator(
-    action_map,
-):
-
-    return TransactionsValidator(
-        action_map=action_map,
-    )
+    return TransactionsValidator()
 
 
 def test_validate_success(

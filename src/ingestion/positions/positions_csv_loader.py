@@ -1,9 +1,11 @@
 import pandas as pd
-
+from ingestion.common.base_csv_loader import BaseCsvLoader
+#from models.position import Position
 from core.logger import get_logger
+from decimal import Decimal, InvalidOperation
 
 
-class PositionsCSVLoader:
+class PositionsCSVLoader(BaseCsvLoader[pd.DataFrame]):
     """
     Load and normalize portfolio CSV data.
     """
@@ -11,27 +13,66 @@ class PositionsCSVLoader:
     def __init__(self):
         self.logger = get_logger(self.__class__.__name__)
 
-    def load(self, file_path: str) -> list[dict]:
+       
+    # --------------------------------------------------
+    # Helper: Clean and convert numeric strings
+    # --------------------------------------------------
+    @staticmethod
+    def clean_numeric(val) -> Decimal | None:
+            
+        if val is None or pd.isna(val):
+            return None
+
+        cleaned = (
+                str(val)
+                .replace("$", "")
+                .replace("%", "")
+                .replace(",", "")
+                .replace("+", "")
+                .strip()
+            )
+
+        if cleaned.lower() in ("", "nan", "none", "null", "n/a", "--", "cash"):
+            return None
+
+        try:
+            return Decimal(cleaned)
+        except InvalidOperation:
+            return None
+
+    def load(self, file_path: str) ->  pd.DataFrame:
         """
         Load CSV file into normalized row dictionaries.
         """
 
-        self.logger.info(f"Loading CSV file: {file_path}")
+        self.logger.info(
+            "Loading CSV file: %s",
+            file_path,
+        )
 
         try:
             df = pd.read_csv(file_path, index_col=False)
 
-        except FileNotFoundError as e:
-            self.logger.error(f"CSV file not found: {file_path}")
-            raise e
+        except FileNotFoundError:
+            self.logger.exception(
+                "CSV file not found: %s",
+                file_path,
+            )
+            raise
 
-        except Exception as e:
-            self.logger.error(f"Failed to load CSV file: {file_path}")
-            raise e
+        except Exception:
+            self.logger.exception(
+                "Failed loading CSV file: %s",
+                file_path,
+            )
+            raise
 
         if df.empty:
-            self.logger.warning(f"CSV file is empty: {file_path}")
-            return []
+            self.logger.warning(
+                "CSV file is empty: %s",
+                file_path,
+            )
+            return pd.DataFrame()
 
         # --------------------------------------------------
         # Normalize column names
@@ -57,23 +98,6 @@ class PositionsCSVLoader:
         rows = df.to_dict(orient="records")
 
         # --------------------------------------------------
-        # Helper: Clean and convert numeric strings
-        # --------------------------------------------------
-        def clean_numeric(val) -> float | None:
-            if val is None or pd.isna(val):
-                return None
-            if isinstance(val, (int, float)):
-                return float(val)
-            val_str = str(val).strip()
-            if not val_str or val_str.lower() in ("nan", "none", "null", "n/a", "--", "cash"):
-                return None
-            cleaned = val_str.replace("$", "").replace("%", "").replace(",", "").replace("+", "").strip()
-            try:
-                return float(cleaned)
-            except ValueError:
-                return None
-
-        # --------------------------------------------------
         # Filter and clean rows
         # --------------------------------------------------
         valid_rows = []
@@ -92,33 +116,45 @@ class PositionsCSVLoader:
         for r in rows:
             symbol = r.get("symbol")
             account_number = r.get("account_number")
+
+            # Normalize symbol
+            if symbol is not None:
+                symbol = str(symbol).replace("*", "").strip()
+                r["symbol"] = symbol
             
-            # Filter out null/nan values (handling float nan)
-            if symbol is None or pd.isna(symbol) or account_number is None or pd.isna(account_number):
+            # Filter out missing/null symbol or account values
+            if (
+                symbol is None
+                or str(symbol).strip().lower() in ("", "nan", "none")
+                or account_number is None
+                or str(account_number).strip().lower() in ("", "nan", "none")
+            ):
                 continue
                 
             symbol_str = str(symbol).strip()
-            account_str = str(account_number).strip()
+            account_num_str = str(account_number).strip()
             
             # Filter out disclaimers and footers (which have very long text or metadata keywords)
             if (
                 not symbol_str 
-                or not account_str 
-                or len(account_str) > 50 
-                or "downloaded" in account_str.lower()
-                or "spreadsheet" in account_str.lower()
-                or "brokerage" in account_str.lower()
+                or not account_num_str 
+                or len(account_num_str) > 50 
+                or "downloaded" in account_num_str.lower()
+                or "spreadsheet" in account_num_str.lower()
+                or "brokerage" in account_num_str.lower()
+                or symbol_str.__eq__("Pending activity")
+                
             ):
                 continue
                 
             # Clean numeric values
             for col in numeric_cols:
                 if col in r:
-                    r[col] = clean_numeric(r[col])
+                    r[col] = self.clean_numeric(r[col])
                     
             valid_rows.append(r)
 
         self.logger.info(f"Loaded {len(valid_rows)} valid portfolio rows (filtered and cleaned from {len(rows)})")
 
-        return valid_rows
-
+        positions_dataframe = pd.DataFrame(valid_rows)
+        return positions_dataframe

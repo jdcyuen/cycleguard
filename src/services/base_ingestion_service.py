@@ -6,9 +6,19 @@ from ingestion.common.file_hash import (
     calculate_file_hash,
 )
 
-from ingestion.common.import_result import (
+from models.import_result import (
     ImportResult,
 )
+
+from repositories.import_history_repo import (
+    ImportHistoryRepository,
+)
+
+from models.importhistory import (
+    ImportHistory,
+)
+
+import yfinance as yf
 
 logger = get_logger(__name__)
 
@@ -38,115 +48,138 @@ class BaseIngestionService(ABC):
     ):
 
         self._account_repo = account_repo
-        self._import_history_repo = (
-            import_history_repo
-        )
+        self._import_history_repo = (import_history_repo)
         self._loader = loader
         self._validator = validator
 
     def ingest(
         self,
         csv_file: str,
-        account_name: str,
+        name: str,
+        snapshot_date=None,
+        dry_run: bool = False,
     ) -> ImportResult:
 
-        logger.info(
-            f"Starting {self.import_type} import "
-            f"for account '{account_name}'"
-        )
+        print("Reached BaseIngestionService")
+        logger.info(f"Starting {self.import_type} import for account '{name}'")
+        logger.info(f"Calculating file hash: {csv_file}")
 
-        logger.info(
-            f"Calculating file hash: {csv_file}"
-        )
+        file_hash = calculate_file_hash(csv_file)
 
-        file_hash = calculate_file_hash(
-            csv_file
-        )
+        logger.debug(f"File hash: {file_hash}")
 
-        logger.debug(
-            f"File hash: {file_hash}"
-        )
-
-        account = self._get_account(
-            account_name
-        )
+        account = self._get_account(name)
 
         logger.info(
             f"Resolved account "
-            f"'{account_name}' "
+            f"'{name}' "
             f"(id={account.id})"
         )
 
-        logger.info(
-            "Checking import history"
-        )
+        logger.info("Checking import history")
 
         self._check_duplicate_import(
             account_id=account.id,
             file_hash=file_hash,
         )
 
-        logger.info(
-            f"Loading CSV: {csv_file}"
+        logger.info(f"Loading CSV: {csv_file}")
+
+        dataframe = self._loader.load(csv_file)
+        logger.info("Loader returned object of type: %s", type(dataframe).__name__)
+        logger.debug("Loader class: %s",type(dataframe))
+        logger.info("Loader returned type: %s",type(dataframe).__name__)
+
+        if isinstance(dataframe, list):
+            logger.info(
+                "List contains %d objects.",
+                len(dataframe),
+            )
+
+            if dataframe:
+                logger.info(
+                    "First object type: %s",
+                    type(dataframe[0]).__name__,
+                )
+        logger.info(f"Loaded {len(dataframe)} rows")
+
+        logger.info("Validating CSV contents")
+        self._validator.validate(dataframe)
+        logger.info("Validation successful")
+
+        if dry_run:
+            logger.info("Dry run requested.")
+
+            return ImportResult(
+                account_id=account.id,
+                account_name=name,
+                institution=account.institution,
+                import_type=self.import_type,
+                filename=csv_file,
+                snapshot_date=snapshot_date,
+                rows_read=len(dataframe),
+                rows_imported=0,
+                rows_skipped=0,
+                import_history_id=None,
+                snapshot_id=None,
+                elapsed_ms=0,
+                status="SUCCESS",
+                warnings=[],
+            )
+
+        history = ImportHistory(
+            account_id=account.id,
+            import_type=self.import_type,
+            institution=account.institution,
+            filename=csv_file,
+            file_hash=file_hash,
+            snapshot_date=snapshot_date,
+            status="RUNNING",
         )
 
-        dataframe = self._loader.load(
-            csv_file
-        )
+        import_history = self._record_import(
+            history,
+        )   
 
-        logger.info(
-            f"Loaded "
-            f"{len(dataframe)} rows"
-        )
-
-        logger.info(
-            "Validating CSV contents"
-        )
-
-        self._validator.validate(
-            dataframe
-        )
-
-        logger.info(
-            "Validation successful"
-        )
-
-        logger.info(
-            f"Persisting "
-            f"{len(dataframe)} rows"
-        )
-
-        rows_imported = self.persist(
+        logger.info(f"Persisting {len(dataframe)} rows")
+        num_rows_imported = self.persist(
             dataframe=dataframe,
             account=account,
+            snapshot_date=snapshot_date,
+            import_history_id=import_history.id,
         )
+        logger.info(f"Persisted {num_rows_imported} rows")
 
-        logger.info(
-            f"Persisted "
-            f"{rows_imported} rows"
+        logger.info("Recording import history")
+
+        
+        import_history.rows_read = len(dataframe)
+        import_history.rows_imported = num_rows_imported
+        import_history.rows_skipped = len(dataframe) - num_rows_imported
+        import_history.status = "SUCCESS"
+        updated_import_history = self._record_import(
+            import_history,
         )
-
-        logger.info(
-            "Recording import history"
-        )
-
-        self._record_import(
-            account_id=account.id,
-            file_name=csv_file,
-            file_hash=file_hash,
-            row_count=rows_imported,
-        )
-
         logger.info(
             f"{self.import_type} import "
             f"completed successfully"
         )
 
         return ImportResult(
-            account_name=account_name,
+            account_id=account.id,
+            account_name=name,
+            institution=account.institution,
             import_type=self.import_type,
-            rows_imported=rows_imported,
-            file_name=csv_file,
+            filename=csv_file,
+            snapshot_date=snapshot_date,
+            rows_read=len(dataframe),
+            rows_imported=num_rows_imported,
+            rows_skipped=len(dataframe) - num_rows_imported,
+            import_history_id=updated_import_history.id,
+            snapshot_id=None,
+            elapsed_ms=0,
+            status="SUCCESS",
+            warnings=[],
         )
 
     def _get_account(
@@ -171,6 +204,13 @@ class BaseIngestionService(ABC):
                 f"{account_name}"
             )
 
+        logger.info(
+            f"Resolved account:"
+            f" id={account.id},"
+            f" name={account.name},"
+            f" number={account.account_number}"
+        )
+
         return account
 
     def _check_duplicate_import(
@@ -178,6 +218,12 @@ class BaseIngestionService(ABC):
         account_id: int,
         file_hash: str,
     ) -> None:
+
+        logger.info(
+            f"Checking if import already exists for account_id={account_id}, import_type={self.import_type}, file_hash={file_hash}"
+        )
+        logger.info(type(self._import_history_repo))
+        logger.info(dir(self._import_history_repo))
 
         exists = (
             self._import_history_repo
@@ -201,26 +247,40 @@ class BaseIngestionService(ABC):
                 "been imported."
             )
 
-    def _record_import(
-        self,
-        account_id: int,
-        file_name: str,
-        file_hash: str,
-        row_count: int,
-    ) -> None:
+    def _record_import(self, history: ImportHistory) -> ImportHistory:
 
-        self._import_history_repo.insert(
+        import_history = ImportHistory(
             account_id=account_id,
             import_type=self.import_type,
-            file_name=file_name,
+            filename=file_name,
             file_hash=file_hash,
-            row_count=row_count,
+            rows_read=rows_imported,
+            rows_imported=0,
+            rows_skipped=0,
+            status="STARTED",
+            elapsed_ms=0,
+            error_message=None,
+        )
+        new_import_history = self._import_history_repo.insert(
+            import_history
         )
 
         logger.info(
             f"Import history recorded "
             f"for {self.import_type}"
         )
+
+        return new_import_history
+
+    @property
+    def account_repo(self):
+        """
+        Read-only access to the account repository.
+
+        Used by CLI helpers for account validation
+        and account selection.
+        """
+        return self._account_repo    
 
     @property
     @abstractmethod
@@ -237,6 +297,8 @@ class BaseIngestionService(ABC):
         self,
         dataframe,
         account,
+        snapshot_date=None,
+        import_history_id=None,
     ) -> int:
         """
         Persist imported data.
@@ -245,3 +307,11 @@ class BaseIngestionService(ABC):
             Number of rows imported.
         """
         pass
+
+    @classmethod
+    @abstractmethod
+    def build(cls):
+        """
+        Construct and return a fully configured ingestion service.
+        """
+        raise NotImplementedError

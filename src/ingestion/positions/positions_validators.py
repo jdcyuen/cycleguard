@@ -17,7 +17,7 @@ class PositionsValidator:
     REQUIRED_COLUMNS = [
         "symbol",
         "quantity",
-        "market_value",
+        "current_value",
     ]
 
     def validate(
@@ -25,27 +25,14 @@ class PositionsValidator:
         dataframe: pd.DataFrame,
     ) -> None:
 
-        logger.info(
-            "Validating positions CSV"
-        )
+        logger.info("Validating positions CSV")
 
         try:
 
-            self._validate_not_empty(
-                dataframe
-            )
-
-            self._validate_columns(
-                dataframe
-            )
-
-            self._validate_required_fields(
-                dataframe
-            )
-
-            logger.info(
-                "Positions validation successful"
-            )
+            self._validate_not_empty(dataframe)
+            self._validate_columns(dataframe)
+            self._validate_required_fields(dataframe)
+            logger.info("Positions validation successful")
 
         except ValueError:
             raise
@@ -66,12 +53,14 @@ class PositionsValidator:
         dataframe: pd.DataFrame,
     ) -> None:
 
+        logger.info("Validating DataFrame is not empty.")
+        logger.debug("DataFrame contains %d row(s).", len(dataframe),)
         if dataframe.empty:
+            logger.error("Validation failed: DataFrame is empty.")
+            raise ValueError("Positions CSV is empty.")
+        logger.info("DataFrame contains %d row(s). Validation passed.", len(dataframe),)
 
-            raise ValueError(
-                "Positions CSV is empty."
-            )
-
+    
     def _validate_columns(
         self,
         dataframe: pd.DataFrame,
@@ -95,23 +84,82 @@ class PositionsValidator:
         dataframe: pd.DataFrame,
     ) -> None:
 
+        logger.info(
+            "Validating required position fields."
+        )
+
+        # --------------------------------------------------
+        # Symbol
+        # --------------------------------------------------
+
+        logger.debug("Checking required field: symbol")
+
         if dataframe["symbol"].isnull().any():
+
+            missing = dataframe[dataframe["symbol"].isnull()]
+
+            logger.error("Found %d position(s) with missing symbol.", len(missing),)
+            logger.debug("Rows with missing symbol:\n%s", missing )
 
             raise ValueError(
                 "One or more positions "
                 "are missing a symbol."
             )
 
-        if dataframe["quantity"].isnull().any():
+        logger.debug("All positions contain a symbol.")
 
-            raise ValueError(
-                "One or more positions "
-                "are missing quantity."
+        # --------------------------------------------------
+        # Quantity
+        # --------------------------------------------------
+
+        logger.debug("Checking required field: quantity")
+
+        missing_quantity = dataframe[
+            dataframe["quantity"].isna()
+            & (dataframe["symbol"] != "FDRXX")
+        ]
+
+        if not missing_quantity.empty:
+            logger.error(
+                "Found %d position(s) with missing quantity.",
+                len(missing_quantity),
             )
 
-        if dataframe["market_value"].isnull().any():
+            logger.debug(
+                "Symbols missing quantity: %s",
+                missing_quantity["symbol"].tolist(),
+            )
+            raise ValueError(
+                "One or more positions are missing quantity."
+            )
 
+        logger.debug("All positions contain a quantity.")
+
+        # --------------------------------------------------
+        # Current Value
+        # --------------------------------------------------
+
+        logger.debug("Checking required field: current_value")
+        
+        if dataframe["current_value"].isnull().any():
+            missing = dataframe[
+                dataframe["current_value"].isnull()
+            ]
+
+            logger.error(
+                "Found %d position(s) with missing current value.",
+                len(missing),
+            )
+
+            logger.debug(
+                "Rows with missing current value:\n%s",
+                missing,
+            )
             raise ValueError(
                 "One or more positions "
-                "are missing market value."
+                "are missing current value."
             )
+
+        logger.info(
+            "Required field validation completed successfully."
+        )    

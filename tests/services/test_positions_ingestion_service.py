@@ -3,9 +3,13 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from datetime import date
 
+from models.account import Account
+from models.snapshot import Snapshot
 from services.positions_ingestion_service import (
     PositionsIngestionService,
+    SnapshotAlreadyExistsError,
 )
 
 
@@ -18,6 +22,7 @@ def service():
         snapshot_repo=MagicMock(),
         position_repo=MagicMock(),
         import_history_repo=MagicMock(),
+        security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
     )
@@ -47,6 +52,9 @@ def test_import_type(service):
     "services.positions_ingestion_service.ImportHistoryRepository"
 )
 @patch(
+    "services.positions_ingestion_service.SecurityResolutionService"
+)
+@patch(
     "services.positions_ingestion_service.PositionsCSVLoader"
 )
 @patch(
@@ -55,6 +63,7 @@ def test_import_type(service):
 def test_build(
     mock_validator,
     mock_loader,
+    mock_security_resolution_service,
     mock_import_history_repo,
     mock_position_repo,
     mock_snapshot_repo,
@@ -79,7 +88,7 @@ def test_build(
     mock_db_connection.return_value.connect.assert_called_once()
 
     mock_account_repo.assert_called_once_with(conn)
-    mock_security_repo.assert_called_once_with(conn)
+    assert mock_security_repo.call_count == 2
     mock_snapshot_repo.assert_called_once_with(conn)
     mock_position_repo.assert_called_once_with(conn)
     mock_import_history_repo.assert_called_once_with(conn)
@@ -90,13 +99,26 @@ def test_build(
 
 def test_persist_success(service):
 
-    account = SimpleNamespace(id=123)
+    account = SimpleNamespace(id=123, name="Joint WROS TOD")
 
-    service._snapshot_repo.create_snapshot.return_value = 999
 
-    service._security_repo.get_or_create.side_effect = [
-        SimpleNamespace(id=1),
-        SimpleNamespace(id=2),
+    #
+    # No existing snapshot
+    #
+    service._snapshot_repo.get_by_account_and_date.return_value = None
+
+    #
+    # Snapshot creation
+    #
+    mock_snapshot = SimpleNamespace(id=999)
+    service._snapshot_repo.create.return_value = mock_snapshot
+
+    #
+    # Security resolution
+    #
+    service._security_resolution_service.resolve.side_effect = [
+        SimpleNamespace(id=1, symbol="AAPL"),
+        SimpleNamespace(id=2, symbol="MSFT"),
     ]
 
     dataframe = pd.DataFrame(
@@ -104,14 +126,28 @@ def test_persist_success(service):
             {
                 "symbol": "AAPL",
                 "quantity": 10,
-                "market_value": 2000.0,
-                "cost_basis": 1500.0,
+                "average_cost_basis": 150.0,
+                "cost_basis_total": 1500.0,
+                "current_value": 2000.0,
+                "percent_of_account": 0.5,
+                "todays_gain_loss_dollar": 10.0,
+                "todays_gain_loss_percent": 0.01,
+                "total_gain_loss_dollar": 500.0,
+                "total_gain_loss_percent": 0.33,
+                "description": "Apple Inc",
             },
             {
                 "symbol": "MSFT",
                 "quantity": 5,
-                "market_value": 1500.0,
-                "cost_basis": 1000.0,
+                "average_cost_basis": 200.0,
+                "cost_basis_total": 1000.0,
+                "current_value": 1500.0,
+                "percent_of_account": 0.3,
+                "todays_gain_loss_dollar": 20.0,
+                "todays_gain_loss_percent": 0.02,
+                "total_gain_loss_dollar": 500.0,
+                "total_gain_loss_percent": 0.5,
+                "description": "Microsoft Corp",
             },
         ]
     )
@@ -119,51 +155,52 @@ def test_persist_success(service):
     rows = service.persist(
         dataframe=dataframe,
         account=account,
+        snapshot_date="2025-12-31",
+        import_history_id=123,
     )
 
     assert rows == 2
 
-    service._snapshot_repo.create_snapshot.assert_called_once_with(
-        account_id=123
+    # Verify duplicate snapshot check
+    service._snapshot_repo.get_by_account_and_date.assert_called_once_with(
+        123,
+        "2025-12-31",
     )
 
-    assert (
-        service._security_repo.get_or_create.call_count
-        == 2
-    )
+    # Check snapshot creation call
+    snapshot_arg = service._snapshot_repo.create.call_args.args[0]
+    assert snapshot_arg.snapshot_date == "2025-12-31"
 
-    assert (
-        service._position_repo.insert.call_count
-        == 2
-    )
+    # Check security resolution calls
+    assert service._security_resolution_service.resolve.call_count == 2
 
-    service._position_repo.insert.assert_any_call(
-        snapshot_id=999,
-        security_id=1,
-        quantity=10,
-        market_value=2000.0,
-        cost_basis=1500.0,
-    )
+    # Check position insertions
+    assert service._position_repo.insert.call_count == 2
 
-    service._position_repo.insert.assert_any_call(
-        snapshot_id=999,
-        security_id=2,
-        quantity=5,
-        market_value=1500.0,
-        cost_basis=1000.0,
-    )
+    pos1 = service._position_repo.insert.call_args_list[0].args[0]
+    assert pos1.account_id == 123
+    assert pos1.security_id == 1
+    assert pos1.snapshot_id == 999
+    assert pos1.quantity == 10
+
+    pos2 = service._position_repo.insert.call_args_list[1].args[0]
+    assert pos2.account_id == 123
+    assert pos2.security_id == 2
+    assert pos2.snapshot_id == 999
+    assert pos2.quantity == 5
 
 
 def test_persist_raises_on_insert_error(
     service,
 ):
 
-    account = SimpleNamespace(id=123)
+    account = SimpleNamespace(id=123, name="Joint WROS TOD")
+    service._snapshot_repo.get_by_account_and_date.return_value = None
+    mock_snapshot = SimpleNamespace(id=999)
+    service._snapshot_repo.create.return_value = mock_snapshot
 
-    service._snapshot_repo.create_snapshot.return_value = 999
-
-    service._security_repo.get_or_create.return_value = (
-        SimpleNamespace(id=1)
+    service._security_resolution_service.resolve.return_value = (
+        SimpleNamespace(id=1, symbol="AAPL")
     )
 
     service._position_repo.insert.side_effect = (
@@ -175,8 +212,15 @@ def test_persist_raises_on_insert_error(
             {
                 "symbol": "AAPL",
                 "quantity": 10,
-                "market_value": 2000.0,
-                "cost_basis": 1500.0,
+                "average_cost_basis": 150.0,
+                "cost_basis_total": 1500.0,
+                "current_value": 2000.0,
+                "percent_of_account": 0.5,
+                "todays_gain_loss_dollar": 10.0,
+                "todays_gain_loss_percent": 0.01,
+                "total_gain_loss_dollar": 500.0,
+                "total_gain_loss_percent": 0.33,
+                "description": "Apple Inc",
             }
         ]
     )
@@ -192,8 +236,52 @@ def test_persist_raises_on_insert_error(
         service.persist(
             dataframe=dataframe,
             account=account,
+            snapshot_date="2025-12-31",
+            import_history_id=123,
         )
 
-    service._snapshot_repo.create_snapshot.assert_called_once()
-    service._security_repo.get_or_create.assert_called_once()
+    service._snapshot_repo.create.assert_called_once()
+    service._security_resolution_service.resolve.assert_called_once()
     service._position_repo.insert.assert_called_once()
+
+def test_persist_raises_when_snapshot_already_exists(
+    service,
+):
+
+    account = SimpleNamespace(
+        id=123,
+        name="Joint WROS TOD",
+    )
+
+    service._snapshot_repo.get_by_account_and_date.return_value = (
+        SimpleNamespace(id=999)
+    )
+
+    dataframe = pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "quantity": 10,
+                "average_cost_basis": 150.0,
+                "cost_basis_total": 1500.0,
+                "current_value": 2000.0,
+                "percent_of_account": 0.5,
+                "todays_gain_loss_dollar": 10.0,
+                "todays_gain_loss_percent": 0.01,
+                "total_gain_loss_dollar": 500.0,
+                "total_gain_loss_percent": 0.33,
+                "description": "Apple Inc",
+            }
+        ]
+    )
+
+    with pytest.raises(
+        SnapshotAlreadyExistsError,
+        match="Snapshot already exists",
+    ):
+        service.persist(
+            dataframe=dataframe,
+            account=account,
+            snapshot_date="2025-12-31",
+            import_history_id=123,
+        )

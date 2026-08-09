@@ -1,8 +1,15 @@
 import pytest
+from decimal import Decimal
 
 from ingestion.positions.positions_csv_loader import (
     PositionsCSVLoader,
 )
+
+def _load_to_records(loader, file_path):
+    res = loader.load(file_path)
+    if hasattr(res, "to_dict"):
+        return res.to_dict(orient="records")
+    return res
 
 
 @pytest.fixture
@@ -25,9 +32,7 @@ MSFT,12345,5,"$1,500.00"
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     assert len(rows) == 2
 
@@ -51,9 +56,7 @@ def test_load_csv_with_headers_only(
         "Symbol,Account Number,Quantity\n"
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     assert rows == []
 
@@ -84,9 +87,7 @@ AAPL,12345,1000,+15%
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     row = rows[0]
 
@@ -109,9 +110,7 @@ FOOTER,"Downloaded from Fidelity Brokerage Services",0
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     assert len(rows) == 1
 
@@ -132,9 +131,7 @@ AAPL,12345,5
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     assert len(rows) == 1
 
@@ -154,15 +151,13 @@ AAPL,12345,"1,000","$12,345.67","+15.25%"
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     row = rows[0]
 
-    assert row["quantity"] == 1000.0
-    assert row["current_value"] == 12345.67
-    assert row["total_gain_loss_percent"] == 15.25
+    assert row["quantity"] == Decimal("1000")
+    assert row["current_value"] == Decimal("12345.67")
+    assert row["total_gain_loss_percent"] == Decimal("15.25")
 
 
 def test_numeric_cleanup_special_values(
@@ -178,9 +173,7 @@ AAPL,12345,Cash,N/A
 """
     )
 
-    rows = loader.load(
-        str(csv_file)
-    )
+    rows = _load_to_records(loader, str(csv_file))
 
     row = rows[0]
 
