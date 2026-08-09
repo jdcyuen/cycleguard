@@ -2,10 +2,12 @@
 # Account Metadata
 # =========================
 account:
-  name: "Rollover IRA"
-  type: "rollover_ira"
-  risk_profile: "conservative"
+  name: rollover_ira
+  display_name: "Rollover IRA"
+  account_type: rollover_ira
+  risk_profile: conservative
   account_number: "250464524"
+  institution: Fidelity
 
 
 # =========================

@@ -4,7 +4,7 @@ disable_existing_loggers: false
 
 formatters:
   standard:
-    format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    format: "%(asctime)s | %(levelname)s | %(name)s | %(filename)s: %(lineno)d | %(funcName)s | %(message)s"
 
   detailed:
     format: "%(asctime)s | %(levelname)s | %(name)s | %(filename)s: %(lineno)d | %(funcName)s | %(message)s"
@@ -12,7 +12,7 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO
+    level: DEBUG
     formatter: standard
     stream: ext://sys.stdout
 
@@ -29,7 +29,7 @@ loggers:
     propagate: false
 
 root:
-  level: INFO
+  level: DEBUG
   handlers: [console]
 
 

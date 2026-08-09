@@ -1,0 +1,21 @@
+actions:
+  - match: "YOU BOUGHT"
+    normalized: "BUY"
+
+  - match: "YOU SOLD"
+    normalized: "SELL"
+
+  - match: "DIVIDEND RECEIVED"
+    normalized: "DIVIDEND"
+
+  - match: "REINVESTMENT"
+    normalized: "REINVESTMENT"
+
+  - match: "PURCHASE INTO CORE ACCOUNT"
+    normalized: "CORE_PURCHASE"
+
+  - match: "REDEMPTION FROM CORE ACCOUNT"
+    normalized: "CORE_REDEMPTION"
+
+  - match: "NORMAL DISTR PARTIAL"
+    normalized: "DISTRIBUTION"

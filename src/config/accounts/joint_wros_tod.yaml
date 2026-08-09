@@ -1,14 +1,13 @@
 # =========================
 # Account Metadata
 # =========================
-
 account:
-  name: "Joint WROS TOD"
-  type: "joint_wros_tod"
+  name: "joint_wros_tod"
+  display_name: "Joint WROS TOD"
+  account_type: "taxable"
   risk_profile: "moderate"
   account_number: "Z32228042"
-
-
+  institution: Fidelity
 # =========================
 # CURRENT PORTFOLIO
 # =========================

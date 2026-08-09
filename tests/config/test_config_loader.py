@@ -1,5 +1,5 @@
 import os
-from src.config.config_loader import ConfigLoader
+from config.config_loader import ConfigLoader
 
 
 # -----------------------------

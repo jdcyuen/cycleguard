@@ -1,13 +1,13 @@
 # =========================
 # Account Metadata
 # =========================
-
 account:
-  name: "Roth IRA"
-  type: "roth_ira"
+  name: roth_ira
+  display_name: "Roth IRA"
+  account_type: roth_ira
   risk_profile: "aggressive"
   account_number: "245735466"
-
+  institution: Fidelity
 
 # =========================
 # CURRENT PORTFOLIO

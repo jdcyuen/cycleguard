@@ -28,84 +28,143 @@ class SchemaValidator:
 
         for key in required_keys:
             if key not in self.config:
-                raise ConfigError(f"Missing required top-level key: '{key}'")
+                raise ConfigError(
+                    f"Missing required top-level key: '{key}'"
+                )
 
     # =========================
     # Bucket Validation
     # =========================
     def _validate_buckets(self):
-        buckets = self.config.get("portfolio", {}).get("buckets")
+        portfolio = self.config.get("portfolio", {})
 
-        if not buckets:
-            raise ConfigError("Missing 'portfolio.buckets' section")
+        if "buckets" not in portfolio:
+            raise ConfigError(
+                "Missing 'portfolio.buckets' section"
+            )
+
+        buckets = portfolio["buckets"]
 
         if not isinstance(buckets, dict):
-            raise ConfigError("'portfolio.buckets' must be a dictionary")
+            raise ConfigError(
+                "'portfolio.buckets' must be a dictionary"
+            )
+
+        if not buckets:
+            raise ConfigError(
+                "Missing 'portfolio.buckets' section"
+            )
 
         for bucket_name, value in buckets.items():
             if isinstance(value, dict):
-                # Nested bucket (e.g., defensive.cash_like)
+                # Nested bucket (e.g. defensive.cash_like)
                 for sub_name, symbols in value.items():
-                    self._validate_symbol_list(symbols, f"{bucket_name}.{sub_name}")
+                    self._validate_symbol_list(
+                        symbols,
+                        f"{bucket_name}.{sub_name}",
+                    )
             else:
-                self._validate_symbol_list(value, bucket_name)
+                self._validate_symbol_list(
+                    value,
+                    bucket_name,
+                )
 
-    def _validate_symbol_list(self, symbols: Any, context: str):
+    def _validate_symbol_list(
+        self,
+        symbols: Any,
+        context: str,
+    ):
         if not isinstance(symbols, list):
-            raise ConfigError(f"{context} must be a list of symbols")
+            raise ConfigError(
+                f"{context} must be a list of symbols"
+            )
 
         if len(symbols) == 0:
-            raise ConfigError(f"{context} cannot be empty")
+            raise ConfigError(
+                f"{context} cannot be empty"
+            )
 
         for symbol in symbols:
             if not isinstance(symbol, str):
-                raise ConfigError(f"Invalid symbol '{symbol}' in {context}")
+                raise ConfigError(
+                    f"Invalid symbol '{symbol}' in {context}"
+                )
 
     # =========================
     # Regime Validation
     # =========================
     def _validate_regimes(self):
-        regimes = self.config.get("regimes")
+        if "regimes" not in self.config:
+            raise ConfigError(
+                "Missing 'regimes' section"
+            )
 
-        if not regimes:
-            raise ConfigError("Missing 'regimes' section")
+        regimes = self.config["regimes"]
 
         if not isinstance(regimes, dict):
-            raise ConfigError("'regimes' must be a dictionary")
+            raise ConfigError(
+                "'regimes' must be a dictionary"
+            )
+
+        if not regimes:
+            raise ConfigError(
+                "Missing 'regimes' section"
+            )
 
         for regime_name, allocations in regimes.items():
             if not isinstance(allocations, dict):
-                raise ConfigError(f"Regime '{regime_name}' must be a dictionary")
+                raise ConfigError(
+                    f"Regime '{regime_name}' must be a dictionary"
+                )
 
-            self._validate_regime_weights(regime_name, allocations)
+            self._validate_regime_weights(
+                regime_name,
+                allocations,
+            )
 
-    def _validate_regime_weights(self, regime_name: str, allocations: Dict[str, Any]):
+    def _validate_regime_weights(
+        self,
+        regime_name: str,
+        allocations: Dict[str, Any],
+    ):
         total_weight = 0.0
 
         for bucket, value in allocations.items():
             if isinstance(value, dict):
                 for sub_bucket, weight in value.items():
                     self._validate_weight(
-                        weight, f"{regime_name}.{bucket}.{sub_bucket}"
+                        weight,
+                        f"{regime_name}.{bucket}.{sub_bucket}",
                     )
                     total_weight += weight
             else:
-                self._validate_weight(value, f"{regime_name}.{bucket}")
+                self._validate_weight(
+                    value,
+                    f"{regime_name}.{bucket}",
+                )
                 total_weight += value
 
         # Allow tolerance for floating point math
         if not (0.99 <= total_weight <= 1.01):
             raise ConfigError(
-                f"Regime '{regime_name}' weights must sum to ~1.0 "
-                f"(got {total_weight:.4f})"
+                f"Regime '{regime_name}' weights must sum "
+                f"to ~1.0 (got {total_weight:.4f})"
             )
 
-    def _validate_weight(self, weight: Any, context: str):
+    def _validate_weight(
+        self,
+        weight: Any,
+        context: str,
+    ):
         if not isinstance(weight, (int, float)):
-            raise ConfigError(f"Weight must be numeric in {context}")
+            raise ConfigError(
+                f"Weight must be numeric in {context}"
+            )
 
         if weight < 0 or weight > 1:
-            raise ConfigError(f"Weight must be between 0 and 1 in {context}")
+            raise ConfigError(
+                f"Weight must be between 0 and 1 in {context}"
+            )
 
     # =========================
     # Duplicate Detection
@@ -118,29 +177,45 @@ class SchemaValidator:
             if isinstance(value, dict):
                 for sub_name, symbols in value.items():
                     for symbol in symbols:
-                        self._check_duplicate(symbol, bucket_name, sub_name, symbol_map)
+                        self._check_duplicate(
+                            symbol,
+                            bucket_name,
+                            sub_name,
+                            symbol_map,
+                        )
             else:
                 for symbol in value:
-                    self._check_duplicate(symbol, bucket_name, None, symbol_map)
+                    self._check_duplicate(
+                        symbol,
+                        bucket_name,
+                        None,
+                        symbol_map,
+                    )
 
     def _check_duplicate(
         self,
         symbol: str,
         bucket: str,
-        sub_bucket: str,
-        symbol_map: Dict[str, Tuple[str, str]],
+        sub_bucket: str | None,
+        symbol_map: Dict[str, Tuple[str, str | None]],
     ):
         if symbol in symbol_map:
             prev_bucket, prev_sub = symbol_map[symbol]
 
             raise ConfigError(
                 f"Duplicate symbol '{symbol}' found in "
-                f"{prev_bucket}.{prev_sub} and {bucket}.{sub_bucket}"
+                f"{prev_bucket}.{prev_sub} and "
+                f"{bucket}.{sub_bucket}"
             )
 
-        symbol_map[symbol] = (bucket, sub_bucket)
+        symbol_map[symbol] = (
+            bucket,
+            sub_bucket,
+        )
 
 
-def validate_config(config):
+def validate_config(config: Dict[str, Any]) -> None:
+    """Convenience function to validate a configuration."""
+
     validator = SchemaValidator(config)
     validator.validate()

@@ -75,3 +75,12 @@ def get_config(env: str | None = None):
     config_path = _resolve_config_path(env)
 
     return ConfigLoader(config_path).load()
+
+def clear_config_cache():
+    """
+    Clear cached configuration.
+
+    Useful for unit tests where environment
+    variables or config files change.
+    """
+    get_config.cache_clear()
