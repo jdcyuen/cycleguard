@@ -35,15 +35,22 @@ CREATE TABLE cycleguard.import_history (
     account_id INTEGER NOT NULL,
 
     import_type VARCHAR(50) NOT NULL,
+    institution VARCHAR(100) NOT NULL,
 
-    file_name VARCHAR(255) NOT NULL,
+    filename VARCHAR(255) NOT NULL,
     file_hash VARCHAR(64) NOT NULL,
 
-    row_count INTEGER,
+    snapshot_date DATE,
+    import_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
 
-    status VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+    rows_read INTEGER NOT NULL DEFAULT 0,
+    rows_imported INTEGER NOT NULL DEFAULT 0,
+    rows_skipped INTEGER NOT NULL DEFAULT 0,
 
-    imported_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    status VARCHAR(20) NOT NULL DEFAULT 'STARTED',
+    elapsed_ms INTEGER NOT NULL DEFAULT 0,
+
+    error_message TEXT,
 
     FOREIGN KEY (account_id)
         REFERENCES cycleguard.accounts(id),
@@ -67,4 +74,28 @@ UNIQUE
     amount,
     action,
     trade_type
+);
+
+-- Since import_type and status only allow a small set of values, add CHECK constraints to enforce them
+-- This prevents invalid values (for example, "Position" or "Complete") from ever being written to the database 
+-- and helps keep your audit trail consistent.
+
+ALTER TABLE cycleguard.import_history
+ADD CONSTRAINT chk_import_type
+CHECK (
+    import_type IN (
+        'POSITIONS',
+        'TRANSACTIONS'
+    )
+);
+
+ALTER TABLE cycleguard.import_history
+ADD CONSTRAINT chk_import_status
+CHECK (
+    status IN (
+        'STARTED',
+        'SUCCESS',
+        'PARTIAL',
+        'FAILED'
+    )
 );

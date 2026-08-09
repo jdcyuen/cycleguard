@@ -5,6 +5,14 @@ import pytest
 from repositories.snapshot_repo import (
     SnapshotRepository,
 )
+from models.snapshot import Snapshot
+
+import psycopg
+
+from repositories.snapshot_repo import (
+    SnapshotRepositoryError,
+)
+
 
 
 @pytest.fixture
@@ -17,7 +25,7 @@ def repository(mock_conn):
     return SnapshotRepository(mock_conn)
 
 
-def test_get_by_date_returns_id(
+def test_get_by_date_returns_snapshot(
     repository,
     mock_conn,
 ):
@@ -26,23 +34,29 @@ def test_get_by_date_returns_id(
         .__enter__.return_value
     )
 
-    cursor.fetchone.return_value = (123,)
+    cursor.fetchone.return_value = (123, "2025-01-31")
 
     result = repository.get_by_date(
         "2025-01-31"
     )
 
-    assert result == 123
+    assert isinstance(result, Snapshot)
+    assert result.id == 123
+    assert result.snapshot_date == "2025-01-31"
 
     sql, params = cursor.execute.call_args.args
 
-    assert "SELECT id" in sql
-    assert "FROM snapshots" in sql
+    assert "SELECT" in sql
+    assert "id" in sql
+    assert "snapshot_date" in sql
+    assert "FROM cycleguard.snapshots" in sql
     assert "WHERE snapshot_date = %s" in sql
 
     assert params == (
         "2025-01-31",
     )
+    mock_conn.commit.assert_not_called()
+
 
 def test_get_by_date_returns_none(
     repository,
@@ -60,8 +74,10 @@ def test_get_by_date_returns_none(
     )
 
     assert result is None
+    mock_conn.commit.assert_not_called()
 
-def test_create_returns_snapshot_id(
+
+def test_create_returns_snapshot(
     repository,
     mock_conn,
 ):
@@ -70,37 +86,47 @@ def test_create_returns_snapshot_id(
         .__enter__.return_value
     )
 
-    cursor.fetchone.return_value = (456,)
+    cursor.fetchone.return_value = (456, "2025-01-31")
 
     result = repository.create(
-        "2025-01-31"
+        Snapshot(snapshot_date="2025-01-31")
     )
 
-    assert result == 456
+    assert isinstance(result, Snapshot)
+    assert result.id == 456
+    assert result.snapshot_date == "2025-01-31"
 
     sql, params = cursor.execute.call_args.args
 
-    assert "INSERT INTO snapshots" in sql
+    assert "INSERT INTO cycleguard.snapshots" in sql
     assert "RETURNING id" in sql
 
     assert params == (
         "2025-01-31",
     )
 
+    # Verify transaction behavior
     mock_conn.commit.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
 
 def test_ensure_not_exists_when_missing(
     repository,
     monkeypatch,
 ):
+    mock_get = MagicMock(return_value=None)
+
     monkeypatch.setattr(
         repository,
         "get_by_date",
-        lambda snapshot_date: None,
+        mock_get,
     )
 
     repository.ensure_not_exists(
+        "2025-01-31"
+    )
+
+    mock_get.assert_called_once_with(
         "2025-01-31"
     )
 
@@ -111,7 +137,7 @@ def test_ensure_not_exists_raises(
     monkeypatch.setattr(
         repository,
         "get_by_date",
-        lambda snapshot_date: 123,
+        lambda snapshot_date: Snapshot(id=123, snapshot_date="2025-01-31"),
     )
 
     with pytest.raises(
@@ -125,3 +151,93 @@ def test_ensure_not_exists_raises(
         "Snapshot already exists"
         in str(exc_info.value)
     )
+
+def test_get_by_date_database_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = psycopg.Error()
+
+    with pytest.raises(
+        SnapshotRepositoryError
+    ) as exc_info:
+        repository.get_by_date(
+            "2025-01-31"
+        )
+
+    assert (
+        "Failed to lookup snapshot"
+        in str(exc_info.value)
+    )
+
+def test_create_integrity_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = (
+        psycopg.IntegrityError()
+    )
+
+    with pytest.raises(
+        SnapshotRepositoryError
+    ) as exc_info:
+        repository.create(
+            Snapshot(snapshot_date="2025-01-31")
+        )
+
+    assert (
+        "Snapshot already exists"
+        in str(exc_info.value)
+    )
+
+    mock_conn.rollback.assert_called_once()
+
+
+def test_create_database_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = (
+        psycopg.Error()
+    )
+
+    with pytest.raises(
+        SnapshotRepositoryError
+    ) as exc_info:
+        repository.create(
+            Snapshot(snapshot_date="2025-01-31")
+        )
+
+    assert (
+        "Failed to create snapshot"
+        in str(exc_info.value)
+    )
+
+    mock_conn.rollback.assert_called_once()
+
+
+
+
+
+
+
+
+
+
+
+

@@ -9,21 +9,27 @@ def init_db():
     CREATE TABLE IF NOT EXISTS snapshots (
         id SERIAL PRIMARY KEY,
         account_id INTEGER NOT NULL,
-        snapshot_date DATE UNIQUE NOT NULL,
+        snapshot_date DATE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        CONSTRAINT uq_snapshot_account_date
+        UNIQUE (
+            account_id,
+            snapshot_date
+        )
     );
 
     CREATE TABLE IF NOT EXISTS accounts (
         id SERIAL PRIMARY KEY,
         account_number VARCHAR(100) UNIQUE NOT NULL,
-        account_name VARCHAR(255),
+        name VARCHAR(255),
         provider VARCHAR(100) DEFAULT 'unknown',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS securities (
         id SERIAL PRIMARY KEY,
-        ticker VARCHAR(50) UNIQUE NOT NULL,
+        symbol VARCHAR(50) UNIQUE NOT NULL,
         description VARCHAR(255),
         asset_type VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -37,7 +43,7 @@ def init_db():
         quantity NUMERIC(18, 4),
         avg_cost NUMERIC(18, 4),
         cost_basis_total NUMERIC(18, 4),
-        market_value NUMERIC(18, 4),
+        current_value NUMERIC(18, 4),
         percent_of_account NUMERIC(18, 4),
         daily_gain NUMERIC(18, 4),
         daily_gain_pct NUMERIC(18, 4),
