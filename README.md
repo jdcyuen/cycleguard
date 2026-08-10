@@ -4,6 +4,8 @@ E:\CycleGuard
 Github repository
 https://github.com/jdcyuen/cycleguard.git
 
+##Environment
+
 If you are just running the code locally on your machine, you don't have to do anything. It will automatically default to dev and use dev.yaml.
 
 If you want to run your tests, your test suite (or you) can set the environment variable right before running the code so it uses test.yaml:
@@ -31,6 +33,7 @@ python -m unittest tests/test_crash_manager.py
 
 To run the command line for the CycleGuard portfolio ingestion pipeline, you should run it as a Python module from the project root (E:\CycleGuard).
 
+##Ingestion command line for positions
 The Run Command
 bash
 python -m src.cli.ingest_positions --file <path_to_csv> [options]
@@ -67,7 +70,7 @@ If you do not explicitly provide a --snapshot-date argument, the CLI resolves th
 
     
 
-
+##Ingestion command line for transactions
 
 #To run the ingestion pipline cli for transactions:
 
@@ -77,8 +80,8 @@ To run the command line for the CycleGuard transaction ingestion pipeline, you s
 
 Example:
 
-python -m src.cli.ingest_transactions --file "C:\Users\Joe\Downloads\transactions.csv" --account rollover_ira --confirm
 
+python -m src.cli.ingest_transactions --file "K:\Joe\Fidelity\2026\Rollover\Transactions\Apr2026.csv" --account rollover_ira --confirm
 
 
 Command Line Arguments
@@ -89,7 +92,7 @@ Command Line Arguments
 
 
 
-
+##Database
 
 
 To access the database via the command line:
@@ -191,7 +194,10 @@ If foreign keys exist between tables:
 
     TRUNCATE TABLE
             cycleguard.positions,
+            cycleguard.securities,
+            cycleguard.accounts,
             cycleguard.snapshots,
+            cycleguard.transactions,
             cycleguard.import_history
     RESTART IDENTITY CASCADE;
 
@@ -208,19 +214,53 @@ See row counts before clearing
 
 For a full CycleGuard reset
 
+
+
+
 If you want to completely reload positions and transactions from scratch:
 
     TRUNCATE TABLE
         cycleguard.positions,
         cycleguard.transactions,
         cycleguard.snapshots,
-        cycleguard.import_history
+        cycleguard.import_history,
+        cycleguard.accounts,
+        cycleguard.securities
     RESTART IDENTITY CASCADE;
 
 This keeps your tables, indexes, constraints, accounts, and securities intact, while removing all imported data.
 
+Add unique constraint:
+
+ALTER TABLE cycleguard.snapshots
+ADD CONSTRAINT uq_snapshot
+UNIQUE (
+    id,
+    snapshot_date
+);
+
+This guarantees the database cannot contain duplicate snapshots.
 
 
+
+##Cycleguard Architecture
+
+
+##Testing    
+
+Running Unit tests:
+pytest tests/repositories/test_account_repository.py -vv
+pytest tests/repositories/test_import_history_repository.py -vv
+pytest tests/repositories/test_positions_repository.py -vv
+pytest tests/repositories/test_security_repository.py -vv
+pytest tests/repositories/test_snapshot_repository.py -vv
+pytest tests/repositories/test_transaction_repository.py -vv
+
+pytest tests/config/test_schema_validator.py -vv
+pytest tests/config/test_config_manager.py -vv
+pytest tests/config/test_config_loader.py -vv
+pytest tests/ingestion/common/test_cli_ingestion_helper.py -vv
+pytest tests/services/test_positions_ingestion_service.py -vv
 
 
 
