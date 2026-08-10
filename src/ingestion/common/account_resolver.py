@@ -7,8 +7,10 @@ import json
 from services.account_validation_service import (
     AccountValidationService,
 )
+from ingestion.common.cli_ingestion_helper import confirm_add_account
 
 logger = get_logger(__name__)
+
 class AccountResolver:
     """
     Resolves account names from configuration.
@@ -37,6 +39,7 @@ class AccountResolver:
 
 
     def resolve_account(
+        self,
         account_name: str | None,
         account_repo,
     ) -> str:

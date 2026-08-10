@@ -1,10 +1,7 @@
 from unittest.mock import MagicMock, patch
 import pytest
 
-from services.account_resolver import (
-    AccountResolver,
-    resolve_account,
-)
+from ingestion.common.account_resolver import AccountResolver
 
 
 # ----------------------------------------------------
@@ -25,7 +22,7 @@ def mock_account_repo():
 # get_account_names()
 # ----------------------------------------------------
 
-@patch("services.account_resolver.get_config")
+@patch("ingestion.common.account_resolver.get_config")
 def test_get_account_names_returns_sorted_accounts(mock_get_config, resolver):
 
     mock_get_config.return_value = {
@@ -41,7 +38,7 @@ def test_get_account_names_returns_sorted_accounts(mock_get_config, resolver):
     assert result == ["IRA", "Joint", "Roth"]
 
 
-@patch("services.account_resolver.get_config")
+@patch("ingestion.common.account_resolver.get_config")
 def test_get_account_names_empty(mock_get_config, resolver):
 
     mock_get_config.return_value = {
@@ -75,16 +72,17 @@ def test_validate_account_false(mock_names, resolver):
 # resolve_account()
 # ----------------------------------------------------
 
-@patch("services.account_resolver.AccountValidationService")
+@patch("ingestion.common.account_resolver.AccountValidationService")
 def test_resolve_existing_account(
     mock_validation,
     mock_account_repo,
+    resolver,
 ):
 
     validator = mock_validation.return_value
     validator.exists.return_value = True
 
-    result = resolve_account(
+    result = resolver.resolve_account(
         "IRA",
         mock_account_repo,
     )
@@ -95,12 +93,13 @@ def test_resolve_existing_account(
     validator.add_account.assert_not_called()
 
 
-@patch("services.account_resolver.confirm_add_account")
-@patch("services.account_resolver.AccountValidationService")
+@patch("ingestion.common.account_resolver.confirm_add_account")
+@patch("ingestion.common.account_resolver.AccountValidationService")
 def test_resolve_new_account_adds_to_database(
     mock_validation,
     mock_confirm,
     mock_account_repo,
+    resolver,
 ):
 
     validator = mock_validation.return_value
@@ -108,7 +107,7 @@ def test_resolve_new_account_adds_to_database(
     validator.exists.return_value = False
     mock_confirm.return_value = True
 
-    result = resolve_account(
+    result = resolver.resolve_account(
         "IRA",
         mock_account_repo,
     )
@@ -118,12 +117,13 @@ def test_resolve_new_account_adds_to_database(
     validator.add_account.assert_called_once_with("IRA")
 
 
-@patch("services.account_resolver.confirm_add_account")
-@patch("services.account_resolver.AccountValidationService")
+@patch("ingestion.common.account_resolver.confirm_add_account")
+@patch("ingestion.common.account_resolver.AccountValidationService")
 def test_resolve_new_account_cancelled(
     mock_validation,
     mock_confirm,
     mock_account_repo,
+    resolver,
 ):
 
     validator = mock_validation.return_value
@@ -132,7 +132,7 @@ def test_resolve_new_account_cancelled(
     mock_confirm.return_value = False
 
     with pytest.raises(SystemExit):
-        resolve_account(
+        resolver.resolve_account(
             "IRA",
             mock_account_repo,
         )
@@ -140,12 +140,12 @@ def test_resolve_new_account_cancelled(
     validator.add_account.assert_not_called()
 
 
-def test_resolve_account_no_accounts(mock_account_repo):
+def test_resolve_account_no_accounts(mock_account_repo, resolver):
 
     mock_account_repo.list_accounts.return_value = []
 
     with pytest.raises(ValueError):
-        resolve_account(
+        resolver.resolve_account(
             None,
             mock_account_repo,
         )
@@ -155,6 +155,7 @@ def test_resolve_account_no_accounts(mock_account_repo):
 def test_resolve_account_select_existing(
     mock_input,
     mock_account_repo,
+    resolver,
 ):
 
     acct1 = MagicMock()
@@ -168,7 +169,7 @@ def test_resolve_account_select_existing(
         acct2,
     ]
 
-    result = resolve_account(
+    result = resolver.resolve_account(
         None,
         mock_account_repo,
     )
@@ -180,6 +181,7 @@ def test_resolve_account_select_existing(
 def test_resolve_account_invalid_then_valid(
     mock_input,
     mock_account_repo,
+    resolver,
 ):
 
     acct = MagicMock()
@@ -187,7 +189,7 @@ def test_resolve_account_invalid_then_valid(
 
     mock_account_repo.list_accounts.return_value = [acct]
 
-    result = resolve_account(
+    result = resolver.resolve_account(
         None,
         mock_account_repo,
     )
