@@ -1,10 +1,10 @@
 # src/data/market_data.py
 # 👉 Lightweight wrapper for the MarketData engine to return a clean dictionary
 
-from src.engine.crash_manager import CrashManager
+from engine.crash_manager import CrashManager
 
 # from src.config.config_loader import ConfigLoader
-from src.config.config_manager import get_config
+from config.config_manager import get_config
 
 
 def get_market_data():
