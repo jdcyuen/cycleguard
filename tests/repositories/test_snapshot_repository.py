@@ -19,10 +19,81 @@ from repositories.snapshot_repo import (
 def mock_conn():
     return MagicMock()
 
+@pytest.fixture
+def mock_cursor():
+    return MagicMock()
+
 
 @pytest.fixture
-def repository(mock_conn):
+def repository(mock_conn, mock_cursor):
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     return SnapshotRepository(mock_conn)
+
+
+def test_delete_by_import_history_id_returns_row_count(
+    repository,
+    mock_cursor,
+):
+    import_id = 123
+    mock_cursor.rowcount = 5
+
+    result = repository.delete_by_import_history_id(import_id)
+
+    assert result == 5
+    mock_cursor.execute.assert_called_once()
+
+
+def test_delete_by_import_history_id_executes_expected_sql(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    import_history_id = 123
+
+    repository.delete_by_import_history_id(import_history_id)
+
+    mock_cursor.execute.assert_called_once()
+
+    sql, params = mock_cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.snapshots" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (import_history_id,)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_delete_by_import_history_id_does_not_commit(
+    repository,
+    mock_conn,
+    mock_cursor,
+):
+    mock_cursor.rowcount = 5
+
+    repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_delete_by_import_history_id_raises_repository_error(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    mock_cursor.execute.side_effect = Exception(
+        "database error"
+    )
+
+    with pytest.raises(
+        SnapshotRepositoryError,
+        match="Unable to delete snapshots",
+    ):
+        repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
 
 
 def test_get_by_date_returns_snapshot(

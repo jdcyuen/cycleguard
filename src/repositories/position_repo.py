@@ -204,7 +204,7 @@ class PositionRepository:
 
         except Exception as exc:
 
-            self.conn.rollback()
+            #self.conn.rollback()
 
             logger.exception(
                 "Failed deleting positions "

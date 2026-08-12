@@ -15,16 +15,97 @@ from models.position import Position
 def mock_conn():
     return MagicMock()
 
+@pytest.fixture
+def mock_cursor():
+    return MagicMock()
+
 
 @pytest.fixture
-def repository(mock_conn):
+def repository(mock_conn, mock_cursor):
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     return PositionRepository(mock_conn)
+
+
+def test_delete_by_import_history_id_returns_row_count(
+    repository,
+    mock_cursor,
+):
+    import_id = 123
+    mock_cursor.rowcount = 5
+
+    result = repository.delete_by_import_history_id(import_id)
+
+    assert result == 5
+    mock_cursor.execute.assert_called_once()
+
+def test_delete_by_import_history_id_executes_expected_sql(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    import_history_id = 123
+
+    repository.delete_by_import_history_id(import_history_id)
+
+    mock_cursor.execute.assert_called_once()
+
+    sql, params = mock_cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.positions" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (import_history_id,)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+def test_delete_by_import_history_id_does_not_commit(
+    repository,
+    mock_conn,
+    mock_cursor,
+):
+    mock_cursor.rowcount = 5
+
+    repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+def test_delete_by_import_history_id_raises_repository_error(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    mock_cursor.execute.side_effect = Exception(
+        "database error"
+    )
+
+    with pytest.raises(
+        PositionRepositoryError,
+        match="Unable to delete positions",
+    ):
+        repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+def test_delete_by_import_history_id_raises_exception_on_db_error(
+    repository,
+    mock_conn,
+    mock_cursor,
+):
+    mock_cursor.execute.side_effect = psycopg.Error()
+
+    with pytest.raises(PositionRepositoryError):
+        repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
 
 # ---------------------------------------------------------------------
 # insert()
 # ---------------------------------------------------------------------
 
-def test_insert_success(
+def test_insert_position_success(
     repository,
     mock_conn,
 ):
@@ -242,3 +323,28 @@ def test_delete_by_snapshot_database_error(repository, mock_conn):
 
     mock_conn.rollback.assert_called_once()
     mock_conn.commit.assert_not_called()
+
+def test_delete_by_import_history_id():
+    conn = MagicMock()
+    cursor = MagicMock()
+
+    cursor.rowcount = 25
+
+    conn.cursor.return_value.__enter__.return_value = cursor
+
+    repo = PositionRepository(conn)
+
+    result = repo.delete_by_import_history_id(
+        import_history_id=42,
+    )
+
+    assert result == 25
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.positions" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (42,)
+
+    assert not conn.commit.called
+    assert not conn.rollback.called    

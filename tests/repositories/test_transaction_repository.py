@@ -4,6 +4,7 @@ import pytest
 
 from repositories.transaction_repo import (
     TransactionRepository,
+    TransactionRepositoryError,
 )
 from models.transaction import Transaction
 
@@ -12,11 +13,98 @@ from models.transaction import Transaction
 def mock_conn():
     return MagicMock()
 
+@pytest.fixture
+def mock_cursor():
+    return MagicMock()
+
+
 
 @pytest.fixture
-def repository(mock_conn):
+def repository(mock_conn, mock_cursor):
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     return TransactionRepository(mock_conn)
 
+
+def test_delete_by_import_history_id_returns_row_count(
+    repository,
+    mock_cursor,
+):
+    import_id = 123
+    mock_cursor.rowcount = 5
+
+    result = repository.delete_by_import_history_id(import_id)
+
+    assert result == 5
+    mock_cursor.execute.assert_called_once()
+
+
+def test_delete_by_import_history_id_executes_expected_sql(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    import_history_id = 123
+
+    repository.delete_by_import_history_id(import_history_id)
+
+    mock_cursor.execute.assert_called_once()
+
+    sql, params = mock_cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.transactions" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (import_history_id,)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_delete_by_import_history_id_does_not_commit(
+    repository,
+    mock_conn,
+    mock_cursor,
+):
+    mock_cursor.rowcount = 5
+
+    repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_delete_by_import_history_id_raises_repository_error(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+
+    mock_cursor.execute.side_effect = Exception(
+        "database error"
+    )
+
+    with pytest.raises(
+        TransactionRepositoryError,
+        match="Unable to delete transactions",
+    ):
+        repository.delete_by_import_history_id(123)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+def test_delete_by_import_history_id_preserves_original_exception(
+    repository,
+    mock_cursor,
+):
+    original_error = Exception("database error")
+
+    mock_cursor.execute.side_effect = original_error
+
+    with pytest.raises(
+        TransactionRepositoryError
+    ) as exc_info:
+        repository.delete_by_import_history_id(123)
+
+    assert exc_info.value.__cause__ is original_error
 
 def test_insert_transaction_success(
     repository,
@@ -53,7 +141,6 @@ def test_insert_transaction_success(
     assert result.action == "BUY"
 
     cursor.execute.assert_called_once()
-
     mock_conn.commit.assert_called_once()
 
 
