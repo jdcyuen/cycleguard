@@ -226,4 +226,66 @@ class SnapshotRepository:
                 f"Unable to retrieve snapshot for "
                 f"account_id={account_id} "
                 f"on {snapshot_date}"
-            ) from exc    
+            ) from exc
+    
+    def delete_by_import_history_id(
+        self,
+        import_history_id: int,
+    ) -> int:
+
+        """
+        Deletes all snapshots created by the specified import.
+
+        ```
+        Args:
+            import_history_id: ID of the import history record.
+
+        Returns:
+            Number of snapshots deleted.
+
+        Raises:
+            SnapshotRepositoryError:
+                If the delete operation fails.
+        """
+
+        sql = """
+            DELETE FROM cycleguard.snapshots
+            WHERE import_history_id = %s;
+        """
+
+        logger.info(
+            "Deleting snapshots for import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                rows_deleted = cur.rowcount
+
+            logger.info(
+                "Deleted %s snapshot(s) "
+                "for import_history_id=%s",
+                rows_deleted,
+                import_history_id,
+            )
+
+            return rows_deleted
+
+        except Exception as exc:
+
+            logger.exception(
+                "Failed deleting snapshots "
+                "for import_history_id=%s",
+                import_history_id,
+            )
+
+            raise SnapshotRepositoryError(
+                "Unable to delete snapshots "
+                f"for import_history_id={import_history_id}"
+            ) from exc

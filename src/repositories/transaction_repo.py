@@ -437,3 +437,69 @@ class TransactionRepository:
             raise TransactionRepositoryError(
                 f"Failed retrieving transactions for account_id={account_id}"
             ) from exc
+
+    def delete_by_import_history_id(
+        self,
+        import_history_id: int,
+        ) -> int:
+        
+        """
+        Deletes all transactions created by the specified import.
+
+        ```
+        Args:
+            import_history_id: ID of the import history record.
+
+        Returns:
+            Number of transactions deleted.
+
+        Raises:
+            TransactionRepositoryError:
+                If the delete operation fails.
+        """
+
+        sql = """
+            DELETE FROM cycleguard.transactions
+            WHERE import_history_id = %s;
+        """
+
+        logger.info(
+            "Deleting transactions for import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                rows_deleted = cur.rowcount
+
+           #self.conn.commit()
+
+            logger.info(
+                "Deleted %s transaction(s) "
+                "for import_history_id=%s",
+                rows_deleted,
+                import_history_id,
+            )
+
+            return rows_deleted
+
+        except Exception as exc:
+
+            #self.conn.rollback()
+
+            logger.exception(
+                "Failed deleting transactions "
+                "for import_history_id=%s",
+                import_history_id,
+            )
+
+            raise TransactionRepositoryError(
+                "Unable to delete transactions "
+                f"for import_history_id={import_history_id}"
+            ) from exc

@@ -149,4 +149,70 @@ class PositionRepository:
         except psycopg.Error as exc: 
             self.conn.rollback() 
             logger.exception( "Failed deleting positions." ) 
-            raise PositionRepositoryError( "Failed deleting positions." ) from exc      
+            raise PositionRepositoryError( "Failed deleting positions." ) from exc
+
+    def delete_by_import_history_id(
+        self,
+        import_history_id: int,
+    ) -> int:
+
+        """
+        Deletes all positions created by the specified import.
+
+        ```
+        Args:
+            import_history_id: ID of the import history record.
+
+        Returns:
+            Number of positions deleted.
+
+        Raises:
+            PositionRepositoryError:
+                If the delete operation fails.
+        """
+
+        sql = """
+            DELETE FROM cycleguard.positions
+            WHERE import_history_id = %s;
+        """
+
+        logger.info(
+            "Deleting positions for import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                rows_deleted = cur.rowcount
+
+            #self.conn.commit()
+
+            logger.info(
+                "Deleted %s position(s) "
+                "for import_history_id=%s",
+                rows_deleted,
+                import_history_id,
+            )
+
+            return rows_deleted
+
+        except Exception as exc:
+
+            self.conn.rollback()
+
+            logger.exception(
+                "Failed deleting positions "
+                "for import_history_id=%s",
+                import_history_id,
+            )
+
+            raise PositionRepositoryError(
+                "Unable to delete positions "
+                f"for import_history_id={import_history_id}"
+            ) from exc

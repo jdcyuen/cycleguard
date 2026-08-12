@@ -601,4 +601,68 @@ class ImportHistoryRepository:
                 f"Unable to update import history id={import_history.id}"
             ) from exc 
 
+    def delete_by_import_history_id(
+        self,
+        import_history_id: int,
+    ) -> int:
+
+        """
+        Deletes the import history record identified by import_history_id.
+
+        ```
+        Args:
+            import_history_id: ID of the import history record.
+
+        Returns:
+            Number of import history records deleted.
+
+        Raises:
+            ImportHistoryRepositoryError:
+                If the delete operation fails.
+        """
+
+        sql = """
+            DELETE FROM cycleguard.import_history
+            WHERE id = %s;
+        """
+
+        logger.info(
+            "Deleting import history record: "
+            "import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+
+            with self.conn.cursor() as cur:
+
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                rows_deleted = cur.rowcount
+
+            logger.info(
+                "Deleted %s import history record(s) "
+                "for import_history_id=%s",
+                rows_deleted,
+                import_history_id,
+            )
+
+            return rows_deleted
+
+        except Exception as exc:
+
+            logger.exception(
+                "Failed deleting import history record "
+                "import_history_id=%s",
+                import_history_id,
+            )
+
+            raise ImportHistoryRepositoryError(
+                "Unable to delete import history record "
+                f"import_history_id={import_history_id}"
+            ) from exc
+
             
