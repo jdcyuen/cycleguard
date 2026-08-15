@@ -105,7 +105,7 @@ def test_get_by_date_returns_snapshot(
         .__enter__.return_value
     )
 
-    cursor.fetchone.return_value = (123, "2025-01-31")
+    cursor.fetchone.return_value = (123, "2025-01-31", 789)
 
     result = repository.get_by_date(
         "2025-01-31"
@@ -114,6 +114,7 @@ def test_get_by_date_returns_snapshot(
     assert isinstance(result, Snapshot)
     assert result.id == 123
     assert result.snapshot_date == "2025-01-31"
+    assert result.import_history_id == 789
 
     sql, params = cursor.execute.call_args.args
 
@@ -157,23 +158,28 @@ def test_create_returns_snapshot(
         .__enter__.return_value
     )
 
-    cursor.fetchone.return_value = (456, "2025-01-31")
+    cursor.fetchone.return_value = (456, "2025-01-31", 123)
 
     result = repository.create(
-        Snapshot(snapshot_date="2025-01-31")
+        Snapshot(snapshot_date="2025-01-31",
+        import_history_id=123,)
     )
 
     assert isinstance(result, Snapshot)
     assert result.id == 456
     assert result.snapshot_date == "2025-01-31"
+    assert result.import_history_id == 123
 
     sql, params = cursor.execute.call_args.args
 
     assert "INSERT INTO cycleguard.snapshots" in sql
-    assert "RETURNING id" in sql
+    assert "RETURNING id, snapshot_date, import_history_id" in sql
+    assert "snapshot_date" in sql
+    assert "import_history_id" in sql
 
     assert params == (
         "2025-01-31",
+        123,
     )
 
     # Verify transaction behavior
