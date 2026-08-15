@@ -36,7 +36,8 @@ class SnapshotRepository:
                     """
                     SELECT
                         id,
-                        snapshot_date
+                        snapshot_date,
+                        import_history_id
                     FROM cycleguard.snapshots
                     WHERE snapshot_date = %s
                     """,
@@ -53,6 +54,7 @@ class SnapshotRepository:
                 return Snapshot(
                     id=row[0],
                     snapshot_date=row[1],
+                    import_history_id=row[2],
                 )
 
 
@@ -82,11 +84,14 @@ class SnapshotRepository:
             with self.conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO cycleguard.snapshots(snapshot_date)
-                    VALUES (%s)
-                    RETURNING id, snapshot_date
+                    INSERT INTO cycleguard.snapshots(snapshot_date, import_history_id)
+                    VALUES (%s, %s)
+                    RETURNING id, snapshot_date, import_history_id
                     """,
-                    (snapshot.snapshot_date,),
+                    (
+                        snapshot.snapshot_date,
+                        snapshot.import_history_id,
+                    ),
                 )
 
                 row = cur.fetchone()
@@ -101,6 +106,7 @@ class SnapshotRepository:
             return Snapshot(
                 id=row[0],
                 snapshot_date=row[1],
+                import_history_id=row[2],
             )
 
         except psycopg.IntegrityError as exc:
@@ -173,7 +179,8 @@ class SnapshotRepository:
         sql = """
             SELECT
                 id,
-                snapshot_date
+                snapshot_date,
+                import_history_id
             FROM cycleguard.snapshots
             WHERE account_id = %s
             AND snapshot_date = %s
@@ -212,6 +219,7 @@ class SnapshotRepository:
             return Snapshot(
                 id=row[0],
                 snapshot_date=row[1],
+                import_history_id=row[2],
             )
 
         except Exception as exc:
