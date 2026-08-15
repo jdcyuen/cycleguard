@@ -47,6 +47,7 @@ class TransactionRepository:
             transaction.symbol,
             transaction.run_date,
             transaction.action,
+            transaction.import_history_id,
         )
         logger.debug(
             "run_date=%r (%s)",
@@ -80,6 +81,7 @@ class TransactionRepository:
                     type(transaction.settlement_date),
                 )
                 params = (
+                    transaction.import_history_id,
                     transaction.account_id,
                     transaction.security_id,
                     transaction.run_date,
@@ -101,6 +103,7 @@ class TransactionRepository:
                     """
                     INSERT INTO cycleguard.transactions
                     (
+                        import_history_id,
                         account_id,
                         security_id,
                         run_date,
@@ -117,13 +120,14 @@ class TransactionRepository:
                     )
                     VALUES
                     (
-                        %s, %s, %s, %s,
+                        %s,%s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s
                     )
                     RETURNING id
                     """,
                     (
+                        transaction.import_history_id,
                         transaction.account_id,
                         transaction.security_id,
                         transaction.run_date,
@@ -164,6 +168,7 @@ class TransactionRepository:
                 accrued_interest=transaction.accrued_interest,
                 amount=transaction.amount,
                 cash_balance=transaction.cash_balance,
+                import_history_id=transaction.import_history_id,
             )
 
         except psycopg.IntegrityError as exc:
@@ -294,6 +299,7 @@ class TransactionRepository:
                     """
                     SELECT
                         id,
+                        import_history_id,
                         account_id,
                         security_id,
                         run_date,
@@ -331,19 +337,20 @@ class TransactionRepository:
 
                 return Transaction(
                     id=row[0],
-                    account_id=row[1],
-                    security_id=row[2],
-                    run_date=row[3],
-                    settlement_date=row[4],
-                    action=row[5],
-                    trade_type=row[6],
-                    price=row[7],
-                    quantity=row[8],
-                    commission=row[9],
-                    fees=row[10],
-                    accrued_interest=row[11],
-                    amount=row[12],
-                    cash_balance=row[13],
+                    import_history_id=row[1],
+                    account_id=row[2],
+                    security_id=row[3],
+                    run_date=row[4],
+                    settlement_date=row[5],
+                    action=row[6],
+                    trade_type=row[7],
+                    price=row[8],
+                    quantity=row[9],
+                    commission=row[10],
+                    fees=row[11],
+                    accrued_interest=row[12],
+                    amount=row[13],
+                    cash_balance=row[14],
                 )
 
         except psycopg.Error as exc:
@@ -380,6 +387,7 @@ class TransactionRepository:
                     """
                     SELECT
                         id,
+                        import_history_id,
                         account_id,
                         security_id,
                         run_date,
@@ -410,19 +418,20 @@ class TransactionRepository:
                 return [
                     Transaction(
                         id=row[0],
-                        account_id=row[1],
-                        security_id=row[2],
-                        run_date=row[3],
-                        settlement_date=row[4],
-                        action=row[5],
-                        trade_type=row[6],
-                        price=row[7],
-                        quantity=row[8],
-                        commission=row[9],
-                        fees=row[10],
-                        accrued_interest=row[11],
-                        amount=row[12],
-                        cash_balance=row[13],
+                        import_history_id=row[1],
+                        account_id=row[2],
+                        security_id=row[3],
+                        run_date=row[4],
+                        settlement_date=row[5],
+                        action=row[6],
+                        trade_type=row[7],
+                        price=row[8],
+                        quantity=row[9],
+                        commission=row[10],
+                        fees=row[11],
+                        accrued_interest=row[12],
+                        amount=row[13],
+                        cash_balance=row[14],
                     )
                     for row in rows
                 ]
@@ -501,5 +510,55 @@ class TransactionRepository:
 
             raise TransactionRepositoryError(
                 "Unable to delete transactions "
+                f"for import_history_id={import_history_id}"
+            ) from exc
+
+    def count_by_import_history_id(
+        self,
+        import_history_id: int,
+    ) -> int:
+        """
+        Returns the number of transactions created by the specified import.
+        """
+
+        sql = """
+            SELECT COUNT(*)
+            FROM cycleguard.transactions
+            WHERE import_history_id = %s
+        """
+
+        logger.info(
+            "Counting transactions for import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                row = cur.fetchone()
+
+            count = row[0]
+
+            logger.debug(
+                "Found %s transaction(s) for import_history_id=%s",
+                count,
+                import_history_id,
+            )
+
+            return count
+
+        except psycopg.Error as exc:
+            logger.exception(
+                "Failed counting transactions "
+                "for import_history_id=%s",
+                import_history_id,
+            )
+
+            raise TransactionRepositoryError(
+                "Unable to count transactions "
                 f"for import_history_id={import_history_id}"
             ) from exc
