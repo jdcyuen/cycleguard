@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+import psycopg
 
 from repositories.transaction_repo import (
     TransactionRepository,
@@ -119,6 +120,7 @@ def test_insert_transaction_success(
 
     result = repository.insert(
         Transaction(
+            import_history_id=0,
             account_id=1,
             security_id=10,
             run_date="2026-06-17",
@@ -211,6 +213,7 @@ def test_insert_commits_after_insert(
 
     repository.insert(
         Transaction(
+            import_history_id=0,
             account_id=1,
             security_id=None,
             run_date="2026-06-17",
@@ -228,3 +231,74 @@ def test_insert_commits_after_insert(
     )
 
     mock_conn.commit.assert_called_once()
+
+# ---------------------------------------------------------------------
+# count_by_import_history_id()
+# ---------------------------------------------------------------------
+
+def test_count_by_import_history_id_success(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchone.return_value = (25,)
+
+    result = repository.count_by_import_history_id(42)
+
+    assert result == 25
+
+    cursor.execute.assert_called_once()
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "SELECT COUNT(*)" in sql
+    assert "FROM cycleguard.transactions" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (42,)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_count_by_import_history_id_returns_zero(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchone.return_value = (0,)
+
+    result = repository.count_by_import_history_id(42)
+
+    assert result == 0
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_count_by_import_history_id_database_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = psycopg.Error()
+
+    with pytest.raises(
+        TransactionRepositoryError,
+        match="Unable to count transactions",
+    ):
+        repository.count_by_import_history_id(42)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
