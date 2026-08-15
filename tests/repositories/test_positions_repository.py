@@ -116,6 +116,7 @@ def test_insert_position_success(
 
     repository.insert(
         Position(
+            import_history_id=0,
             snapshot_id=1,
             account_id=2,
             security_id=3,
@@ -134,6 +135,7 @@ def test_insert_position_success(
     sql, params = cursor.execute.call_args.args
 
     assert "INSERT INTO cycleguard.positions" in sql
+    assert "import_history_id" in sql
     assert "snapshot_id" in sql
     assert "account_id" in sql
     assert "security_id" in sql
@@ -142,6 +144,7 @@ def test_insert_position_success(
     assert "current_value" in sql
 
     assert params == (
+        0,      # import_history_id
         1,      # snapshot_id
         2,      # account_id
         3,      # security_id
@@ -324,27 +327,73 @@ def test_delete_by_snapshot_database_error(repository, mock_conn):
     mock_conn.rollback.assert_called_once()
     mock_conn.commit.assert_not_called()
 
-def test_delete_by_import_history_id():
-    conn = MagicMock()
-    cursor = MagicMock()
+# ---------------------------------------------------------------------
+# count_by_import_history_id()
+# ---------------------------------------------------------------------
 
-    cursor.rowcount = 25
-
-    conn.cursor.return_value.__enter__.return_value = cursor
-
-    repo = PositionRepository(conn)
-
-    result = repo.delete_by_import_history_id(
-        import_history_id=42,
+def test_count_by_import_history_id_success(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
     )
+
+    cursor.fetchone.return_value = (25,)
+
+    result = repository.count_by_import_history_id(42)
 
     assert result == 25
 
+    cursor.execute.assert_called_once()
+
     sql, params = cursor.execute.call_args.args
 
-    assert "DELETE FROM cycleguard.positions" in sql
+    assert "SELECT COUNT(*)" in sql
+    assert "FROM cycleguard.positions" in sql
     assert "WHERE import_history_id = %s" in sql
     assert params == (42,)
 
-    assert not conn.commit.called
-    assert not conn.rollback.called    
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_count_by_import_history_id_returns_zero(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchone.return_value = (0,)
+
+    result = repository.count_by_import_history_id(42)
+
+    assert result == 0
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
+
+
+def test_count_by_import_history_id_database_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = psycopg.Error()
+
+    with pytest.raises(
+        PositionRepositoryError,
+        match="Unable to count positions",
+    ):
+        repository.count_by_import_history_id(42)
+
+    mock_conn.commit.assert_not_called()
+    mock_conn.rollback.assert_not_called()
