@@ -30,6 +30,7 @@ class PositionRepository:
                 cur.execute(
                     """
                     INSERT INTO cycleguard.positions (
+                        import_history_id,
                         snapshot_id,
                         account_id,
                         security_id,
@@ -43,9 +44,10 @@ class PositionRepository:
                         total_gain,
                         total_gain_pct
                     )
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
+                        position.import_history_id,
                         position.snapshot_id, 
                         position.account_id, 
                         position.security_id, 
@@ -214,5 +216,54 @@ class PositionRepository:
 
             raise PositionRepositoryError(
                 "Unable to delete positions "
+                f"for import_history_id={import_history_id}"
+            ) from exc
+
+    def count_by_import_history_id(
+        self,
+        import_history_id: int,
+    ) -> int:
+        """
+        Returns the number of positions created by the specified import.
+        """
+
+        sql = """
+            SELECT COUNT(*)
+            FROM cycleguard.positions
+            WHERE import_history_id = %s
+           """
+
+        logger.info(
+            "Counting positions for import_history_id=%s",
+            import_history_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (import_history_id,),
+                )
+
+                row = cur.fetchone()
+
+            count = row[0]
+            logger.debug(
+                "Found %s position(s) for import_history _id=%s",
+                count,
+                import_history_id,
+            )
+
+            return count
+
+        except psycopg.Error as exc:
+            logger.exception(
+                "Failed counting positions "
+                "for import_history_id=%s",
+                import_history_id,
+            )
+
+            raise PositionRepositoryError(
+                "Unable to count positions "
                 f"for import_history_id={import_history_id}"
             ) from exc
