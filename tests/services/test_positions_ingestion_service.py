@@ -22,6 +22,7 @@ def service():
         snapshot_repo=MagicMock(),
         position_repo=MagicMock(),
         import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
@@ -88,10 +89,11 @@ def test_build(
     mock_db_connection.return_value.connect.assert_called_once()
 
     mock_account_repo.assert_called_once_with(conn)
-    assert mock_security_repo.call_count == 2
+    assert mock_security_repo.call_count == 1
     mock_snapshot_repo.assert_called_once_with(conn)
     mock_position_repo.assert_called_once_with(conn)
     mock_import_history_repo.assert_called_once_with(conn)
+    mock_security_repo.assert_called_once_with(conn)
 
     mock_loader.assert_called_once()
     mock_validator.assert_called_once()
