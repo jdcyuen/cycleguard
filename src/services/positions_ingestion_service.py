@@ -24,6 +24,9 @@ from repositories.import_history_repo import (ImportHistoryRepository,)
 
 from services.security_resolution_service import (SecurityResolutionService,)
 
+from repositories.transaction_repo import TransactionRepository
+from services.import_audit_service import ImportAuditService
+
 logger = get_logger(__name__)
 
 
@@ -45,6 +48,7 @@ class PositionsIngestionService(BaseIngestionService):
         snapshot_repo,
         position_repo,
         import_history_repo,
+        import_audit_service,
         security_resolution_service,
         loader,
         validator,
@@ -53,6 +57,7 @@ class PositionsIngestionService(BaseIngestionService):
         super().__init__(
             account_repo=account_repo,
             import_history_repo=import_history_repo,
+            import_audit_service=import_audit_service,
             loader=loader,
             validator=validator,
         )
@@ -70,22 +75,35 @@ class PositionsIngestionService(BaseIngestionService):
     @classmethod
     def build(cls):
 
-        logger.info("Building PositionsIngestionService" )
+        logger.info("Building PositionsIngestionService")
 
         try:
-
             conn = DBConnection().connect()
 
+            account_repo = AccountRepository(conn)
+            security_repo = SecurityRepository(conn)
+            snapshot_repo = SnapshotRepository(conn)
+            position_repo = PositionRepository(conn)
+            import_history_repo = ImportHistoryRepository(conn)
+
             security_resolution_service = SecurityResolutionService(
-                security_repo=SecurityRepository(conn),
+                security_repo=security_repo,
+            )
+
+            import_audit_service = ImportAuditService(
+                import_history_repository=import_history_repo,
+                position_repository=position_repo,
+                transaction_repository=TransactionRepository(conn),
+                snapshot_repository=snapshot_repo,
             )
 
             return cls(
-                account_repo=AccountRepository(conn),
-                security_repo=SecurityRepository(conn),
-                snapshot_repo=SnapshotRepository(conn),
-                position_repo=PositionRepository(conn),
-                import_history_repo=ImportHistoryRepository(conn),
+                account_repo=account_repo,
+                security_repo=security_repo,
+                snapshot_repo=snapshot_repo,
+                position_repo=position_repo,
+                import_history_repo=import_history_repo,
+                import_audit_service=import_audit_service,
                 loader=PositionsCSVLoader(),
                 validator=PositionsValidator(),
                 security_resolution_service=security_resolution_service,
@@ -94,8 +112,7 @@ class PositionsIngestionService(BaseIngestionService):
         except Exception as exc:
 
             logger.exception(
-                "Failed building "
-                "PositionsIngestionService"
+                "Failed building PositionsIngestionService"
             )
 
             raise PositionsIngestionServiceError(
