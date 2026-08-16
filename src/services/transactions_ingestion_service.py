@@ -39,6 +39,10 @@ from repositories.import_history_repo import (
     ImportHistoryRepository,
 )
 
+from repositories.position_repo import (PositionRepository,)
+
+from repositories.snapshot_repo import (SnapshotRepository,)
+
 from models.transaction import Transaction
 from services.security_resolution_service import (
     SecurityResolutionService,
@@ -56,6 +60,7 @@ class TransactionsIngestionService(BaseIngestionService):
         security_repo,
         transaction_repo,
         import_history_repo,
+        import_audit_service,
         security_resolution_service,
         loader,
         validator,
@@ -64,14 +69,13 @@ class TransactionsIngestionService(BaseIngestionService):
         super().__init__(
             account_repo=account_repo,
             import_history_repo=import_history_repo,
+            import_audit_service=import_audit_service,
             loader=loader,
             validator=validator,
         )
 
         self._security_repo = security_repo
-        self._transaction_repo = (
-            transaction_repo
-        )
+        self._transaction_repo = transaction_repo
         self._security_resolution_service = security_resolution_service
 
     @property
@@ -101,6 +105,16 @@ class TransactionsIngestionService(BaseIngestionService):
             "First rule: %s",
             action_map[0] if action_map else None,
         )
+
+        # Create repositories once
+        account_repo = AccountRepository(conn)
+        security_repo = SecurityRepository(conn)
+        transaction_repo = TransactionRepository(conn)
+        import_history_repo = ImportHistoryRepository(conn)
+        position_repo = PositionRepository(conn)
+        snapshot_repo = SnapshotRepository(conn)
+
+
 
         security_resolution_service = SecurityResolutionService(
             security_repo=SecurityRepository(conn),
