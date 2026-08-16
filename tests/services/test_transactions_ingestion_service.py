@@ -52,6 +52,7 @@ def service(
         security_resolution_service=security_resolution_service,
         loader=mocker.Mock(),
         validator=mocker.Mock(),
+        import_audit_service=mocker.Mock(),
     )
 
 
