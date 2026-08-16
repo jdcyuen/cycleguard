@@ -1,3 +1,4 @@
+from models import importhistory
 from abc import ABC, abstractmethod
 
 from core.logger import get_logger
@@ -45,12 +46,14 @@ class BaseIngestionService(ABC):
         import_history_repo,
         loader,
         validator,
+        import_audit_service,
     ):
 
         self._account_repo = account_repo
         self._import_history_repo = (import_history_repo)
         self._loader = loader
         self._validator = validator
+        self._import_audit_service = import_audit_service
 
     def ingest(
         self,
@@ -165,6 +168,47 @@ class BaseIngestionService(ABC):
             f"completed successfully"
         )
 
+        # ---------------------------------------------------------
+        # Audit the completed import
+        # ---------------------------------------------------------
+
+        logger.info(
+            "Starting import audit "
+            "for import_id=%s",
+            updated_import_history.id,
+        )
+
+        audit_result = self._import_audit_service.audit(
+            updated_import_history.id,
+        )
+
+        if audit_result.status != ImportAuditStatus.PASS:
+            logger.error(
+                "Import audit FAILED "
+                "for import_id=%s: %s",
+                updated_import_history.id,
+                audit_result.message,
+            )
+
+            raise ValueError(
+                f"Import audit failed: "
+                f"{audit_result.message}"
+            )
+        #An import isn't considered successfully completed unless the persisted data passes the audit.
+        logger.info(
+            "Import audit completed "
+            "for import_id=%s: status=%s, message=%s",
+            updated_import_history.id,
+            audit_result.status,
+            audit_result.message,
+        )
+
+        logger.info(
+            f"{self.import_type} import "
+            f"completed successfully"
+        )
+
+
         return ImportResult(
             account_id=account.id,
             account_name=name,
@@ -247,30 +291,33 @@ class BaseIngestionService(ABC):
                 "been imported."
             )
 
-    def _record_import(self, history: ImportHistory) -> ImportHistory:
+    def _record_import(
+        self, 
+        history: ImportHistory
+    ) -> ImportHistory:
 
-        import_history = ImportHistory(
-            account_id=account_id,
-            import_type=self.import_type,
-            filename=file_name,
-            file_hash=file_hash,
-            rows_read=rows_imported,
-            rows_imported=0,
-            rows_skipped=0,
-            status="STARTED",
-            elapsed_ms=0,
-            error_message=None,
-        )
-        new_import_history = self._import_history_repo.insert(
-            import_history
+        if history.id is None:
+            new_import_history = self._import_history_repo.insert(history)
+
+            logger.info(
+                "Import history created for %s: id=%s",
+                self.import_type,
+                new_import_history.id,
+            )
+
+            return new_import_history
+
+        updated_import_history = self._import_history_repo.update(
+            history
         )
 
         logger.info(
-            f"Import history recorded "
-            f"for {self.import_type}"
+            "Import history updated for %s: id=%s",
+            self.import_type,
+            updated_import_history.id,
         )
 
-        return new_import_history
+        return updated_import_history
 
     @property
     def account_repo(self):
