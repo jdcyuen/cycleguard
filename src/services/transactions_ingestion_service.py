@@ -48,6 +48,8 @@ from services.security_resolution_service import (
     SecurityResolutionService,
 )
 
+from services.import_audit_service import ImportAuditService
+
 
 logger = get_logger(__name__)
 
@@ -114,21 +116,29 @@ class TransactionsIngestionService(BaseIngestionService):
         position_repo = PositionRepository(conn)
         snapshot_repo = SnapshotRepository(conn)
 
-
-
         security_resolution_service = SecurityResolutionService(
-            security_repo=SecurityRepository(conn),
+            security_repo=security_repo,
         )
+
+        import_audit_service = ImportAuditService(
+        import_history_repository=import_history_repo,
+        position_repository=position_repo,
+        transaction_repository=transaction_repo,
+        snapshot_repository=snapshot_repo,
+    )
 
         return cls(
-            account_repo=AccountRepository(conn),
-            security_repo=SecurityRepository(conn),
-            transaction_repo=TransactionRepository(conn),
-            import_history_repo=ImportHistoryRepository(conn),
-            loader=TransactionsCSVLoader(action_map=action_map),
-            validator=TransactionsValidator(),
-            security_resolution_service=security_resolution_service,
-        )
+        account_repo=account_repo,
+        security_repo=security_repo,
+        transaction_repo=transaction_repo,
+        import_history_repo=import_history_repo,
+        import_audit_service=import_audit_service,
+        loader=TransactionsCSVLoader(
+            action_map=action_map
+        ),
+        validator=TransactionsValidator(),
+        security_resolution_service=security_resolution_service,
+    )
 
     
 
