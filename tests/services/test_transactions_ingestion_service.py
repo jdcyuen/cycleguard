@@ -1,71 +1,213 @@
 # tests/services/test_transactions_ingestion_service.py
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from models.security import Security
 from models.transaction import Transaction
+
 from services.transactions_ingestion_service import (
     TransactionsIngestionService,
 )
 
+@patch(
+    "services.transactions_ingestion_service.DBConnection"
+)
+@patch(
+    "services.transactions_ingestion_service.AccountRepository"
+)
+@patch(
+    "services.transactions_ingestion_service.SecurityRepository"
+)
+@patch(
+    "services.transactions_ingestion_service.TransactionRepository"
+)
+@patch(
+    "services.transactions_ingestion_service.ImportHistoryRepository"
+)
+@patch(
+    "services.transactions_ingestion_service.ImportAuditService"
+)
+@patch(
+    "services.transactions_ingestion_service.SecurityResolutionService"
+)
+@patch(
+    "services.transactions_ingestion_service.TransactionsCSVLoader"
+)
+@patch(
+    "services.transactions_ingestion_service.TransactionsValidator"
+)
 
-@pytest.fixture
-def account():
-    return SimpleNamespace(id=123)
+def test_build(
+    mock_validator,
+    mock_loader,
+    mock_security_resolution_service,
+    mock_import_audit_service,
+    mock_import_history_repo,
+    mock_transaction_repo,
+    mock_security_repo,
+    mock_account_repo,
+    mock_db_connection,
+):
+    conn = MagicMock()
 
+    mock_db_connection.return_value.connect.return_value = conn
 
-@pytest.fixture
-def security_resolution_service(mocker):
-    service = mocker.Mock()
+    service = TransactionsIngestionService.build()
 
-    service.resolve.return_value = Security(
+    assert isinstance(
+        service,
+        TransactionsIngestionService,
+    )
+
+    mock_db_connection.return_value.connect.assert_called_once()
+
+    mock_account_repo.assert_called_once_with(conn)
+    mock_security_repo.assert_called_once_with(conn)
+    mock_transaction_repo.assert_called_once_with(conn)
+    mock_import_history_repo.assert_called_once_with(conn)
+
+    mock_import_audit_service.assert_called_once()
+
+    mock_security_resolution_service.assert_called_once_with(
+        security_repo=mock_security_repo.return_value,
+    )
+
+    mock_loader.assert_called_once()
+    mock_validator.assert_called_once()
+
+def test_persist_success():
+
+    transaction_repo = MagicMock()
+    transaction_repo.exists.return_value = False
+
+    security_resolution_service = MagicMock()
+
+    security_resolution_service.resolve.return_value = Security(
         id=99,
         symbol="AAPL",
         description="Apple Inc",
     )
 
-    return service
-
-
-@pytest.fixture
-def transaction_repo(mocker):
-    repo = mocker.Mock()
-    repo.exists.return_value = False
-
-    return repo
-
-
-@pytest.fixture
-def service(
-    mocker,
-    security_resolution_service,
-    transaction_repo,
-):
-    return TransactionsIngestionService(
-        account_repo=mocker.Mock(),
-        security_repo=mocker.Mock(),
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
         transaction_repo=transaction_repo,
-        import_history_repo=mocker.Mock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
         security_resolution_service=security_resolution_service,
-        loader=mocker.Mock(),
-        validator=mocker.Mock(),
-        import_audit_service=mocker.Mock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
     )
 
+    account = SimpleNamespace(id=123)
 
-def test_null_if_na_returns_none_for_nan(service):
+    dataframe = pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "description": "Apple Inc",
+                "run_date": "2026-01-01",
+                "settlement_date": "2026-01-02",
+                "action": "BUY",
+                "trade_type": "TRADE",
+                "price": 100,
+                "quantity": 10,
+                "commission": 0,
+                "fees": 0,
+                "accrued_interest": None,
+                "amount": 1000,
+                "cash_balance": 9000,
+            }
+        ]
+    )
+
+    result = service.persist(
+        dataframe=dataframe,
+        account=account,
+        import_history_id=123,
+    )
+
+    assert result == 1
+
+    security_resolution_service.resolve.assert_called_once()
+
+    transaction_repo.exists.assert_called_once()
+
+    transaction_repo.insert.assert_called_once()
+
+    transaction = transaction_repo.insert.call_args.args[0]
+
+    assert isinstance(transaction, Transaction)
+    assert transaction.account_id == 123
+    assert transaction.security_id == 99
+    assert transaction.import_history_id == 123
+    assert transaction.action == "BUY"
+    assert transaction.amount == 1000
+
+
+def test_import_type():
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=MagicMock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
+    assert service.import_type == "transactions"
+
+
+def test_null_if_na_returns_none_for_nan():
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=MagicMock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
     assert service._null_if_na(float("nan")) is None
 
 
-def test_null_if_na_preserves_values(service):
+def test_null_if_na_preserves_values():
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=MagicMock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
     assert service._null_if_na(100) == 100
     assert service._null_if_na("BUY") == "BUY"
 
 
-def test_to_transaction_creates_transaction(service):
+def test_to_transaction_creates_transaction():
+
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=MagicMock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
     row = SimpleNamespace(
         run_date="2026-01-01",
         settlement_date="2026-01-02",
@@ -94,12 +236,32 @@ def test_to_transaction_creates_transaction(service):
     assert transaction.amount == 500
 
 
-def test_persist_inserts_security_transaction(
-    service,
-    transaction_repo,
-    security_resolution_service,
-    account,
-):
+def test_persist_inserts_security_transaction():
+
+    transaction_repo = MagicMock()
+    transaction_repo.exists.return_value = False
+
+    security_resolution_service = MagicMock()
+
+    security_resolution_service.resolve.return_value = Security(
+        id=99,
+        symbol="AAPL",
+        description="Apple Inc",
+    )
+
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=transaction_repo,
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=security_resolution_service,
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
+    account = SimpleNamespace(id=123)
+
     dataframe = pd.DataFrame(
         [
             {
@@ -120,20 +282,44 @@ def test_persist_inserts_security_transaction(
         ]
     )
 
-    imported = service.persist(dataframe, account)
+    imported = service.persist(
+        dataframe,
+        account,
+        import_history_id=123,
+    )
 
     assert imported == 1
+
     security_resolution_service.resolve.assert_called_once()
     transaction_repo.exists.assert_called_once()
     transaction_repo.insert.assert_called_once()
 
+    transaction = transaction_repo.insert.call_args.args[0]
 
-def test_persist_inserts_cash_transaction_without_security(
-    service,
-    transaction_repo,
-    security_resolution_service,
-    account,
-):
+    assert transaction.security_id == 99
+    assert transaction.import_history_id == 123
+
+
+def test_persist_inserts_cash_transaction_without_security():
+
+    transaction_repo = MagicMock()
+    transaction_repo.exists.return_value = False
+
+    security_resolution_service = MagicMock()
+
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=transaction_repo,
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=security_resolution_service,
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
+    account = SimpleNamespace(id=123)
+
     dataframe = pd.DataFrame(
         [
             {
@@ -154,23 +340,40 @@ def test_persist_inserts_cash_transaction_without_security(
         ]
     )
 
-    imported = service.persist(dataframe, account)
+    imported = service.persist(
+        dataframe,
+        account,
+        import_history_id=123,
+    )
 
     assert imported == 1
+
     security_resolution_service.resolve.assert_not_called()
 
     transaction = transaction_repo.insert.call_args.args[0]
 
     assert transaction.security_id is None
     assert transaction.action == "DIVIDEND"
+    assert transaction.import_history_id == 123
 
 
-def test_persist_skips_duplicate_transaction(
-    service,
-    transaction_repo,
-    account,
-):
+def test_persist_skips_duplicate_transaction():
+
+    transaction_repo = MagicMock()
     transaction_repo.exists.return_value = True
+
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=transaction_repo,
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
+    account = SimpleNamespace(id=123)
 
     dataframe = pd.DataFrame(
         [
@@ -192,20 +395,36 @@ def test_persist_skips_duplicate_transaction(
         ]
     )
 
-    imported = service.persist(dataframe, account)
+    imported = service.persist(
+        dataframe,
+        account,
+        import_history_id=123,
+    )
 
     assert imported == 0
     transaction_repo.insert.assert_not_called()
 
 
-def test_persist_raises_when_insert_fails(
-    service,
-    transaction_repo,
-    account,
-):
+def test_persist_raises_when_insert_fails():
+
+    transaction_repo = MagicMock()
+    transaction_repo.exists.return_value = False
     transaction_repo.insert.side_effect = RuntimeError(
         "database failure"
     )
+
+    service = TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=transaction_repo,
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
+    account = SimpleNamespace(id=123)
 
     dataframe = pd.DataFrame(
         [
@@ -228,4 +447,11 @@ def test_persist_raises_when_insert_fails(
     )
 
     with pytest.raises(RuntimeError):
-        service.persist(dataframe, account)
+        service.persist(
+            dataframe,
+            account,
+            import_history_id=123,
+        )
+
+    transaction_repo.exists.assert_called_once()
+    transaction_repo.insert.assert_called_once()
