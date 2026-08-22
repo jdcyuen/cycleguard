@@ -643,10 +643,10 @@ For positions
 Usage: `python -m src.cli.ingest_positions --file <path_to_csv> --account <account_name> --snapshot-date <snapshot_date> --dry-run --confirm`
 
 Command Line Arguments
---file (Required): The path to your portfolio CSV file.
---snapshot-date (Optional): An explicit date to associate with the snapshot in YYYY-MM-DD format.
---dry-run (Optional): A flag to run the command without making any changes to the database.
---confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
+* --file (Required): The path to your portfolio CSV file.
+* --snapshot-date (Optional): An explicit date to associate with the snapshot in YYYY-MM-DD format.
+* --dry-run (Optional): A flag to run the command without making any changes to the database.
+* --confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
 
 Example:
 
