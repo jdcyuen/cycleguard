@@ -430,6 +430,122 @@ CLI → Success message
 
 ```
 ---
+## What happens when something goes wrong?
+
+There are two different situations that are important to distinguish.
+
+Failure during the database transaction
+
+The TransactionManager handles this:
+
+```python
+ROLLBACK
+```
+The uncommitted database changes are removed.
+
+The ingestion service does not call ImportRollbackService.
+
+Manual cleanup of a committed import
+
+A different situation is:
+
+```python
+Import
+  ↓
+COMMIT
+  ↓
+Later discover import was wrong
+
+```
+The data is now legitimately committed.
+
+The operator can explicitly run:
+
+```python
+python -m cli.rollback_import --import-history-id 123
+```
+which invokes:
+
+```python
+ImportRollbackService
+```
+and removes the data associated with that import.
+
+By default, the import_history record remains so there is an audit trail of what happened.
+
+
+
+---
+
+### 13. The ingestion pipeline is designed for traceability and correctness.
+
+* **Import history** traces each import to a specific CSV file.
+
+* **Data validation** ensures that the data is correct before it enters the database.
+
+* **Transaction management** ensures that the database is always in a valid state.
+
+* **Audit checks** verify that the imported data is correct.
+
+This design makes CycleGuard imports auditable, reliable, and safe to run.
+
+### The complete pipeline
+```python
+                       FIDELITY
+                          │
+                          │ CSV
+                          ▼
+                     ┌─────────┐
+                     │   CLI   │
+                     └────┬────┘
+                          │
+                          ▼
+                ┌───────────────────┐
+                │ Ingestion Service │
+                └─────────┬─────────┘
+                          │
+              ┌───────────┼───────────┐
+              ▼           ▼           ▼
+           Loader     Validator    Account
+              │           │        Resolve
+              └───────────┼───────────┘
+                          │
+                          ▼
+                   Import History
+                     RUNNING
+                          │
+                          ▼
+                    Persistence
+                          │
+              ┌───────────┴───────────┐
+              ▼                       ▼
+        Transactions              Positions
+                                      │
+                                      ▼
+                                  Snapshot
+              │                       │
+              └───────────┬───────────┘
+                          ▼
+                     Import Audit
+                          │
+                     ┌────┴────┐
+                     │         │
+                    PASS      FAIL
+                     │         │
+                     ▼         ▼
+                  SUCCESS   Exception
+                     │         │
+                     ▼         ▼
+                   COMMIT   ROLLBACK
+```
+The fundamental design principle is:
+
+The ingestion pipeline is responsible for safely transforming Fidelity CSV data into trusted CycleGuard data. The TransactionManager guarantees database atomicity, while Import History provides traceability and the rollback service provides deliberate manual cleanup of committed imports.
+
+This makes ingestion the foundation of CycleGuard: everything that comes later—portfolio aggregation, bucket mapping, market analysis, regime classification, risk scoring, and rebalancing—depends on this pipeline producing accurate and auditable portfolio data.
+
+
+---
 
 ## Positions
 
