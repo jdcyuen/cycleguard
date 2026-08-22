@@ -1,8 +1,96 @@
+# Local Project path
+* E:\CycleGuard
 
-E:\CycleGuard
+# Github repository
+* https://github.com/jdcyuen/cycleguard.git
 
-Github repository
-https://github.com/jdcyuen/cycleguard.git
+#CycleGuard Project Documentation
+https://github.com/jdcyuen/cycleguard/blob/main/docs/system_design.md
+
+CycleGuard is a portfolio management and risk-control system designed to help manage an investment portfolio through changing market and economic conditions.
+
+Its core purpose is to answer three questions:
+
+1. What do I own?
+* Accounts
+* Positions
+* Transactions
+* Cash
+* Asset classes and portfolio buckets
+2. What is happening in the market?
+Price trends
+* Market breadth
+* Volatility
+* Interest rates and bond yields
+* Credit conditions
+* Technical indicators
+* Economic/market regime
+3. What should I do about it?
+* Compare current holdings with target allocations
+* Detect excessive drift or concentration
+* Identify changes in market regime
+* Generate buy/sell/rebalance recommendations
+* Control portfolio risk
+* Provide a disciplined, rules-based response rather than relying on emotion
+
+In one sentence
+
+CycleGuard is a rules-based portfolio management and risk-control engine that integrates portfolio data, market conditions, and investment rules to determine how a portfolio should be positioned as market conditions change.
+
+The important architectural idea is that CycleGuard is not simply a portfolio tracker. It is intended to evolve from an accurate record of the portfolio into a system that analyzes risk and market conditions and recommends—or eventually executes—portfolio actions.
+
+---
+
+## CLI
+From the cli, you can import positions and transactions into the database. From your Fidelity account, you can download transaction and position history from your account.
+
+
+For positions
+
+Usage: `python -m src.cli.ingest_positions --file <path_to_csv> --account <account_name> --snapshot-date <snapshot_date> --dry-run --confirm`
+
+Example:
+
+```bash
+    python -m src.cli.ingest_positions --file "C:\Users\Joe\Downloads\Portfolio_Positions_Jan_15_2026.csv" --account rollover_ira --snapshot-date 2026-01-15
+```
+
+
+For transactions:
+
+Usage: `python -m src.cli.ingest_transactions --file <path_to_csv> --account <account_name> --snapshot-date <snapshot_date> --dry-run --confirm`
+
+Example:
+
+```bash
+    python -m src.cli.ingest_transactions --file "C:\Users\Joe\Downloads\Portfolio_Transactions_Jan_15_2026.csv" --account rollover_ira --snapshot-date 2026-01-15
+```
+
+For import rollback:
+
+Usage: `python -m src.cli.rollback_import --import-history-id --confirm --delete-import-history`
+
+Example:
+
+```bash
+    python -m src.cli.rollback_import 3 --confirm --delete-import-history
+```
+
+##Other cli programs
+daily_rebalance.py:
+    python scripts\daily_rebalance.py
+
+debug_csv.py:
+    python scripts\debug_csv.py
+
+get_ohlc.py:
+    python scripts\get_ohlc.py
+
+sync_portfolio.py:
+    python scripts\sync_portfolio.py
+
+technical_indicators.py:
+    python scripts\technical_indicators.py
 
 ##Environment
 
@@ -249,22 +337,23 @@ This guarantees the database cannot contain duplicate snapshots.
 ##Testing    
 
 Running Unit tests:
-pytest tests/repositories/test_account_repository.py -vv
-pytest tests/repositories/test_import_history_repository.py -vv
-pytest tests/repositories/test_positions_repository.py -vv
-pytest tests/repositories/test_security_repository.py -vv
-pytest tests/repositories/test_snapshot_repository.py -vv
-pytest tests/repositories/test_transaction_repository.py -vv
+pytest -x tests/repositories/test_account_repository.py -vv
+pytest -x tests/repositories/test_import_history_repository.py -vv
+pytest -x tests/repositories/test_positions_repository.py -vv
+pytest -x tests/repositories/test_security_repository.py -vv
+pytest -x tests/repositories/test_snapshot_repository.py -vv
+pytest -x tests/repositories/test_transaction_repository.py -vv
 
-pytest tests/config/test_schema_validator.py -vv
-pytest tests/config/test_config_manager.py -vv
-pytest tests/config/test_config_loader.py -vv
-pytest tests/ingestion/common/test_cli_ingestion_helper.py -vv
-pytest tests/services/test_positions_ingestion_service.py -vv
+pytest -x tests/config/test_schema_validator.py -vv
+pytest -x tests/config/test_config_manager.py -vv
+pytest -x tests/config/test_config_loader.py -vv
+pytest -x tests/ingestion/common/test_cli_ingestion_helper.py -vv
+pytest -x tests/services/test_positions_ingestion_service.py -vv
+pytest -x tests/services/test_transactions_ingestion_service.py -vv
+pytest -x tests/services/test_import_rollback_service.py -vv
+pytest -x tests/services/test_import_audit_service.py -vv
 
-
-
-
+pytest -x tests/services/test_base_ingestion_service.py -vv
 
 
 
