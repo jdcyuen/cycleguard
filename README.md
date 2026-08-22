@@ -150,6 +150,7 @@ The CLI does not perform the actual import logic.
 
 Conceptually:
 
+```python
 User
  │
  ▼
@@ -159,6 +160,7 @@ CLI
  ▼
 Ingestion Service
 
+```
 ---
 
 3. The loader reads the CSV
@@ -167,6 +169,7 @@ The ingestion service passes the CSV file to the loader.
 
 The loader is responsible for converting the external CSV representation into objects that CycleGuard can work with.
 
+```python
 Fidelity CSV
      │
      ▼
@@ -174,7 +177,7 @@ Fidelity CSV
      │
      ▼
 CycleGuard data objects
-
+```
 ---
 
 4. The validator validates the data
@@ -183,6 +186,7 @@ The loaded data is then passed to the validator.
 
 The validator checks that the data is structurally and logically acceptable before CycleGuard modifies the database.
 
+```python
 Loaded data
      │
      ▼
@@ -192,6 +196,7 @@ Loaded data
      │
      └── invalid ─────► exception
 
+```
 
 This is an important safety boundary:
 
@@ -205,6 +210,7 @@ The pipeline determines which CycleGuard account the Fidelity data belongs to.
 
 For example:
 
+```python
 Fidelity
     │
     ▼
@@ -212,6 +218,8 @@ Fidelity
     │
     ▼
 accounts.id = 1
+
+```
 
 The database account ID is then used by the records created during the import.
 
@@ -246,6 +254,7 @@ The ingestion service then calls the appropriate persistence logic.
 
 For a transaction import:
 
+```python
 Fidelity Transactions CSV
              │
              ▼
@@ -253,10 +262,11 @@ Fidelity Transactions CSV
              │
              ▼
       transactions table
-
+```
 
 For a positions import:
 
+```python
 Fidelity Positions CSV
              │
              ▼
@@ -269,6 +279,7 @@ Fidelity Positions CSV
                                   ▼
                              snapshots table
 
+```
 
 The records contain the import_history_id.
 
@@ -309,6 +320,7 @@ The ingestion service performs the business workflow, but the TransactionManager
 
 Conceptually:
 
+```python
 TransactionManager
         │
         ▼
@@ -323,9 +335,11 @@ TransactionManager
         │
         └── exception ─► ROLLBACK
 
+```
 If an exception occurs during the import, the database transaction is rolled back.
 
 That means CycleGuard does not intentionally leave half an import committed.
+
 ---
 9. Import history is completed
 
@@ -353,6 +367,7 @@ Your current architecture also performs an import audit after persistence.
 
 Conceptually:
 
+```python
 Persist
    │
    ▼
@@ -362,6 +377,7 @@ Import Audit
    │
    └── FAIL ──► import fails
 
+```
 This gives CycleGuard another layer of protection.
 
 The import isn't considered successfully completed simply because the database accepted the rows. The resulting data must also pass the application's audit checks.
@@ -376,6 +392,7 @@ If any validation fails, the transaction is rolled back, and the database is ret
 
 Conceptually:
 
+```python
 Database transaction
 ─────────────────────────────
 BEGIN
@@ -389,6 +406,7 @@ BEGIN
   │
   └── Rollback → Failure
 
+```
 This is an atomic operation from the perspective of the database. Either the entire import succeeds, or the entire import is rolled back.
 
 ---
@@ -399,8 +417,10 @@ The final step is to report success to the user.
 
 Conceptually:
 
+```python
 CLI → Success message
 
+```
 ---
 
 ## Positions
@@ -411,7 +431,7 @@ The source of position data is a Fidelity positions CSV file downloaded by the u
 
 The position data enters CycleGuard through the ingestion pipeline:
 
-
+```python
 Fidelity
    │
    │ Positions CSV
@@ -426,6 +446,7 @@ Ingestion Pipeline
            │
            ▼
       Positions Table
+```
 
 Once imported, the positions are stored in CycleGuard's positions table. They become the system's structured representation of the holdings reported by Fidelity.
 
@@ -439,6 +460,7 @@ The source of transaction data is a Fidelity transaction CSV file downloaded by 
 
 The transaction data enters CycleGuard through the ingestion pipeline:
 
+```python
 Fidelity
    │
    │ Transactions CSV
@@ -454,6 +476,7 @@ Ingestion Pipeline
            ▼
      Transactions Table
 
+```
 ---
 ## Snapshots
 
@@ -465,6 +488,7 @@ The source of snapshot data is the Fidelity positions CSV file downloaded by the
 
 The snapshot fits into the ingestion pipeline as follows:
 
+```python
 Fidelity
    │
    │ Positions CSV
@@ -482,8 +506,7 @@ Ingestion Pipeline
            │
            ▼
       Snapshots Table
-
-
+```
 
 ---
 
