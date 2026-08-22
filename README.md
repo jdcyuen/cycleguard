@@ -434,7 +434,7 @@ CLI → Success message
 
 There are two different situations that are important to distinguish.
 
-##### 1.Failure during the database transaction
+##### :one:. Failure during the database transaction
 
 The TransactionManager handles this:
 
@@ -445,7 +445,7 @@ The uncommitted database changes are removed.
 
 The ingestion service does not call ImportRollbackService.
 
-##### 2. Manual cleanup of a committed import
+##### :two:. Manual cleanup of a committed import
 
 A different situation is:
 
