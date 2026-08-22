@@ -529,3 +529,28 @@ def test_get_latest_none(
     assert result is None
 
 
+def test_delete_by_import_history_id():
+    conn = MagicMock()
+    cursor = MagicMock()
+
+    cursor.rowcount = 1
+
+    conn.cursor.return_value.__enter__.return_value = cursor
+
+    repo = ImportHistoryRepository(conn)
+
+    result = repo.delete_by_import_history_id(
+        import_history_id=42,
+    )
+
+    assert result == 1
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.import_history" in sql
+    assert "WHERE id = %s" in sql
+    assert params == (42,)
+
+    assert not conn.commit.called
+    assert not conn.rollback.called
+

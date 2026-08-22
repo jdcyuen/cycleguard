@@ -25,6 +25,30 @@ def repository(mock_conn, mock_cursor):
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     return TransactionRepository(mock_conn)
 
+def test_delete_by_import_history_id():
+    conn = MagicMock()
+    cursor = MagicMock()
+
+    cursor.rowcount = 247
+
+    conn.cursor.return_value.__enter__.return_value = cursor
+
+    repo = TransactionRepository(conn)
+
+    result = repo.delete_by_import_history_id(
+        import_history_id=42,
+    )
+
+    assert result == 247
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "DELETE FROM cycleguard.transactions" in sql
+    assert "WHERE import_history_id = %s" in sql
+    assert params == (42,)
+
+    assert not conn.commit.called
+    assert not conn.rollback.called
 
 def test_delete_by_import_history_id_returns_row_count(
     repository,
