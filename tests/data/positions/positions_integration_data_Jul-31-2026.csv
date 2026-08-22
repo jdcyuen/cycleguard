@@ -1,0 +1,35 @@
+﻿Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type
+250464524,Rollover IRA,FDRXX**,HELD IN MONEY MARKET,,,,$149588.73,,,,,15.16%,,,Cash,
+250464524,Rollover IRA,GOOG,ALPHABET INC CAP STK CL C,0.693,$356.65,+$22.97,$247.15,+$15.91,+6.88%,+$134.38,+119.17%,0.03%,$112.77,$162.73,Cash,
+250464524,Rollover IRA,NVDA,NVIDIA CORPORATION COM,10.907,$200.75,+$5.71,$2189.58,+$62.27,+2.92%,+$919.86,+72.44%,0.22%,$1269.72,$116.41,Cash,
+250464524,Rollover IRA,IEMG,ISHARES CORE MSCI EMERGING MARKETS ETF,439.806,$77.61,+$0.56,$34133.34,+$246.29,+0.72%,-$165.66,-0.49%,3.46%,$34299.00,$77.99,Cash,
+250464524,Rollover IRA,FZROX,FIDELITY ZERO TOTAL MARKET INDEX,5931.203,$26.14,+$0.15,$155041.64,+$889.68,+0.57%,+$19984.27,+14.79%,15.71%,$135057.37,$22.77,Cash,
+250464524,Rollover IRA,JEPQ,J P MORGAN EXCHANGE TRADED FD NASDAQ EQT PREM,135.33,$58.25,+$0.33,$7882.97,+$44.65,+0.56%,+$483.31,+6.53%,0.80%,$7399.66,$54.68,Cash,
+250464524,Rollover IRA,JEPI,J P MORGAN EXCHANGE TRADED FD EQUITY PREMIUM,360.766,$57.43,+$0.19,$20718.79,+$68.54,+0.33%,+$767.92,+3.84%,2.10%,$19950.87,$55.30,Cash,
+250464524,Rollover IRA,SMH,VANECK ETF TRUST SEMICONDUCTR ETF,0.272,$540.53,+$1.63,$147.02,+$0.44,+0.30%,+$8.95,+6.48%,0.01%,$138.07,$507.61,Cash,
+250464524,Rollover IRA,SPMO,INVESCO EXCH TRADED FD TR II S&P 500 MOMNTM,16.546,$143.83,+$0.41,$2379.81,+$6.78,+0.28%,-$120.04,-4.81%,0.24%,$2499.85,$151.08,Cash,
+250464524,Rollover IRA,DBMF,IM GLOBAL PARTNER FUNDS IMGP DBI MANAGED FUTURES STRATEGY ETF,1247.155,$30.92,+$0.08,$38562.03,+$99.77,+0.25%,+$1562.08,+4.22%,3.91%,$36999.95,$29.67,Cash,
+250464524,Rollover IRA,SCHD,SCHWAB US DIVIDEND EQUITY ETF,2820.813,$33.47,+$0.06,$94412.61,+$169.24,+0.17%,+$7929.19,+9.16%,9.57%,$86483.42,$30.66,Cash,
+250464524,Rollover IRA,SOXX,ISHARES TR ISHARES SEMICDTR,18.082,$504.89,+$0.36,$9129.42,+$6.50,+0.07%,-$1374.71,-13.09%,0.93%,$10504.13,$580.92,Cash,
+250464524,Rollover IRA,VUSB,VANGUARD BD INDEX FDS VANGUARD ULTRA,840.023,$49.76,+$0.01,$41799.54,+$8.40,+0.02%,+$775.56,+1.89%,4.24%,$41023.98,$48.84,Cash,
+250464524,Rollover IRA,SGOV,ISHARES TR 0-3 MNTH TREASRY,817.907,$100.71,+$0.02,$82371.41,+$16.35,+0.01%,+$881.80,+1.08%,8.35%,$81489.61,$99.63,Cash,
+250464524,Rollover IRA,FZILX,FIDELITY ZERO INTERNATIONAL INDEX,2467.507,$16.80,$0.00,$41454.11,$0.00,0.00%,+$2217.52,+5.65%,4.20%,$39236.59,$15.90,Cash,
+250464524,Rollover IRA,IBIE,ISHARES TRUST IBONDS OCT 2028 TERM TIPS ETF USD,781.025,$25.735,-$0.005,$20099.67,-$3.91,-0.02%,+$99.69,+0.49%,2.04%,$19999.98,$25.61,Cash,
+250464524,Rollover IRA,IBID,ISHARES TRUST IBONDS OCT 2027 TERM TIPS ETF,784.038,$25.715,-$0.005,$20161.53,-$3.93,-0.02%,+$161.54,+0.80%,2.04%,$19999.99,$25.51,Cash,
+250464524,Rollover IRA,IBIC,ISHARES TRUST IBONDS OCT 2026 TERM TIPS ETF,789.725,$25.60,-$0.015,$20216.96,-$11.85,-0.06%,+$216.98,+1.08%,2.05%,$19999.98,$25.33,Cash,
+250464524,Rollover IRA,BINC,ISHARES FLEXIBLE INCOME ACTIVE ETF,1079.717,$51.99,-$0.04,$56134.48,-$43.19,-0.08%,+$1166.42,+2.12%,5.69%,$54968.06,$50.91,Cash,
+250464524,Rollover IRA,IBIG,ISHARES TRUST IBONDS OCT 2030 TERM TIPS ETF USD,778.862,$25.6081,-$0.0269,$19945.17,-$20.96,-0.11%,-$54.82,-0.28%,2.02%,$19999.99,$25.68,Cash,
+250464524,Rollover IRA,IBIF,ISHARES TRUST IBONDS OCT 2029 TERM TIPS ETF USD,778.607,$25.695,-$0.0274,$20006.30,-$21.34,-0.11%,+$6.30,+0.03%,2.03%,$20000.00,$25.69,Cash,
+250464524,Rollover IRA,ICVT,ISHARES TRUST CONVERTIBLE BOND ETF,21.374,$113.23,-$0.15,$2420.17,-$3.21,-0.14%,-$84.49,-3.38%,0.25%,$2504.66,$117.18,Cash,
+250464524,Rollover IRA,FTEC,FIDELITY MSCI INFORMATION TECHNOLOGY INDEX ETF,89.723,$270.10,-$0.96,$24234.18,-$41.93,-0.18%,-$764.83,-3.06%,2.46%,$24999.01,$278.62,Cash,
+250464524,Rollover IRA,FXNAX,FIDELITY U.S. BOND INDEX FUND,9537.676,$10.27,-$0.03,$97951.93,-$286.14,-0.30%,+$6935.76,+7.62%,9.93%,$91016.17,$9.54,Cash,
+250464524,Rollover IRA,VYMI,VANGUARD WHITEHALL FDS INTL HIGH ETF,259.689,$103.56,-$0.53,$26893.39,-$137.64,-0.51%,+$2899.62,+12.08%,2.73%,$23993.77,$92.39,Cash,
+250464524,Rollover IRA,SNDK,SANDISK CORP COM,0.419,$1214.83,-$65.13,$509.01,-$27.29,-5.09%,-$27.54,-5.14%,0.05%,$536.55,$1280.55,Cash,
+250464524,Rollover IRA,MU,MICRON TECHNOLOGY INC COM,0.655,$823.03,-$51.63,$539.08,-$33.82,-5.91%,+$33.05,+6.53%,0.05%,$506.03,$772.56,Cash,
+250464524,Rollover IRA,Pending activity,,,,,-$2499.96,,,,,,,,,
+
+"The data and information in this spreadsheet is provided to you solely for your use and is not for distribution. The spreadsheet is provided for informational purposes only, and is not intended to provide advice, nor should it be construed as an offer to sell, a solicitation of an offer to buy or a recommendation for any security by Fidelity or any third party. Data and information shown is based on information known to Fidelity as of the date it was exported and is subject to change. It should not be used in place of your account statements or trade confirmations and is not intended for tax reporting purposes. For more information on the data included in this spreadsheet, including any limitations thereof, go to Fidelity.com."
+
+"Brokerage services are provided by Fidelity Brokerage Services LLC (FBS), 900 Salem Street, Smithfield, RI 02917. Custody and other services provided by National Financial Services LLC (NFS). Both are Fidelity Investment companies and members SIPC, NYSE. Neither FBS nor NFS offer crypto as a direct investment nor provide trading or custody services for such assets."
+
+"Date downloaded Jul-31-2026 11:11 p.m ET"
