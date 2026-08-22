@@ -19,6 +19,8 @@ from models.importhistory import (
     ImportHistory,
 )
 
+from models.import_audit import ImportAuditStatus
+
 import yfinance as yf
 
 logger = get_logger(__name__)
