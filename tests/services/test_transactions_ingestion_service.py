@@ -13,6 +13,21 @@ from services.transactions_ingestion_service import (
     TransactionsIngestionService,
 )
 
+
+
+@pytest.fixture
+def service():
+    return TransactionsIngestionService(
+        account_repo=MagicMock(),
+        security_repo=MagicMock(),
+        transaction_repo=MagicMock(),
+        import_history_repo=MagicMock(),
+        import_audit_service=MagicMock(),
+        security_resolution_service=MagicMock(),
+        loader=MagicMock(),
+        validator=MagicMock(),
+    )
+
 @patch(
     "services.transactions_ingestion_service.DBConnection"
 )
@@ -455,3 +470,70 @@ def test_persist_raises_when_insert_fails():
 
     transaction_repo.exists.assert_called_once()
     transaction_repo.insert.assert_called_once()
+
+@patch(
+    "services.base_ingestion_service.calculate_file_hash",
+    return_value="test-file-hash",
+)
+def test_transactions_dry_run_does_not_persist(
+    mock_file_hash,
+    service,
+):
+    account = SimpleNamespace(
+        id=123,
+        name="Joint WROS TOD",
+        institution="Fidelity",
+        account_number="123456",
+    )
+
+    service._account_repo.get_by_name.return_value = account
+
+    service._import_history_repo.exists.return_value = False
+
+    service._loader.load.return_value = pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "description": "Apple Inc",
+                "run_date": "2026-01-01",
+                "settlement_date": "2026-01-02",
+                "action": "BUY",
+                "trade_type": "TRADE",
+                "price": 100,
+                "quantity": 10,
+                "commission": 0,
+                "fees": 0,
+                "accrued_interest": None,
+                "amount": 1000,
+                "cash_balance": 9000,
+            }
+        ]
+    )
+
+    service.persist = MagicMock()
+
+    result = service.ingest(
+        csv_file="transactions.csv",
+        name="Joint WROS TOD",
+        snapshot_date="2026-01-01",
+        dry_run=True,
+    )
+
+    assert result.account_id == 123
+    assert result.account_name == "Joint WROS TOD"
+    assert result.institution == "Fidelity"
+    assert result.import_type == "transactions"
+    assert result.filename == "transactions.csv"
+    assert result.snapshot_date == "2026-01-01"
+
+    assert result.rows_read == 1
+    assert result.rows_imported == 0
+    assert result.rows_skipped == 0
+
+    assert result.import_history_id is None
+    assert result.snapshot_id is None
+    assert result.status == "SUCCESS"
+    assert result.warnings == []
+
+    service.persist.assert_not_called()
+    service._import_history_repo.insert.assert_not_called()
