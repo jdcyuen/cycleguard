@@ -540,7 +540,7 @@ This design makes CycleGuard imports auditable, reliable, and safe to run.
 ```
 The fundamental design principle is:
 
-The ingestion pipeline is responsible for safely transforming Fidelity CSV data into trusted CycleGuard data. The TransactionManager guarantees database atomicity, while Import History provides traceability and the rollback service provides deliberate manual cleanup of committed imports.
+>The ingestion pipeline is responsible for safely transforming Fidelity CSV data into trusted CycleGuard data. The TransactionManager guarantees database atomicity, while Import History provides traceability and the rollback service provides deliberate manual cleanup of committed imports.
 
 This makes ingestion the foundation of CycleGuard: everything that comes later—portfolio aggregation, bucket mapping, market analysis, regime classification, risk scoring, and rebalancing—depends on this pipeline producing accurate and auditable portfolio data.
 
@@ -665,10 +665,10 @@ Example:
 python -m src.cli.ingest_transactions --file "K:\Joe\Fidelity\2026\Rollover\Transactions\Apr2026.csv" --account rollover_ira --confirm
 
 Command Line Arguments
---file (Required): The path to your transactions CSV file.
---account (Optional): The name of the account to import the transactions into. If not provided, the CLI will prompt the user to select an account.
---dry-run (Optional): A flag to run the command without making any changes to the database.
---confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
+* --file (Required): The path to your transactions CSV file.
+* --account (Optional): The name of the account to import the transactions into. If not provided, the CLI will prompt the user to select an account.
+* --dry-run (Optional): A flag to run the command without making any changes to the database.
+* --confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
 
 Example:
 
@@ -681,9 +681,9 @@ For import rollback:
 Usage: `python -m src.cli.rollback_import --import-history-id <IMPORT_HISTORY_ID> --confirm --delete-import-history`
 
 Command Line Arguments
---import-history-id (Required): The ID of the import history to roll back.
---confirm (Optional): A flag to bypass the interactive Are you sure? (y/n) confirmation prompt.
---delete-import-history (Optional): A flag to delete the import history after rolling back.
+* --import-history-id (Required): The ID of the import history to roll back.
+* --confirm (Optional): A flag to bypass the interactive Are you sure? (y/n) confirmation prompt.
+* --delete-import-history (Optional): A flag to delete the import history after rolling back.
 
 Example:
 
@@ -711,6 +711,9 @@ Example:
     * `python scripts\technical_indicators.py SPMO`
     * `python scripts\technical_indicators.py SPMO --period 6mo --interval 1d`
     * `python scripts\technical_indicators.py SPMO --period 6mo --interval 1d --export`
+```
+
+---
 
 ##Environment
 
@@ -720,6 +723,17 @@ If you want to run your tests, your test suite (or you) can set the environment 
 
 powershell
 -----------
+```bash
+C:\Users\Joe>powershell
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+PS C:\Users\Joe>
+
+```
+
 $env:CYCLEGUARD_ENV="test"
 pytest
 
@@ -752,11 +766,10 @@ Example:
 
 
 Command Line Arguments
---file (Required): The path to your portfolio CSV file.
---snapshot-date (Optional): An explicit date to associate with the snapshot in YYYY-MM-DD format.
---confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
-
---account (Optional): The name of the account to import the positions into. If not provided, the CLI will prompt the user to select an account.
+* --file (Required): The path to your portfolio CSV file.
+* --snapshot-date (Optional): An explicit date to associate with the snapshot in YYYY-MM-DD format.
+* --confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
+* --account (Optional): The name of the account to import the positions into. If not provided, the CLI will prompt the user to select an account.
 
 Ingestion Date Resolution
 If you do not explicitly provide a --snapshot-date argument, the CLI resolves the date automatically using the following order of priority:
@@ -793,10 +806,12 @@ python -m src.cli.ingest_transactions --file "K:\Joe\Fidelity\2026\Rollover\Tran
 
 
 Command Line Arguments
---file (Required): The path to your transactions CSV file.
---account (Optional): The name of the account to import the transactions into. If not provided, the CLI will prompt the user to select an account.
---confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
+* --file (Required): The path to your transactions CSV file.
+* --account (Optional): The name of the account to import the transactions into. If not provided, the CLI will prompt the user to select an account.
+* --confirm (Optional): A flag to bypass the interactive Proceed with ingestion? (y/n) confirmation prompt.
 
+
+---
 
 
 
@@ -949,11 +964,11 @@ UNIQUE (
 
 This guarantees the database cannot contain duplicate snapshots.
 
-
+---
 
 ##Cycleguard Architecture
 
-
+---
 ##Testing    
 
 Running Unit tests:
@@ -975,7 +990,7 @@ pytest -x tests/services/test_import_audit_service.py -vv
 
 pytest -x tests/services/test_base_ingestion_service.py -vv
 
-
+---
 
 
 
