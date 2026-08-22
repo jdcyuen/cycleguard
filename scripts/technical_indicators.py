@@ -81,7 +81,9 @@ def main():
 
     df["RSI_14"] = 100 - (100 / (1 + rs))
 
-    df["Volume_20D_Avg"] = df["Volume"].rolling(20).mean()
+    df["Volume_20D_Avg"] = 
+    
+    
     df["Volume_Ratio"] = df["Volume"] / df["Volume_20D_Avg"]
 
     latest = df.iloc[-1]
