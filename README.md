@@ -109,7 +109,7 @@ In both cases, the goal is to preserve the fidelity of the imported data while m
 
 ---
 
-1. Fidelity provides the source data
+###1. Fidelity provides the source data
 
 The process begins outside CycleGuard.
 
@@ -133,7 +133,7 @@ python -m cli.ingest_positions --file positions.csv
 
 ---
 
-2. The CLI starts the ingestion
+###2. The CLI starts the ingestion
 
 The CLI is the entry point into the pipeline.
 
@@ -163,7 +163,7 @@ Ingestion Service
 ```
 ---
 
-3. The loader reads the CSV
+###3. The loader reads the CSV
 
 The ingestion service passes the CSV file to the loader.
 
@@ -180,7 +180,7 @@ CycleGuard data objects
 ```
 ---
 
-4. The validator validates the data
+###4. The validator validates the data
 
 The loaded data is then passed to the validator.
 
@@ -204,7 +204,7 @@ Invalid input should not result in partially imported portfolio data.
 
 ---
 
-5. CycleGuard resolves the account
+###5. CycleGuard resolves the account
 
 The pipeline determines which CycleGuard account the Fidelity data belongs to.
 
@@ -225,12 +225,13 @@ The database account ID is then used by the records created during the import.
 
 ---
 
-6. The import is recorded
+###6. The import is recorded
 
 Before the actual portfolio records are persisted, CycleGuard creates an import_history record.
 
 For example:
 
+```python
 Import History
 ──────────────────────────────
 ID:             123
@@ -241,6 +242,7 @@ Filename:       Fidelity_Positions.csv
 File Hash:      84e958...
 Snapshot Date:  2026-08-22
 Status:         RUNNING
+```
 
 The import_history_id becomes the identifier connecting the data created by this import to its source.
 
@@ -248,7 +250,7 @@ This is a key part of CycleGuard's auditability.
 
 ---
 
-7. The data is persisted
+###7. The data is persisted
 
 The ingestion service then calls the appropriate persistence logic.
 
@@ -285,34 +287,39 @@ The records contain the import_history_id.
 
 For example:
 
+```python
 transactions
 ────────────────────────
 id
 account_id
 import_history_id
 ...
+```
 
 and:
 
+```python
 positions
 ────────────────────────
 id
 account_id
 import_history_id
 ...
+```
 
 and:
 
+```python
 snapshots
 ────────────────────────
 id
 account_id
 import_history_id
 ...
-
+```
 
 ---
-8. TransactionManager controls the database transaction
+### 8. TransactionManager controls the database transaction
 
 This is an important distinction in the architecture.
 
@@ -341,12 +348,13 @@ If an exception occurs during the import, the database transaction is rolled bac
 That means CycleGuard does not intentionally leave half an import committed.
 
 ---
-9. Import history is completed
+###9. Import history is completed
 
 If persistence succeeds, the import history record is updated.
 
 For example:
 
+```python
 Import History
 ──────────────────────────────
 ID:             123
@@ -354,14 +362,14 @@ Status:         SUCCESS
 Rows Read:      500
 Rows Imported:  487
 Rows Skipped:    13
-
+```
 If the import fails, it should instead record the appropriate failure information.
 
 The important point is that import history provides the audit trail for the ingestion operation.
 
 ---
 
-10. The import is audited
+###10. The import is audited
 
 Your current architecture also performs an import audit after persistence.
 
@@ -384,7 +392,7 @@ The import isn't considered successfully completed simply because the database a
 
 ---
 
-11. Commit or rollback
+###11. Commit or rollback
 
 If all validations succeed, the transaction is committed.
 
@@ -411,7 +419,7 @@ This is an atomic operation from the perspective of the database. Either the ent
 
 ---
 
-12. Success is reported
+###12. Success is reported
 
 The final step is to report success to the user.
 
