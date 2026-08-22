@@ -56,6 +56,8 @@ Its job is to move data from the external source—Fidelity—into the CycleGuar
 
 At a high level:
 
+```python
+
 Fidelity
    │
    │ CSV file
@@ -92,6 +94,7 @@ Fidelity
            ▼
         COMMIT
 
+```
 ---
 
 The ingestion pipeline can import both transactions and positions. The flow is almost identical, with two key differences:
