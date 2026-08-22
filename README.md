@@ -434,7 +434,7 @@ CLI → Success message
 
 There are two different situations that are important to distinguish.
 
-Failure during the database transaction
+##### 1.Failure during the database transaction
 
 The TransactionManager handles this:
 
@@ -445,7 +445,7 @@ The uncommitted database changes are removed.
 
 The ingestion service does not call ImportRollbackService.
 
-Manual cleanup of a committed import
+##### 2. Manual cleanup of a committed import
 
 A different situation is:
 
@@ -473,8 +473,6 @@ and removes the data associated with that import.
 
 By default, the import_history record remains so there is an audit trail of what happened.
 
-
-
 ---
 
 ### 13. The ingestion pipeline is designed for traceability and correctness.
@@ -486,6 +484,8 @@ By default, the import_history record remains so there is an audit trail of what
 * **Transaction management** ensures that the database is always in a valid state.
 
 * **Audit checks** verify that the imported data is correct.
+
+---
 
 This design makes CycleGuard imports auditable, reliable, and safe to run.
 
@@ -815,7 +815,7 @@ Command Line Arguments
 
 
 
-##Database
+## Database
 
 
 To access the database via the command line:
