@@ -1,6 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
-
+from unittest.mock import patch
 import psycopg
 import pytest
 
@@ -287,6 +287,144 @@ def test_transactions_ingestion_end_to_end():
             # Delete test account.
             # -----------------------------------------------------
 
+            if account_id is not None:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        DELETE FROM cycleguard.accounts
+                        WHERE id = %s
+                        """,
+                        (account_id,),
+                    )
+
+            conn.commit()
+
+        except Exception:
+            conn.rollback()
+            raise
+
+        finally:
+            conn.close()
+
+@pytest.mark.integration
+def test_transactions_ingestion_rolls_back_on_import_history_update_failure():
+    """
+    Verify that persisted transaction data is rolled back when the
+    SUCCESS import-history update fails.
+    """
+
+    account_name = f"CycleGuard Rollback Test {uuid4().hex[:8]}"
+    account_number = f"TEST-{uuid4().hex[:12]}"
+    institution = "Fidelity"
+
+    csv_file = Path(
+        "tests",
+        "data",
+        "transactions",
+        "transactions_integration_data.csv",
+    )
+
+    conn = DBConnection().connect()
+
+    account_id = None
+
+    try:
+        # ---------------------------------------------------------
+        # Create dedicated test account
+        # ---------------------------------------------------------
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO cycleguard.accounts (
+                    account_number,
+                    name,
+                    institution
+                )
+                VALUES (%s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    account_number,
+                    account_name,
+                    institution,
+                ),
+            )
+
+            account_id = cur.fetchone()[0]
+
+        conn.commit()
+
+        # ---------------------------------------------------------
+        # Build service
+        # ---------------------------------------------------------
+
+        service = TransactionsIngestionService.build()
+
+        # ---------------------------------------------------------
+        # Force SUCCESS import-history update to fail.
+        # ---------------------------------------------------------
+
+        with patch(
+            "services.base_ingestion_service.ImportHistoryRepository.update",
+            side_effect=RuntimeError(
+                "Import history update failed"
+            ),
+        ):
+            with pytest.raises(
+                RuntimeError,
+                match="Import history update failed",
+            ):
+                service.ingest(
+                    csv_file=str(csv_file),
+                    name=account_name,
+                )
+
+        # ---------------------------------------------------------
+        # Verify transaction data was rolled back.
+        # ---------------------------------------------------------
+
+        with conn.cursor() as cur:
+            
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM cycleguard.transactions t
+                JOIN cycleguard.accounts a
+                    ON a.id = t.account_id
+                WHERE a.id = %s
+                """,
+                (account_id,),
+            )
+
+            transaction_count = cur.fetchone()[0]
+
+        assert transaction_count == 0
+
+        # ---------------------------------------------------------
+        # Verify import history was rolled back.
+        # ---------------------------------------------------------
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM cycleguard.import_history
+                WHERE account_id = %s
+                """,
+                (account_id,),
+            )
+
+            import_history_count = cur.fetchone()[0]
+
+        assert import_history_count == 0
+
+    finally:
+        # ---------------------------------------------------------
+        # Cleanup test account.
+        # ---------------------------------------------------------
+
+        try:
             if account_id is not None:
                 with conn.cursor() as cur:
                     cur.execute(
