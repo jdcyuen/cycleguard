@@ -166,8 +166,6 @@ class SecurityRepository:
                 row = cur.fetchone()
                 logger.debug("Database returned row: %s", row)
 
-            self.conn.commit()
-
             logger.info("Committed security '%s'", security.symbol )
 
             return Security(
@@ -178,7 +176,6 @@ class SecurityRepository:
             )
 
         except Exception as exc:
-            self.conn.rollback()
 
             logger.exception(
                 "Failed to create or update security '%s'",
@@ -282,8 +279,6 @@ class SecurityRepository:
                     raise SecurityRepositoryError(
                         f"Security id={security.id} not found."
                     )
-
-                self.conn.commit()
 
                 logger.info(
                     "Security updated successfully for security_id=%s",

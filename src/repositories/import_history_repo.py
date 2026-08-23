@@ -154,9 +154,6 @@ class ImportHistoryRepository:
                         "INSERT did not return an ImportHistory row."
                     )
 
-
-            self.conn.commit()
-
             result = self._row_to_import_history(row)
 
             logger.info(
@@ -173,7 +170,6 @@ class ImportHistoryRepository:
             return result
 
         except Exception as exc:
-            self.conn.rollback()
 
             logger.exception(
                 "Failed creating import history "
@@ -238,8 +234,6 @@ class ImportHistoryRepository:
                     ),
                 )
 
-            self.conn.commit()
-
             logger.info(
                 "Completed import history "
                 "id=%s "
@@ -257,9 +251,6 @@ class ImportHistoryRepository:
             )
 
         except Exception as exc:
-
-            self.conn.rollback()
-
             logger.exception(
                 "Failed completing import history id=%s",
                 import_id,
@@ -570,8 +561,6 @@ class ImportHistoryRepository:
                         f"No import_history record found with id={import_history.id}"
                     )
 
-            self.conn.commit()
-
             result = self._row_to_import_history(row)
 
             logger.info(
@@ -588,7 +577,6 @@ class ImportHistoryRepository:
             return result
 
         except Exception as exc:
-            self.conn.rollback()
 
             logger.exception(
                 "Failed updating import history: "

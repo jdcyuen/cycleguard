@@ -146,8 +146,6 @@ class TransactionRepository:
 
                 transaction_id = cur.fetchone()[0]
 
-            self.conn.commit()
-
             logger.info(
                 f"Transaction inserted successfully for account_id={transaction.account_id}"
             )
@@ -172,8 +170,6 @@ class TransactionRepository:
             )
 
         except psycopg.IntegrityError as exc:
-            self.conn.rollback()
-
             logger.error(
                 "Transaction integrity error",
                 exc_info=True,
@@ -185,8 +181,6 @@ class TransactionRepository:
             ) from exc
 
         except psycopg.Error as exc:
-            self.conn.rollback()
-
             logger.error(
                 "Transaction database error",
                 exc_info=True,
@@ -487,8 +481,6 @@ class TransactionRepository:
 
                 rows_deleted = cur.rowcount
 
-           #self.conn.commit()
-
             logger.info(
                 "Deleted %s transaction(s) "
                 "for import_history_id=%s",
@@ -499,8 +491,6 @@ class TransactionRepository:
             return rows_deleted
 
         except Exception as exc:
-
-            #self.conn.rollback()
 
             logger.exception(
                 "Failed deleting transactions "
