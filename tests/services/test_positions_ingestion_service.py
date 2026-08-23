@@ -15,6 +15,8 @@ from services.positions_ingestion_service import (
     SnapshotAlreadyExistsError,
 )
 
+from database.transaction_manager import TransactionManager
+
 
 @pytest.fixture
 def service():
@@ -29,6 +31,7 @@ def service():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
 
@@ -39,6 +42,9 @@ def test_import_type(service):
 
 @patch(
     "services.positions_ingestion_service.DBConnection"
+)
+@patch(
+    "services.positions_ingestion_service.TransactionManager"
 )
 @patch(
     "services.positions_ingestion_service.AccountRepository"
@@ -73,6 +79,7 @@ def test_build(
     mock_snapshot_repo,
     mock_security_repo,
     mock_account_repo,
+    mock_transaction_manager,
     mock_db_connection,
 ):
 
@@ -80,9 +87,9 @@ def test_build(
 
     mock_db_connection.return_value.connect.return_value = conn
 
-    service = (
-        PositionsIngestionService.build()
-    )
+    service = PositionsIngestionService.build()
+
+    mock_transaction_manager.assert_called_once_with(conn)
 
     assert isinstance(
         service,

@@ -26,10 +26,14 @@ def service():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
 @patch(
     "services.transactions_ingestion_service.DBConnection"
+)
+@patch(
+    "services.transactions_ingestion_service.TransactionManager"
 )
 @patch(
     "services.transactions_ingestion_service.AccountRepository"
@@ -65,6 +69,7 @@ def test_build(
     mock_transaction_repo,
     mock_security_repo,
     mock_account_repo,
+    mock_transaction_manager,
     mock_db_connection,
 ):
     conn = MagicMock()
@@ -72,6 +77,8 @@ def test_build(
     mock_db_connection.return_value.connect.return_value = conn
 
     service = TransactionsIngestionService.build()
+
+    mock_transaction_manager.assert_called_once_with(conn)
 
     assert isinstance(
         service,
@@ -116,6 +123,7 @@ def test_persist_success():
         security_resolution_service=security_resolution_service,
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     account = SimpleNamespace(id=123)
@@ -174,6 +182,7 @@ def test_import_type():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     assert service.import_type == "transactions"
@@ -189,6 +198,7 @@ def test_null_if_na_returns_none_for_nan():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     assert service._null_if_na(float("nan")) is None
@@ -204,6 +214,7 @@ def test_null_if_na_preserves_values():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     assert service._null_if_na(100) == 100
@@ -221,6 +232,7 @@ def test_to_transaction_creates_transaction():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     row = SimpleNamespace(
@@ -273,6 +285,7 @@ def test_persist_inserts_security_transaction():
         security_resolution_service=security_resolution_service,
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     account = SimpleNamespace(id=123)
@@ -331,6 +344,7 @@ def test_persist_inserts_cash_transaction_without_security():
         security_resolution_service=security_resolution_service,
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     account = SimpleNamespace(id=123)
@@ -386,6 +400,7 @@ def test_persist_skips_duplicate_transaction():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     account = SimpleNamespace(id=123)
@@ -437,6 +452,7 @@ def test_persist_raises_when_insert_fails():
         security_resolution_service=MagicMock(),
         loader=MagicMock(),
         validator=MagicMock(),
+        transaction_manager=MagicMock(),
     )
 
     account = SimpleNamespace(id=123)
