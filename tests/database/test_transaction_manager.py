@@ -1,9 +1,34 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock, PropertyMock
 
 import pytest
 
 from database.transaction_manager import TransactionManager
 
+def test_transaction_rolls_back_on_exception():
+    connection = MagicMock()
+
+    transaction_manager = TransactionManager(connection)
+
+    with pytest.raises(
+        RuntimeError,
+        match="test failure",
+    ):
+        with transaction_manager.transaction():
+            raise RuntimeError("test failure")
+
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()
+
+def test_transaction_commits_on_success():
+    connection = MagicMock()
+
+    transaction_manager = TransactionManager(connection)
+
+    with transaction_manager.transaction():
+        pass
+
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
 
 def test_transaction_commits_when_block_succeeds():
     connection = Mock()
