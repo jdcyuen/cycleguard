@@ -1,4 +1,5 @@
 
+from database.transaction_manager import TransactionManager
 from models.snapshot import Snapshot
 from models.security import Security
 from models.position import Position
@@ -52,6 +53,7 @@ class PositionsIngestionService(BaseIngestionService):
         security_resolution_service,
         loader,
         validator,
+        transaction_manager,
     ):
 
         super().__init__(
@@ -60,6 +62,7 @@ class PositionsIngestionService(BaseIngestionService):
             import_audit_service=import_audit_service,
             loader=loader,
             validator=validator,
+            transaction_manager=transaction_manager,
         )
 
         self._security_repo = security_repo
@@ -79,6 +82,7 @@ class PositionsIngestionService(BaseIngestionService):
 
         try:
             conn = DBConnection().connect()
+            transaction_manager = TransactionManager(conn)
 
             account_repo = AccountRepository(conn)
             security_repo = SecurityRepository(conn)
@@ -86,9 +90,7 @@ class PositionsIngestionService(BaseIngestionService):
             position_repo = PositionRepository(conn)
             import_history_repo = ImportHistoryRepository(conn)
 
-            security_resolution_service = SecurityResolutionService(
-                security_repo=security_repo,
-            )
+            security_resolution_service = SecurityResolutionService(security_repo=security_repo)
 
             import_audit_service = ImportAuditService(
                 import_history_repository=import_history_repo,
@@ -107,6 +109,7 @@ class PositionsIngestionService(BaseIngestionService):
                 loader=PositionsCSVLoader(),
                 validator=PositionsValidator(),
                 security_resolution_service=security_resolution_service,
+                transaction_manager=transaction_manager,
             )
 
         except Exception as exc:

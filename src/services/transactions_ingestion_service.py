@@ -50,6 +50,8 @@ from services.security_resolution_service import (
 
 from services.import_audit_service import ImportAuditService
 
+from database.transaction_manager import TransactionManager
+
 
 logger = get_logger(__name__)
 
@@ -66,6 +68,7 @@ class TransactionsIngestionService(BaseIngestionService):
         security_resolution_service,
         loader,
         validator,
+        transaction_manager,
     ):
 
         super().__init__(
@@ -74,6 +77,7 @@ class TransactionsIngestionService(BaseIngestionService):
             import_audit_service=import_audit_service,
             loader=loader,
             validator=validator,
+            transaction_manager=transaction_manager,
         )
 
         self._security_repo = security_repo
@@ -93,6 +97,7 @@ class TransactionsIngestionService(BaseIngestionService):
         )
 
         conn = DBConnection().connect()
+        transaction_manager = TransactionManager(conn)
 
         config = get_config()
 
@@ -125,7 +130,7 @@ class TransactionsIngestionService(BaseIngestionService):
         position_repository=position_repo,
         transaction_repository=transaction_repo,
         snapshot_repository=snapshot_repo,
-    )
+        )
 
         return cls(
         account_repo=account_repo,
@@ -133,11 +138,10 @@ class TransactionsIngestionService(BaseIngestionService):
         transaction_repo=transaction_repo,
         import_history_repo=import_history_repo,
         import_audit_service=import_audit_service,
-        loader=TransactionsCSVLoader(
-            action_map=action_map
-        ),
+        loader=TransactionsCSVLoader(action_map=action_map),
         validator=TransactionsValidator(),
         security_resolution_service=security_resolution_service,
+        transaction_manager=transaction_manager,
     )
 
     

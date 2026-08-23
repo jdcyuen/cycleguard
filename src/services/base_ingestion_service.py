@@ -49,13 +49,15 @@ class BaseIngestionService(ABC):
         loader,
         validator,
         import_audit_service,
+        transaction_manager,
     ):
 
         self._account_repo = account_repo
-        self._import_history_repo = (import_history_repo)
+        self._import_history_repo = import_history_repo
         self._loader = loader
         self._validator = validator
         self._import_audit_service = import_audit_service
+        self._transaction_manager = transaction_manager
 
     def ingest(
         self,
@@ -142,33 +144,37 @@ class BaseIngestionService(ABC):
             status="RUNNING",
         )
 
-        import_history = self._record_import(
-            history,
-        )   
+        with self._transaction_manager.transaction():
 
-        logger.info(f"Persisting {len(dataframe)} rows")
-        num_rows_imported = self.persist(
-            dataframe=dataframe,
-            account=account,
-            snapshot_date=snapshot_date,
-            import_history_id=import_history.id,
-        )
-        logger.info(f"Persisted {num_rows_imported} rows")
+            import_history = self._record_import(
+                history,
+            )   
 
-        logger.info("Recording import history")
+            logger.info(f"Persisting {len(dataframe)} rows")
+            num_rows_imported = self.persist(
+                dataframe=dataframe,
+                account=account,
+                snapshot_date=snapshot_date,
+                import_history_id=import_history.id,
+            )
+            logger.info(f"Persisted {num_rows_imported} rows")
+
+            logger.info("Recording import history")
 
         
-        import_history.rows_read = len(dataframe)
-        import_history.rows_imported = num_rows_imported
-        import_history.rows_skipped = len(dataframe) - num_rows_imported
-        import_history.status = "SUCCESS"
-        updated_import_history = self._record_import(
-            import_history,
-        )
-        logger.info(
-            f"{self.import_type} import "
-            f"completed successfully"
-        )
+            import_history.rows_read = len(dataframe)
+            import_history.rows_imported = num_rows_imported
+            import_history.rows_skipped = len(dataframe) - num_rows_imported
+            import_history.status = "SUCCESS"
+            
+            updated_import_history = self._record_import(
+                import_history,
+            )
+            logger.info(
+                f"{self.import_type} import "
+                f"completed successfully"
+            )
+        # Transaction has now committed.
 
         # ---------------------------------------------------------
         # Audit the completed import
@@ -196,6 +202,7 @@ class BaseIngestionService(ABC):
                 f"Import audit failed: "
                 f"{audit_result.message}"
             )
+
         #An import isn't considered successfully completed unless the persisted data passes the audit.
         logger.info(
             "Import audit completed "
