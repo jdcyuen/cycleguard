@@ -106,7 +106,6 @@ def test_upsert_success(repository, mock_conn):
     assert "INSERT INTO cycleguard.securities" in sql
     assert "ON CONFLICT (symbol)" in sql
     assert params == ("AAPL", "Apple Inc", "Stock")
-    mock_conn.commit.assert_called_once()
 
 
 def test_upsert_database_error(repository, mock_conn):
@@ -116,8 +115,6 @@ def test_upsert_database_error(repository, mock_conn):
     security = Security(symbol="AAPL")
     with pytest.raises(SecurityRepositoryError, match="Unable to create or update security 'AAPL'"):
         repository.upsert(security)
-
-    mock_conn.rollback.assert_called_once()
 
 
 def test_list_securities(repository, mock_conn):
@@ -166,7 +163,6 @@ def test_update_if_missing_success(repository, mock_conn):
     assert "SET" in sql
     assert "COALESCE" in sql
     assert params == ("Apple Inc", "Stock", 123)
-    mock_conn.commit.assert_called_once()
     mock_conn.rollback.assert_not_called()
 
 

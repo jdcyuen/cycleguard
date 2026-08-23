@@ -167,7 +167,6 @@ def test_insert_transaction_success(
     assert result.action == "BUY"
 
     cursor.execute.assert_called_once()
-    mock_conn.commit.assert_called_once()
 
 
 def test_exists_returns_true_when_transaction_exists(
@@ -222,39 +221,6 @@ def test_exists_returns_false_when_transaction_missing(
     assert result is False
 
     cursor.execute.assert_called_once()
-
-
-def test_insert_commits_after_insert(
-    repository,
-    mock_conn,
-):
-    cursor = (
-        mock_conn.cursor.return_value
-        .__enter__.return_value
-    )
-
-    cursor.fetchone.return_value = (999,)
-
-    repository.insert(
-        Transaction(
-            import_history_id=0,
-            account_id=1,
-            security_id=None,
-            run_date="2026-06-17",
-            settlement_date="2026-06-18",
-            action="DIVIDEND",
-            trade_type="CASH",
-            price=None,
-            quantity=None,
-            commission=0,
-            fees=0,
-            accrued_interest=0,
-            amount=250.00,
-            cash_balance=12000.00,
-        )
-    )
-
-    mock_conn.commit.assert_called_once()
 
 # ---------------------------------------------------------------------
 # count_by_import_history_id()

@@ -94,7 +94,7 @@ def test_insert_success(
     assert result.error_message is None
 
     mock_cursor.execute.assert_called_once()
-    mock_conn.commit.assert_called_once()
+    mock_conn.commit.assert_not_called()
 
 
 def test_insert_failure_rolls_back(
@@ -123,7 +123,7 @@ def test_insert_failure_rolls_back(
     ):
         repository.insert(import_history)
 
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
     mock_conn.commit.assert_not_called()
 
@@ -158,7 +158,7 @@ def test_complete_import_success(
 
     mock_cursor.execute.assert_called_once()
 
-    mock_conn.commit.assert_called_once()
+    mock_conn.commit.assert_not_called()
 
 
 
@@ -195,7 +195,7 @@ def test_complete_import_failure(
             error_message="database failure",
         )
 
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
     mock_conn.commit.assert_not_called()
 
