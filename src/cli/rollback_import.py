@@ -37,6 +37,12 @@ def parse_args():
         help="Prompt for confirmation before performing rollback.",
     )
 
+    parser.add_argument(
+        "--delete-import-history",
+        action="store_true",
+        help="Delete the import_history record in addition to the other data.",
+    )
+
     return parser.parse_args()
 
 
@@ -115,7 +121,6 @@ def main():
 
     logger.info("Starting import rollback CLI.")
 
-
     args = parse_args()
 
     logger.info(
@@ -129,8 +134,6 @@ def main():
     # Use the same database connection/factory
     # used by the other CycleGuard CLIs.
     #
-
-
     conn = DBConnection().connect()
 
     try:
@@ -192,6 +195,7 @@ def main():
 
         result = service.rollback(
             import_history_id=args.import_history_id,
+            delete_import_history=args.delete_import_history,
         )
 
         display_result(result)
