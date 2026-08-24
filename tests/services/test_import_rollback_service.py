@@ -80,7 +80,10 @@ def test_rollback_success():
     )
 
     # Act
-    result = service.rollback(import_history_id)
+    result = service.rollback(
+        import_history_id,
+        delete_import_history=True,
+    )
 
     # Assert
     assert result == {
@@ -132,7 +135,7 @@ def test_rollback_deletes_all_import_data(
     snapshots_repository.delete_by_import_history_id.return_value = 1
     import_history_repository.delete.return_value = 1
 
-    result = service.rollback(import_history_id)
+    result = service.rollback(import_history_id, delete_import_history=True,)
 
     transaction_manager.transaction.assert_called_once_with()
 
@@ -174,7 +177,7 @@ def test_rollback_stops_when_repository_fails(
         RuntimeError,
         match="position delete failed",
     ):
-        service.rollback(import_history_id)
+        service.rollback(import_history_id, delete_import_history=True,)
 
     snapshots_repository.delete_by_import_history_id.assert_not_called()
     import_history_repository.delete.assert_not_called()
@@ -191,7 +194,7 @@ def test_rollback_propagates_repository_error(
     positions_repository.delete_by_import_history_id.side_effect = error
 
     with pytest.raises(RuntimeError) as exc_info:
-        service.rollback(import_history_id)
+        service.rollback(import_history_id, delete_import_history=True,)
 
     assert exc_info.value is error
 
@@ -262,7 +265,7 @@ def test_rollback_repository_failure_rolls_back_transaction(
         RuntimeError,
         match=f"{failing_repo} repository failure",
     ):
-        service.rollback(import_history_id)
+        service.rollback(import_history_id, delete_import_history=True,)
 
     # Assert: transaction was started.
     transaction_manager.transaction.assert_called_once_with()
@@ -356,7 +359,7 @@ def test_rollback_commits_on_success():
     )
 
     # Act
-    result = service.rollback(import_history_id)
+    result = service.rollback(import_history_id, delete_import_history=True,)
 
     # Assert
     assert result == {
@@ -378,3 +381,5 @@ def test_rollback_commits_on_success():
         None,
         None,
     )
+
+
