@@ -149,6 +149,18 @@ class PositionsIngestionService(BaseIngestionService):
             total_gain_pct=row.total_gain_loss_percent,
         )
 
+    def get_snapshot_id(
+        self,
+        account,
+        snapshot_date,
+    ) -> int | None:
+        snapshot = self._snapshot_repo.get_by_account_and_date(
+            account.id,
+            snapshot_date,
+        )
+
+        return snapshot.id if snapshot else None
+
     def persist(
         self,
         dataframe,
