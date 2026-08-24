@@ -63,13 +63,12 @@ class PositionRepository:
                     ),
                 )
 
-            self.conn.commit()
             logger.info(
                 f"Position inserted successfully for security_id={position.security_id}"
             )
 
         except psycopg.IntegrityError as exc:
-            self.conn.rollback()
+
             logger.exception( "Duplicate position." )
             raise PositionRepositoryError(
                 f"Position already exists for "
@@ -78,7 +77,7 @@ class PositionRepository:
             ) from exc
 
         except psycopg.Error as exc:
-            self.conn.rollback()
+
             logger.exception(
                 f"Failed to insert position "
                 f"for security_id={position.security_id}"
