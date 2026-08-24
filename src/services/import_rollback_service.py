@@ -49,6 +49,7 @@ class ImportRollbackService:
     def rollback(
         self,
         import_history_id: int,
+        delete_import_history: bool = False,
     ) -> dict:
 
         """
@@ -83,9 +84,10 @@ class ImportRollbackService:
                     self._snapshot_repo.delete_by_import_history_id(import_history_id)
                 )
 
-                import_history_deleted = (
-                    self._import_history_repo.delete(import_history_id)
-            ) 
+                if delete_import_history:
+                    import_history_deleted = (
+                        self._import_history_repo.delete(import_history_id)
+                    ) 
 
             
         except Exception:
