@@ -183,7 +183,12 @@ def test_create_returns_snapshot(
         .__enter__.return_value
     )
 
-    cursor.fetchone.return_value = (456, "2025-01-31", 123)
+    cursor.fetchone.return_value = (
+        456,
+        0,
+        "2025-01-31",
+        123,
+    )
 
     result = repository.create(
         Snapshot(snapshot_date="2025-01-31",
@@ -198,17 +203,19 @@ def test_create_returns_snapshot(
     sql, params = cursor.execute.call_args.args
 
     assert "INSERT INTO cycleguard.snapshots" in sql
-    assert "RETURNING id, snapshot_date, import_history_id" in sql
+    assert "RETURNING id, account_id, snapshot_date, import_history_id" in sql
     assert "snapshot_date" in sql
     assert "import_history_id" in sql
 
     assert params == (
+        0,
         "2025-01-31",
         123,
     )
 
-    # Verify transaction behavior
-    mock_conn.commit.assert_called_once()
+    # Transaction ownership belongs to the service-level
+    # TransactionManager, not the repository.
+    mock_conn.commit.assert_not_called()
     mock_conn.rollback.assert_not_called()
 
 
@@ -302,7 +309,7 @@ def test_create_integrity_error(
         in str(exc_info.value)
     )
 
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
 
 def test_create_database_error(
@@ -330,7 +337,7 @@ def test_create_database_error(
         in str(exc_info.value)
     )
 
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
 
 

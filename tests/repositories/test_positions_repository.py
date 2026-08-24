@@ -184,7 +184,7 @@ def test_insert_position_success(
         None,   # total_gain_pct
     )
 
-    mock_conn.commit.assert_called_once()
+    mock_conn.commit.assert_not_called()
     mock_conn.rollback.assert_not_called()
 
 def test_insert_integrity_error(repository, mock_conn):
@@ -209,7 +209,7 @@ def test_insert_integrity_error(repository, mock_conn):
         )
 
     mock_conn.commit.assert_not_called()
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
 
 
 def test_insert_database_error(
@@ -237,7 +237,7 @@ def test_insert_database_error(
             )
         )
 
-    mock_conn.rollback.assert_called_once()
+    mock_conn.rollback.assert_not_called()
     mock_conn.commit.assert_not_called()
 
 
