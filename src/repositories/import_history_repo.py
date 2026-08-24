@@ -653,4 +653,40 @@ class ImportHistoryRepository:
                 f"import_history_id={import_history_id}"
             ) from exc
 
-            
+
+    def delete(
+        self,
+        import_history_id: int,
+    ) -> int:
+    
+        """
+        Delete an import_history record.
+
+        Returns:
+            Number of records deleted.
+        """
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM cycleguard.import_history
+                    WHERE id = %s
+                    """,
+                    (import_history_id,),
+                )
+
+                deleted = cur.rowcount
+
+            return deleted
+
+        except psycopg.Error as exc:
+            logger.exception(
+                "Failed deleting import history id=%s",
+                import_history_id,
+            )
+
+            raise ImportHistoryRepositoryError(
+                f"Unable to delete import history record "
+                f"id={import_history_id}"
+            ) from exc
