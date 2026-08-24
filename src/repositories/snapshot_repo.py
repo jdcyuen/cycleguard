@@ -84,11 +84,16 @@ class SnapshotRepository:
             with self.conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO cycleguard.snapshots(snapshot_date, import_history_id)
-                    VALUES (%s, %s)
-                    RETURNING id, snapshot_date, import_history_id
+                    INSERT INTO cycleguard.snapshots(
+                        account_id,
+                        snapshot_date,
+                        import_history_id
+                    )
+                    VALUES (%s, %s, %s)
+                    RETURNING id, account_id, snapshot_date, import_history_id
                     """,
                     (
+                        snapshot.account_id,
                         snapshot.snapshot_date,
                         snapshot.import_history_id,
                     ),
@@ -98,19 +103,20 @@ class SnapshotRepository:
                 logger.info(
                     f"Snapshot created successfully with date={snapshot.snapshot_date}"
                 )
-            self.conn.commit()
+
             logger.info(
                 f"Snapshot committed successfully with date={snapshot.snapshot_date}"
             )
 
             return Snapshot(
                 id=row[0],
-                snapshot_date=row[1],
-                import_history_id=row[2],
+                account_id=row[1],
+                snapshot_date=row[2],
+                import_history_id=row[3],
             )
 
         except psycopg.IntegrityError as exc:
-            self.conn.rollback()
+
             logger.exception(
                 f"Failed to create snapshot for date={snapshot.snapshot_date}"   
             )
@@ -120,7 +126,7 @@ class SnapshotRepository:
             ) from exc
 
         except psycopg.Error as exc:
-            self.conn.rollback()
+
             logger.exception(
                 f"Failed to create snapshot for date={snapshot.snapshot_date}"
             )
