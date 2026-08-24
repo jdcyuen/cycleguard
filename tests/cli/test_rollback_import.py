@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from cli.rollback_import import main
+from cli.rollback_import import main, parse_args
 
 
 def make_import_history():
@@ -178,3 +178,19 @@ def test_main_passes_delete_import_history_flag(
     )
 
     mock_conn.close.assert_called_once() 
+
+def test_parse_args_accepts_delete_import_history(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "rollback_import.py",
+            "--import-history-id",
+            "42",
+            "--delete-import-history",
+        ],
+    )
+
+    args = parse_args()
+
+    assert args.import_history_id == 42
+    assert args.delete_import_history is True
