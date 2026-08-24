@@ -159,9 +159,12 @@ class BaseIngestionService(ABC):
             )
             logger.info(f"Persisted {num_rows_imported} rows")
 
-            logger.info("Recording import history")
+            snapshot_id = self.get_snapshot_id(
+                account=account,
+                snapshot_date=snapshot_date,
+            )
 
-        
+            logger.info("Recording import history")       
             import_history.rows_read = len(dataframe)
             import_history.rows_imported = num_rows_imported
             import_history.rows_skipped = len(dataframe) - num_rows_imported
@@ -229,7 +232,7 @@ class BaseIngestionService(ABC):
             rows_imported=num_rows_imported,
             rows_skipped=len(dataframe) - num_rows_imported,
             import_history_id=updated_import_history.id,
-            snapshot_id=None,
+            snapshot_id=snapshot_id,
             elapsed_ms=0,
             status="SUCCESS",
             warnings=[],
@@ -347,6 +350,18 @@ class BaseIngestionService(ABC):
             transactions
         """
         pass
+
+    def get_snapshot_id(
+        self,
+        account,
+        snapshot_date,
+    ) -> int | None:
+        """
+        Return the snapshot ID associated with the import.
+
+        Subclasses that create snapshots may override this.
+        """
+        return None
 
     @abstractmethod
     def persist(
