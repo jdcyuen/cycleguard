@@ -405,8 +405,6 @@ def test_ingest_import_history_failure_rolls_back_persisted_data(
     # Transaction context must have been entered.
     transaction_context.__enter__.assert_called_once()
 
-    
-
     # Transaction must exit with the exception.
     transaction_context.__exit__.assert_called_once()
 
