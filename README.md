@@ -712,9 +712,8 @@ Example:
     * `python scripts\technical_indicators.py SPMO`
     * `python scripts\technical_indicators.py SPMO --period 6mo --interval 1d`
     * `python scripts\technical_indicators.py SPMO --period 6mo --interval 1d --export`
-```
 
----
+
 ## Bucket Mapper
 
 The Bucket Mapper is the bridge between “what securities does the portfolio contain?” and “what role does each security play in the portfolio?”
@@ -727,7 +726,7 @@ Without regimes, your bucket weights are static:
 
 
 
-```
+```bash
 Defensive       15%
 Fixed Income    30%
 TIPS            10%
@@ -737,8 +736,8 @@ Growth           7%
 High Beta        3%
 Foreign          3%
 Alternatives     2%
-
 ```
+
 A regime says:
 
 >"Given the current market environment, should CycleGuard temporarily use a different set of bucket targets?"
