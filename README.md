@@ -745,14 +745,198 @@ A regime says:
 
 ---
 
-##Environment
+## Regime
+
+A regime says:
+
+>"Given the current market environment, should CycleGuard temporarily use a different set of bucket targets?"
+
+---
+
+## Drift Analysis
+
+In CycleGuard, drift analysis is the mechanism that answers:
+
+>“Where is my portfolio actually positioned right now compared with where the portfolio is supposed to be?”
+
+It is a critical bridge between your portfolio configuration and the trading/rebalancing decisions CycleGuard eventually makes.
+
+The fundamental calculation is:
+
+Drift = Actual Weight − Target Weight
+
+So:
+
+* +4% means 4 percentage points overweight
+* −2% means 2 percentage points underweight
+* 0% means exactly on target
+
+---
+## Why CycleGuard needs drift analysis
+
+Without drift analysis, CycleGuard knows:
+
+>“My portfolio should have these target weights.”
+
+But it doesn't know:
+
+>“How far have I moved away from those targets?”
+
+That distinction is extremely important.
+
+Your portfolio changes every day because of:
+
+* market movements
+* dividends
+* interest
+* contributions
+* withdrawals
+* trades
+* different securities moving at different rates
+
+You don't have to trade for the portfolio to drift.
+
+For example, suppose you start with:
+
+FZROX = 15% target
+
+Then FZROX rises substantially while bonds and cash don't.
+
+You might end up with:
+
+FZROX = 19% actual
+
+Nothing was necessarily "wrong" with FZROX.
+
+But CycleGuard now knows:
+
+FZROX drift = +4 percentage points
+
+That may eventually trigger a rebalance.
+
+
+---
+
+## Signals
+
+The signal stack is the part of CycleGuard that answers:
+
+>“What is the market doing right now, and how trustworthy is that move?”
+
+It does not immediately tell CycleGuard to buy or sell a particular ticker. Instead, it collects several independent measurements of market health, combines them, and produces a regime classification:
+
+Defensive → Transition → Risk-On
+
+
+1. 📈 Trend (Primary) — "Is the market going up or down?"
+
+Use broad market proxy:
+
+* SPDR S&P 500 ETF Trust
+
+Rules:
+
+* Bullish: Price > 200DMA
+* Neutral: Price between 50DMA and 200DMA
+* Bearish: Price < 200DMA
+
+
+
+2. 📊 Breadth (Confirmation) — "How many stocks are participating?"
+
+Use:
+
+* % of stocks above 50DMA
+
+Thresholds:
+
+* Strong: > 65%
+* Improving: 50–65%
+* Weak: < 50%
+
+
+
+3. 🌪 Volatility (Risk Filter) — "How much stress is in the market?"
+
+Use:
+
+* CBOE Volatility Index
+
+Thresholds:
+
+* Calm: < 18
+* Neutral: 18–25
+* Risk-off: > 25
+
+
+4. 🚀 Leadership (Your edge) — "Are the right parts of the market leading?"
+
+Track:
+
+* VanEck Semiconductor ETF
+* Invesco QQQ Trust
+
+Rules:
+
+* Strong: Above 50DMA
+* Weak: Below 50DMA
+
+
+5. 🔹 Credit — "Are investors willing to take risk?"
+
+Use:
+
+*JNK — SPDR Bloomberg High Yield Bond ETF
+SHY — iShares 1–3 Year Treasury Bond ETF
+
+It uses their prices, their 50-day moving averages, and the JNK/SHY price ratio.
+
+
+Rules
+
+>JNK/SHY above its 50-day ratio → Healthy; 
+otherwise → Stressed.
+
+
+The really important concept
+
+The signal stack isn't five independent decisions.
+
+It's five pieces of evidence describing the same market environment from different angles.
+
+Think of it like diagnosing a car.
+
+Trend
+
+> Is the car moving forward?
+
+Breadth
+
+> Are all four wheels moving?
+
+Volatility
+
+> Is the engine vibrating?
+
+Credit
+
+> Is the transmission behaving normally?
+
+Leadership
+
+Is the car accelerating?
+
+One measurement isn't enough.
+
+---
+
+## Environment
 
 If you are just running the code locally on your machine, you don't have to do anything. It will automatically default to dev and use dev.yaml.
 
 If you want to run your tests, your test suite (or you) can set the environment variable right before running the code so it uses test.yaml:
 
-powershell
------------
+
 ```bash
 C:\Users\Joe>powershell
 Windows PowerShell
