@@ -886,8 +886,8 @@ Rules:
 
 Use:
 
-*JNK — SPDR Bloomberg High Yield Bond ETF
-SHY — iShares 1–3 Year Treasury Bond ETF
+* JNK — SPDR Bloomberg High Yield Bond ETF
+* SHY — iShares 1–3 Year Treasury Bond ETF
 
 It uses their prices, their 50-day moving averages, and the JNK/SHY price ratio.
 
