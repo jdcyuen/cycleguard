@@ -715,6 +715,36 @@ Example:
 ```
 
 ---
+## Bucket Mapper
+
+The Bucket Mapper is the bridge between “what securities does the portfolio contain?” and “what role does each security play in the portfolio?”
+
+The bucket mapper is a feature of the CycleGuard Rebalancing Dashboard. It allows you to map each security in your portfolio to a specific bucket, which is a category of investments.
+
+A bucket regime gives CycleGuard a way to change the desired allocation of the account based on the market environment.
+
+Without regimes, your bucket weights are static:
+
+
+
+```
+Defensive       15%
+Fixed Income    30%
+TIPS            10%
+Core Equity     20%
+Equity Income   10%
+Growth           7%
+High Beta        3%
+Foreign          3%
+Alternatives     2%
+
+```
+A regime says:
+
+>"Given the current market environment, should CycleGuard temporarily use a different set of bucket targets?"
+
+
+---
 
 ##Environment
 
@@ -827,36 +857,38 @@ To access the database via the command line:
 To access the database via psql, you need to use the -U flag to specify the username, -d to specify the database name, and -p to specify the port number.
 
 Password: When prompted, enter Nokia*90.
-Useful commands once connected:
-List all tables: \dt
-Inspect table schema (e.g., positions): \d positions
-Run a query: SELECT * FROM snapshots;
-Exit: \q
 
-psql -p 5433 -U cycleguard_user -d cycleguard
-Password: When prompted, enter Wilhelmina1364Rise
+
+Useful commands once connected:
+* List all tables: \dt
+* Inspect table schema (e.g., positions): \d positions
+* Run a query: SELECT * FROM snapshots;
+* Exit: \q
+
+    psql -p 5433 -U cycleguard_user -d cycleguard
+    Password: When prompted, enter Wilhelmina1364Rise
 
 
 To obtain all portfolio information for a single ticker, you need to perform an SQL JOIN between the tables in your database (positions, securities, snapshots, and accounts).
 
 Here is the perfect query to do that. Copy and paste this into your psql terminal (replacing 'MU' with whatever ticker you want to query, e.g., 'SMH', 'AAPL', etc.):
 
-SELECT 
-    s.snapshot_date,
-    a.account_name,
-    sec.ticker,
-    sec.description,
-    p.quantity,
-    p.avg_cost,
-    p.market_value,
-    p.total_gain,
-    p.total_gain_pct
-FROM positions p
-JOIN securities sec ON p.security_id = sec.id
-JOIN snapshots s ON p.snapshot_id = s.id
-JOIN accounts a ON p.account_id = a.id
-WHERE sec.ticker = 'MU';
 
+    SELECT 
+        s.snapshot_date,
+        a.account_name,
+        sec.ticker,
+        sec.description,
+        p.quantity,
+        p.avg_cost,
+        p.market_value,
+        p.total_gain,
+        p.total_gain_pct
+    FROM positions p
+    JOIN securities sec ON p.security_id = sec.id
+    JOIN snapshots s ON p.snapshot_id = s.id
+    JOIN accounts a ON p.account_id = a.id
+    WHERE sec.ticker = 'MU';
 
 
 
@@ -956,12 +988,12 @@ This keeps your tables, indexes, constraints, accounts, and securities intact, w
 
 Add unique constraint:
 
-ALTER TABLE cycleguard.snapshots
-ADD CONSTRAINT uq_snapshot
-UNIQUE (
-    id,
-    snapshot_date
-);
+    ALTER TABLE cycleguard.snapshots
+    ADD CONSTRAINT uq_snapshot
+    UNIQUE (
+        id,
+        snapshot_date
+    );
 
 This guarantees the database cannot contain duplicate snapshots.
 
@@ -973,23 +1005,29 @@ This guarantees the database cannot contain duplicate snapshots.
 ##Testing    
 
 Running Unit tests:
-pytest -x tests/repositories/test_account_repository.py -vv
-pytest -x tests/repositories/test_import_history_repository.py -vv
-pytest -x tests/repositories/test_positions_repository.py -vv
-pytest -x tests/repositories/test_security_repository.py -vv
-pytest -x tests/repositories/test_snapshot_repository.py -vv
-pytest -x tests/repositories/test_transaction_repository.py -vv
+*pytest -x -vv
+* pytest -x tests/repositories/test_account_repository.py -vv
+* pytest -x tests/repositories/test_import_history_repository.py -vv
+* pytest -x tests/repositories/test_positions_repository.py -vv
+* pytest -x tests/repositories/test_security_repository.py -vv
+* pytest -x tests/repositories/test_snapshot_repository.py -vv
+* pytest -x tests/repositories/test_transaction_repository.py -vv
 
-pytest -x tests/config/test_schema_validator.py -vv
-pytest -x tests/config/test_config_manager.py -vv
-pytest -x tests/config/test_config_loader.py -vv
-pytest -x tests/ingestion/common/test_cli_ingestion_helper.py -vv
-pytest -x tests/services/test_positions_ingestion_service.py -vv
-pytest -x tests/services/test_transactions_ingestion_service.py -vv
-pytest -x tests/services/test_import_rollback_service.py -vv
-pytest -x tests/services/test_import_audit_service.py -vv
+* pytest -x tests/config/test_schema_validator.py -vv
+* pytest -x tests/config/test_config_manager.py -vv
+* pytest -x tests/config/test_config_loader.py -vv
 
-pytest -x tests/services/test_base_ingestion_service.py -vv
+* pytest -x tests/ingestion/common/test_cli_ingestion_helper.py -vv
+
+* pytest -x tests/services/test_positions_ingestion_service.py -vv
+* pytest -x tests/services/test_transactions_ingestion_service.py -vv
+* pytest -x tests/services/test_import_rollback_service.py -vv
+* pytest -x tests/services/test_import_audit_service.py -vv
+* pytest -x tests/services/test_base_ingestion_service.py -vv
+
+* pytest -x tests/database/test_transaction_manager.py -vv
+
+pytest -x -q tests/integration/services/test_transactions_ingestion_integration.py::test_transactions_ingestion_end_to_end
 
 ---
 
