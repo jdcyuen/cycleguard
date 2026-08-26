@@ -217,3 +217,61 @@ position_limits:
         match="Position limit for FZROX",
     ):
         loader.get("rollover_ira")
+
+
+def test_account_config_exposes_complete_configuration(config_dir):
+    file = config_dir / "rollover_ira.yaml"
+
+    file.write_text(
+        """
+account:
+  name: rollover_ira
+  display_name: Rollover IRA
+  account_type: ira
+  risk_profile: conservative
+  account_number: "123456"
+  institution: Fidelity
+
+bucket_mapping:
+  FZROX: core_equity
+
+bucket_weights:
+  defensive: 0.15
+  fixed_income: 0.30
+  tips_ladder: 0.10
+  core_equity: 0.20
+  equity_income: 0.10
+  equity_growth: 0.07
+  high_beta: 0.03
+  foreign_equity: 0.03
+  alternatives: 0.02
+
+position_limits:
+  max_position_pct: 0.10
+  overrides:
+    FZROX: 0.20
+
+settings:
+  rebalance_frequency: monthly
+  allow_fractional_shares: true
+  enable_recovery_trims: true
+  enable_dynamic_deployment: true
+"""
+    )
+
+    loader = AccountConfigLoader(config_dir)
+
+    account = loader.get("rollover_ira")
+
+    assert account.name == "rollover_ira"
+    assert account.bucket_mapping == {
+        "FZROX": "core_equity",
+    }
+
+    assert account.bucket_weights["core_equity"] == 0.20
+
+    assert account.position_limits.max_position_pct == 0.10
+    assert account.position_limits.overrides["FZROX"] == 0.20
+
+    assert account.settings.rebalance_frequency == "monthly"
+    assert account.settings.allow_fractional_shares is True
