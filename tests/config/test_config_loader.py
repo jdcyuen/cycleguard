@@ -161,3 +161,31 @@ def test_account_config_contains_settings():
     assert account.settings.allow_fractional_shares is True
     assert account.settings.enable_recovery_trims is True
     assert account.settings.enable_dynamic_deployment is True
+
+
+def test_config_load_returns_account_configs():
+    loader = ConfigLoader(get_test_config_path())
+
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert isinstance(accounts, dict)
+
+    for name, account in accounts.items():
+        assert isinstance(name, str)
+        assert isinstance(account, AccountConfig)
+
+
+def test_config_load_exposes_rollover_ira_configuration():
+    loader = ConfigLoader(get_test_config_path())
+
+    config = loader.load()
+
+    account = config["accounts"]["rollover_ira"]
+
+    assert account.name == "rollover_ira"
+    assert account.bucket_weights["core_equity"] == 0.20
+    assert account.position_limits.max_position_pct == 0.10
+    assert account.position_limits.overrides["FZROX"] == 0.20
+    assert account.settings.rebalance_frequency == "monthly"
