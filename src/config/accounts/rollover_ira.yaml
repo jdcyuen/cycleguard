@@ -1,6 +1,7 @@
 # =========================
 # Account Metadata
 # =========================
+
 account:
   name: rollover_ira
   display_name: "Rollover IRA"
@@ -11,66 +12,117 @@ account:
 
 
 # =========================
-# CURRENT PORTFOLIO
+# SECURITY → BUCKET MAPPING
 # =========================
-portfolio:
+#
+# Defines the approved investment bucket for each security within
+# this account.
+#
+# The mapping is ACCOUNT-SPECIFIC. The same security may belong to
+# different buckets in different accounts because each account may
+# have a different investment strategy.
+#
+# Current positions are NOT maintained here. Current holdings and
+# market values come from positions imported into PostgreSQL.
+#
+# If a position is imported and is not present in this mapping,
+# CycleGuard will classify it as UNMAPPED and may recommend a bucket.
+#
+# CycleGuard does not automatically change this configuration.
+# Approved changes require user action.
+#
+# =========================
+
+bucket_mapping:
 
   # -------- Defensive / Cash --------
-  FDRXX: 81048.09
-  SGOV: 71996.45
+
+  FDRXX: defensive
+  SGOV: defensive
 
   # -------- Fixed Income --------
-  FXNAX: 124622.43
-  BINC: 55532.48
-  VUSB: 41591.60
-  ICVT: 32175.02
-  VGLT: 45592.79
+
+  FXNAX: fixed_income
+  BINC: fixed_income
+  VUSB: fixed_income
+  ICVT: fixed_income
+  VGLT: fixed_income
 
   # -------- TIPS Ladder --------
-  IBIC: 0.00
-  IBID: 0.00
-  IBIE: 0.00
-  IBIF: 0.00
-  IBIG: 0.00
+
+  IBIC: tips_ladder
+  IBID: tips_ladder
+  IBIE: tips_ladder
+  IBIF: tips_ladder
+  IBIG: tips_ladder
 
   # -------- Equity Income --------
-  SCHD: 99959.49
-  JEPQ: 21089.13
-  JEPI: 26972.54
-  VYMI: 5978.95
+
+  SCHD: equity_income
+  JEPQ: equity_income
+  JEPI: equity_income
+  VYMI: equity_income
 
   # -------- Core Equity --------
-  FZROX: 98911.40
+
+  FZROX: core_equity
 
   # -------- Equity Growth --------
-  SCHG: 26984.21
-  FTEC: 18852.55
+
+  SCHG: equity_growth
+  FTEC: equity_growth
 
   # -------- High Beta --------
-  SMH: 21135.56
-  NVDA: 5050.08
-  MU: 1833.39
-  WDC: 1836.44
-  CLS: 8933.31
-  FBTC: 14354.92
+
+  SMH: high_beta
+  NVDA: high_beta
+  MU: high_beta
+  WDC: high_beta
+  CLS: high_beta
+  FBTC: high_beta
 
   # -------- Individual Stocks --------
-  AAPL: 5827.47
-  GOOG: 8811.28
+
+  AAPL: equity_growth
+  GOOG: equity_growth
 
   # -------- Foreign Equity --------
-  FZILX: 10782.02
-  IEMG: 5021.06
+
+  FZILX: foreign_equity
+  IEMG: foreign_equity
 
   # -------- Alternatives --------
-  DBMF: 37304.92
-  IAUM: 26456.47
+
+  DBMF: alternatives
+  IAUM: alternatives
 
 
 # =========================
 # TARGET BUCKET WEIGHTS
 # Conservative Account Allocation Model
 # =========================
+#
+# Defines the desired percentage of the total account value that
+# should be allocated to each investment bucket.
+#
+# These are STRATEGY TARGETS, not current portfolio allocations.
+# Current holdings and market values are obtained from positions
+# imported into PostgreSQL.
+#
+# The bucket weights should total 100% (1.00).
+#
+# CycleGuard uses these targets to:
+#   - calculate the desired allocation for each bucket
+#   - compare target allocation with the current portfolio
+#   - calculate bucket-level drift
+#   - identify over- and under-weight buckets
+#   - support rebalancing and deployment recommendations
+#
+# CycleGuard may recommend changes to these targets, but changes
+# to the YAML require user approval.
+#
+# =========================
+
 bucket_weights:
 
   defensive: 0.15
@@ -96,6 +148,25 @@ bucket_weights:
 # POSITION LIMITS
 # Account-Level Risk Controls
 # =========================
+#
+# Defines the maximum percentage of the total account value that may
+# be allocated to any single security.
+#
+# These are STRATEGY CONSTRAINTS, not current portfolio allocations.
+# Current positions and market values are obtained from positions
+# imported into PostgreSQL.
+#
+# max_position_pct:
+#   Defines the default maximum position size for any security that
+#   does not have a specific override.
+#
+# overrides:
+#   Defines account-specific maximum position sizes for individual
+#   securities that are intentionally allowed to differ from the
+#   default maximum.
+#
+# =========================
+
 position_limits:
 
   max_position_pct: 0.10
@@ -116,6 +187,17 @@ position_limits:
 # =========================
 # ACCOUNT-SPECIFIC SETTINGS
 # =========================
+#
+# Defines operational and trading behavior that applies specifically
+# to this account.
+#
+# These settings do not describe the current portfolio and do not
+# define the investment allocation. They tell CycleGuard how it is
+# permitted to operate when analyzing, rebalancing, and deploying
+# capital for this account.
+#
+# =========================
+
 settings:
 
   rebalance_frequency: "monthly"

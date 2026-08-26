@@ -1,6 +1,7 @@
 # =========================
 # Account Metadata
 # =========================
+
 account:
   name: roth_ira
   display_name: "Roth IRA"
@@ -9,31 +10,75 @@ account:
   account_number: "245735466"
   institution: Fidelity
 
+
 # =========================
-# CURRENT PORTFOLIO
+# SECURITY → BUCKET MAPPING
+# =========================
+#
+# Defines the approved investment bucket for each security within
+# this account.
+#
+# The mapping is ACCOUNT-SPECIFIC. The same security may belong to
+# different buckets in different accounts because each account may
+# have a different investment strategy.
+#
+# Current positions are NOT maintained here. Current holdings and
+# market values come from the positions imported into PostgreSQL.
+#
+# If a position is imported and is not present in this mapping,
+# CycleGuard will classify it as UNMAPPED and may recommend a bucket.
+#
+# CycleGuard does not automatically change this configuration.
+# Approved changes require user action.
+#
 # =========================
 
-portfolio:
+bucket_mapping:
 
-  # -------- Defensive / Cash --------
+  FDRXX: defensive
+  FZROX: core_equity
+  FTEC: equity_growth
+  SOXX: equity_growth
+  XBI: equity_growth
+  MU: high_beta
+  SNDK: high_beta
 
-  SGOV: 42269.08
-
-  # -------- Core Equity --------
-
-  FZROX: 14563.00
-
-  # -------- Equity Growth --------
-
-  SCHG: 13658.66
-
-  # -------- High Beta --------
-
-  SMH: 6946.17
-  SNDK: 0.00
 
 # =========================
 # TARGET BUCKET WEIGHTS
+# =========================
+#
+# Defines the desired percentage of the total account value that should
+# be allocated to each investment bucket.
+#
+# These are STRATEGY TARGETS, not current portfolio allocations.
+# Current holdings and market values are obtained from the positions
+# imported into PostgreSQL.
+#
+# The bucket weights should total 100% (1.00).
+#
+# CycleGuard uses these targets to:
+#   - calculate the desired allocation for each bucket
+#   - compare target allocation with the current portfolio
+#   - calculate bucket-level drift
+#   - identify over- and under-weight buckets
+#   - support rebalancing and deployment recommendations
+#
+# The values represent the account's approved investment strategy.
+# CycleGuard may recommend changes to these targets based on its
+# analysis, but changes to the YAML require user approval.
+#
+# Example:
+#
+#   defensive: 0.10
+#
+# means that 10% of the account should be allocated to the
+# Defensive bucket.
+#
+# A value of 0.00 means the bucket currently has no target allocation
+# in this account. It does not necessarily mean that securities in
+# that bucket are prohibited.
+#
 # =========================
 
 bucket_weights:
@@ -56,8 +101,61 @@ bucket_weights:
 
   alternatives: 0.00
 
+
 # =========================
 # POSITION LIMITS
+# =========================
+#
+# Defines the maximum percentage of the total account value that may
+# be allocated to any single security.
+#
+# Position limits are STRATEGY CONSTRAINTS, not current portfolio
+# allocations. Current positions and market values are obtained from
+# the positions imported into PostgreSQL.
+#
+# max_position_pct:
+#   Defines the default maximum position size for any security that
+#   does not have a specific override.
+#
+# overrides:
+#   Defines account-specific maximum position sizes for individual
+#   securities that are intentionally allowed to differ from the
+#   default maximum.
+#
+# CycleGuard uses position limits to:
+#   - identify positions that exceed their approved maximum
+#   - prevent recommended trades from increasing an already
+#     over-limit position
+#   - enforce concentration constraints during rebalancing
+#   - evaluate portfolio risk and concentration
+#   - support trade and deployment recommendations
+#
+# Position limits are independent of target bucket weights.
+#
+# A target answers:
+#   "How much of the account do I want allocated to this bucket?"
+#
+# A position limit answers:
+#   "How large am I willing to allow one security to become?"
+#
+# Example:
+#
+#   max_position_pct: 0.20
+#
+# means that, by default, no individual security should exceed 20%
+# of the total account value.
+#
+# An override such as:
+#
+#   FZROX: 0.40
+#
+# means that FZROX may be allowed to reach 40% of the account,
+# overriding the default 20% maximum.
+#
+# Position limits are approved strategy parameters. CycleGuard may
+# recommend changes to these limits based on its analysis, but changes
+# to the YAML require user approval.
+#
 # =========================
 
 position_limits:
@@ -76,8 +174,67 @@ position_limits:
 
     SGOV: 0.25
 
+
 # =========================
 # ACCOUNT-SPECIFIC SETTINGS
+# =========================
+#
+# Defines operational and trading behavior that applies specifically
+# to this account.
+#
+# These settings do not describe the current portfolio and do not
+# define the investment allocation. They tell CycleGuard how it is
+# permitted to operate when analyzing, rebalancing, and deploying
+# capital for this account.
+#
+# rebalance_frequency:
+#   Defines how often CycleGuard should perform a normal rebalancing
+#   evaluation for the account.
+#
+#   Example:
+#
+#     rebalance_frequency: "monthly"
+#
+#   This does not mean that trades occur every month. CycleGuard
+#   evaluates the portfolio and determines whether a rebalance is
+#   warranted.
+#
+# allow_fractional_shares:
+#   Indicates whether CycleGuard may use fractional-share quantities
+#   when calculating or recommending trades for this account.
+#
+#   true  = fractional shares are permitted
+#   false = trades must use whole shares
+#
+# enable_recovery_trims:
+#   Enables the account to participate in CycleGuard's recovery-trim
+#   strategy.
+#
+#   When enabled, the Rules Engine may evaluate positions that have
+#   previously been reduced because of risk conditions and determine
+#   whether recovery criteria have been met.
+#
+#   This setting enables the capability; the actual recovery rules
+#   are defined separately by the Rules Engine.
+#
+# enable_dynamic_deployment:
+#   Enables the account to use CycleGuard's dynamic capital deployment
+#   logic.
+#
+#   When enabled, CycleGuard may consider factors such as market
+#   regime, portfolio drift, risk, position limits, and other rules
+#   when determining how available capital should be deployed.
+#
+#   This setting enables the capability; it does not specify the
+#   deployment amounts or individual trades.
+#
+# These settings are account-specific because different accounts may
+# have different trading capabilities, rebalancing schedules, and
+# risk-management behavior.
+#
+# CycleGuard may recommend changes to these settings, but changes to
+# the YAML require user approval.
+#
 # =========================
 
 settings:
