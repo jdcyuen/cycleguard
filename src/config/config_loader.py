@@ -2,7 +2,7 @@ import os
 import yaml
 from typing import Any, Dict
 from pathlib import Path
-
+from models.account_config import AccountConfig, PositionLimits, AccountSettings
 
 class ConfigLoader:
     def __init__(self, config_path: str = None):
@@ -71,18 +71,70 @@ class ConfigLoader:
     # -----------------------------
     # ACCOUNT CONFIG LOADER
     # -----------------------------
-    def _load_account_configs(self) -> Dict[str, Any]:
+    def _load_account_configs(self) -> dict[str, AccountConfig]:
         account_dir = os.path.join(self.config_dir, "accounts")
 
         if not os.path.exists(account_dir):
             return {}
 
-        accounts = {}
+        accounts: dict[str, AccountConfig] = {}
 
         for file in os.listdir(account_dir):
             if file.endswith(".yaml"):
                 key = file.replace(".yaml", "")
-                accounts[key] = self._load_yaml(os.path.join(account_dir, file))
+                data = self._load_yaml(os.path.join(account_dir, file))
+                account_data = data["account"]
+
+                settings_data = data.get(
+                    "settings",
+                    {},
+                )
+
+                settings = AccountSettings(
+                    rebalance_frequency=settings_data.get(
+                        "rebalance_frequency",
+                        "monthly",
+                    ),
+                    allow_fractional_shares=settings_data.get(
+                        "allow_fractional_shares",
+                        True,
+                    ),
+                    enable_recovery_trims=settings_data.get(
+                        "enable_recovery_trims",
+                        True,
+                    ),
+                    enable_dynamic_deployment=settings_data.get(
+                        "enable_dynamic_deployment",
+                        True,
+                    ),
+                )
+
+                accounts[key] = AccountConfig(
+                    name=account_data["name"],
+                    display_name=account_data["display_name"],
+                    account_type=account_data["account_type"],
+                    risk_profile=account_data["risk_profile"],
+                    account_number=account_data["account_number"],
+                    institution=account_data["institution"],
+                    bucket_mapping=data.get("bucket_mapping", {}),
+                    bucket_weights=data.get("bucket_weights", {}),
+                    position_limits=PositionLimits(
+                        max_position_pct=data.get(
+                            "position_limits", {}
+                        ).get(
+                            "max_position_pct",
+                            0.10,
+                        ),
+                        overrides=data.get(
+                            "position_limits", {}
+                        ).get(
+                            "overrides",
+                            {},
+                        ),
+                    ),
+                    settings=settings,
+                )
+
 
         return accounts
 

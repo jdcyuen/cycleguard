@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from config.account_config_loader import AccountConfigLoader
-from models.account_config import AccountConfig
+from models.account_config import AccountConfig, PositionLimits, AccountSettings
 
 
 ACCOUNT_YAML = """
@@ -93,4 +93,16 @@ def test_load_file_parses_yaml(config_dir):
         risk_profile="conservative",
         account_number="123456",
         institution="Fidelity",
+         bucket_mapping={},
+         bucket_weights={},
+         position_limits=PositionLimits(
+            max_position_pct=0.10,
+            overrides={},
+        ),
+        settings=AccountSettings(
+            rebalance_frequency="monthly",
+            allow_fractional_shares=True,
+            enable_recovery_trims=True,
+            enable_dynamic_deployment=True,
+        ),
     )

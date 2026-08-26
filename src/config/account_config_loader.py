@@ -6,6 +6,8 @@ from core.logger import get_logger
 
 from models.account_config import (
     AccountConfig,
+    PositionLimits,
+    AccountSettings,
 )
 
 logger = get_logger(__name__)
@@ -116,6 +118,56 @@ class AccountConfigLoader:
 
         account = config["account"]
 
+        bucket_mapping = config.get(
+            "bucket_mapping",
+            {},
+        )
+
+        bucket_weights = config.get(
+            "bucket_weights",
+            {},
+        )
+
+        position_limits_data = config.get(
+            "position_limits",
+            {},
+        )
+
+        position_limits = PositionLimits(
+            max_position_pct=position_limits_data.get(
+                "max_position_pct",
+                0.10,
+            ),
+            overrides=position_limits_data.get(
+                "overrides",
+                {},
+            ),
+        )
+
+        settings_data = config.get(
+            "settings",
+            {},
+        )
+
+        settings = AccountSettings(
+            rebalance_frequency=settings_data.get(
+                "rebalance_frequency",
+                "monthly",
+            ),
+            allow_fractional_shares=settings_data.get(
+                "allow_fractional_shares",
+                True,
+            ),
+            enable_recovery_trims=settings_data.get(
+                "enable_recovery_trims",
+                True,
+            ),
+            enable_dynamic_deployment=settings_data.get(
+                "enable_dynamic_deployment",
+                True,
+            ),
+        )
+
         return AccountConfig(
             name=account["name"],
             display_name=account["display_name"],
@@ -123,4 +175,8 @@ class AccountConfigLoader:
             risk_profile=account["risk_profile"],
             account_number=account["account_number"],
             institution=account["institution"],
+            bucket_mapping=bucket_mapping,
+            bucket_weights=bucket_weights,
+            position_limits=position_limits,
+            settings=settings,
         )

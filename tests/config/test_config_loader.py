@@ -1,5 +1,6 @@
 import os
 from config.config_loader import ConfigLoader
+from models.account_config import AccountConfig
 
 
 # -----------------------------
@@ -43,3 +44,78 @@ def test_config_has_regimes():
     system = config["system"]
 
     assert "regime" in system
+
+
+def test_account_bucket_mapping():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert accounts["rollover_ira"].bucket_mapping["FZROX"] == "core_equity"
+    assert accounts["rollover_ira"].bucket_mapping["FXNAX"] == "fixed_income"
+    assert accounts["rollover_ira"].bucket_mapping["SGOV"] == "defensive"
+
+
+def test_accounts_are_account_configs():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert isinstance(accounts, dict)
+    assert isinstance(accounts["rollover_ira"], AccountConfig)
+
+def test_account_bucket_weights():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert accounts["rollover_ira"].bucket_weights["core_equity"] == 0.20
+    assert accounts["rollover_ira"].bucket_weights["fixed_income"] == 0.30
+
+
+def test_account_position_limits():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert (
+        accounts["rollover_ira"]
+        .position_limits
+        .max_position_pct
+        == 0.10
+    )
+
+    assert (
+        accounts["rollover_ira"]
+        .position_limits
+        .overrides["FZROX"]
+        == 0.20
+    )
+
+def test_account_settings():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    settings = accounts["rollover_ira"].settings
+
+    assert settings.rebalance_frequency == "monthly"
+    assert settings.allow_fractional_shares is True
+    assert settings.enable_recovery_trims is True
+    assert settings.enable_dynamic_deployment is True
+
+def test_accounts_dictionary_contains_account_config():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert isinstance(
+        accounts["rollover_ira"],
+        AccountConfig,
+    )
