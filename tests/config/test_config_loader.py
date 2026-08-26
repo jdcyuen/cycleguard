@@ -119,3 +119,45 @@ def test_accounts_dictionary_contains_account_config():
         accounts["rollover_ira"],
         AccountConfig,
     )
+
+def test_accounts_contains_account_config_objects():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    accounts = config["accounts"]
+
+    assert isinstance(
+        accounts["rollover_ira"],
+        AccountConfig,
+    )
+
+def test_account_config_contains_bucket_weights():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    account = config["accounts"]["rollover_ira"]
+
+    assert account.bucket_weights["defensive"] == 0.15
+    assert account.bucket_weights["fixed_income"] == 0.30
+    assert account.bucket_weights["core_equity"] == 0.20
+
+def test_account_config_contains_position_limits():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    account = config["accounts"]["rollover_ira"]
+
+    assert account.position_limits.max_position_pct == 0.10
+    assert account.position_limits.overrides["FZROX"] == 0.20
+    assert account.position_limits.overrides["SCHD"] == 0.15
+
+def test_account_config_contains_settings():
+    loader = ConfigLoader(get_test_config_path())
+    config = loader.load()
+
+    account = config["accounts"]["rollover_ira"]
+
+    assert account.settings.rebalance_frequency == "monthly"
+    assert account.settings.allow_fractional_shares is True
+    assert account.settings.enable_recovery_trims is True
+    assert account.settings.enable_dynamic_deployment is True

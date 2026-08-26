@@ -16,6 +16,17 @@ account:
   risk_profile: conservative
   account_number: "123456"
   institution: Fidelity
+
+bucket_weights:
+  defensive: 0.15
+  fixed_income: 0.30
+  tips_ladder: 0.10
+  core_equity: 0.20
+  equity_income: 0.10
+  equity_growth: 0.07
+  high_beta: 0.03
+  foreign_equity: 0.03
+  alternatives: 0.02
 """
 
 
@@ -94,8 +105,18 @@ def test_load_file_parses_yaml(config_dir):
         account_number="123456",
         institution="Fidelity",
          bucket_mapping={},
-         bucket_weights={},
-         position_limits=PositionLimits(
+         bucket_weights={
+            "defensive": 0.15,
+            "fixed_income": 0.30,
+            "tips_ladder": 0.10,
+            "core_equity": 0.20,
+            "equity_income": 0.10,
+            "equity_growth": 0.07,
+            "high_beta": 0.03,
+            "foreign_equity": 0.03,
+            "alternatives": 0.02,
+        },
+        position_limits=PositionLimits(
             max_position_pct=0.10,
             overrides={},
         ),
@@ -106,3 +127,36 @@ def test_load_file_parses_yaml(config_dir):
             enable_dynamic_deployment=True,
         ),
     )
+
+def test_bucket_weights_total_100_percent(config_dir):
+    loader = AccountConfigLoader(config_dir)
+    account = loader.get("rollover_ira")
+    assert sum(account.bucket_weights.values()) == pytest.approx(1.0)
+
+
+def test_bucket_weights_must_total_100_percent(config_dir):
+    file = config_dir / "rollover_ira.yaml"
+
+    file.write_text(
+    """
+account:
+  name: rollover_ira
+  display_name: Rollover IRA
+  account_type: ira
+  risk_profile: conservative
+  account_number: "123456"
+  institution: Fidelity
+
+bucket_weights:
+  defensive: 0.50
+  fixed_income: 0.30
+"""
+)
+
+    loader = AccountConfigLoader(config_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="must total 1.0",
+    ):
+        loader.get("rollover_ira")

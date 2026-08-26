@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import yaml
+import math
 
 from core.logger import get_logger
 
@@ -99,6 +100,7 @@ class AccountConfigLoader:
         self,
         file: Path,
     ) -> AccountConfig:
+
         """
         Load one account YAML file.
         """
@@ -127,6 +129,15 @@ class AccountConfigLoader:
             "bucket_weights",
             {},
         )
+        if bucket_weights and not math.isclose(
+            sum(bucket_weights.values()),
+            1.0,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            raise ValueError(
+                f"Bucket weights for {file.name} must total 1.0"
+            )
 
         position_limits_data = config.get(
             "position_limits",
