@@ -160,3 +160,60 @@ bucket_weights:
         match="must total 1.0",
     ):
         loader.get("rollover_ira")
+
+def test_position_limit_must_be_between_zero_and_one(config_dir):
+    file = config_dir / "rollover_ira.yaml"
+
+    file.write_text(
+        """
+account:
+  name: rollover_ira
+  display_name: Rollover IRA
+  account_type: ira
+  risk_profile: conservative
+  account_number: "123456"
+  institution: Fidelity
+
+position_limits:
+  max_position_pct: 1.50
+"""
+    )
+
+    loader = AccountConfigLoader(config_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="must be between 0 and 1.0",
+    ):
+        loader.get("rollover_ira")
+
+
+def test_position_limit_override_must_be_between_zero_and_one(
+    config_dir,
+):
+    file = config_dir / "rollover_ira.yaml"
+
+    file.write_text(
+        """
+account:
+  name: rollover_ira
+  display_name: Rollover IRA
+  account_type: ira
+  risk_profile: conservative
+  account_number: "123456"
+  institution: Fidelity
+
+position_limits:
+  max_position_pct: 0.10
+  overrides:
+    FZROX: 1.50
+"""
+    )
+
+    loader = AccountConfigLoader(config_dir)
+
+    with pytest.raises(
+        ValueError,
+        match="Position limit for FZROX",
+    ):
+        loader.get("rollover_ira")

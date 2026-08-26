@@ -144,15 +144,32 @@ class AccountConfigLoader:
             {},
         )
 
+        max_position_pct = position_limits_data.get(
+            "max_position_pct",
+            0.10,
+        )
+
+        overrides = position_limits_data.get(
+            "overrides",
+            {},
+        )
+
+        if not 0 <= max_position_pct <= 1.0:
+            raise ValueError(
+                f"Default position limit for {file.name} "
+                "must be between 0 and 1.0"
+            )
+
+        for symbol, limit in overrides.items():
+            if not 0 <= limit <= 1.0:
+                raise ValueError(
+                    f"Position limit for {symbol} in {file.name} "
+                    "must be between 0 and 1.0"
+                )
+
         position_limits = PositionLimits(
-            max_position_pct=position_limits_data.get(
-                "max_position_pct",
-                0.10,
-            ),
-            overrides=position_limits_data.get(
-                "overrides",
-                {},
-            ),
+            max_position_pct=max_position_pct,
+            overrides=overrides,
         )
 
         settings_data = config.get(
