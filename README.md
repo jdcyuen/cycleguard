@@ -742,6 +742,636 @@ A regime says:
 
 >"Given the current market environment, should CycleGuard temporarily use a different set of bucket targets?"
 
+---
+
+## Portfolio Aggregation Engine
+
+
+The Portfolio Aggregation Engine is the system that answers:
+
+>“How should I allocate my money across all my accounts in the most optimal way?”
+
+It sits at the top level of the CycleGuard architecture, coordinating multiple accounts.
+
+>The Bucket Mapper tells CycleGuard what each position is. The Portfolio Aggregation Engine tells CycleGuard what the portfolio looks like as a whole.
+
+1. What is the Portfolio Aggregation Engine?
+
+The Portfolio Aggregation Engine (PAE) takes the individual positions in an account and rolls them up into meaningful portfolio-level information.
+
+For example, suppose your Roth IRA contains:
+
+| Position  | Value     | Bucket        |
+|-----------|-----------|---------------|
+| FZROX     | $25,000   | Core Equity   |
+| FTEC      | $14,000   | Equity Growth |
+| SOXX      | $12,000   | High Beta     |
+| MU        | $7,000    | High Beta     |
+| FDRXX     | $20,000   | Defensive     |
+
+
+The raw ingestion system knows:
+
+> FZROX = $25,000
+> FTEC = $14,000
+> SOXX = $12,000
+> MU = $7,000
+> FDRXX = $20,000
+
+Bucket Mapper adds:
+
+> FZROX → Core Equity
+> FTEC → Equity Growth
+> SOXX → High Beta
+> MU → High Beta
+> FDRXX → Defensive
+
+The Portfolio Aggregation Engine then produces:
+
+> Core Equity = $25,000
+> Equity Growth = $14,000
+> High Beta = $19,000
+> Defensive = $20,000
+> Total Portfolio = $78,000
+
+---
+https://chatgpt.com/c/6a8e5672-1c74-83e8-b61d-24f392781e0e
+
+The Portfolio Aggregation Engine itself is best understood as a small pipeline that converts raw position data into a structured view of the portfolio.
+
+1. The architecture
+
+At a high level:
+
+```
+                    AccountConfig
+                         │
+                         │
+                         ▼
+PositionRepository → PortfolioAggregationService
+                         │
+                         ├── Position → Bucket mapping
+                         │
+                         ├── Portfolio value
+                         │
+                         ├── Bucket values
+                         │
+                         ├── Bucket weights
+                         │
+                         ├── Target weights
+                         │
+                         ├── Bucket drift
+                         │
+                         └── Position weights
+                         │
+                         ▼
+                 Allocation Models
+                         │
+             ┌───────────┼───────────┐
+             ▼           ▼           ▼
+       PositionAllocation
+                   BucketAllocation
+                              PortfolioAllocation
+
+
+The key point is that PortfolioAggregationService is the coordinator. It doesn't own the database and it doesn't own the configuration. It brings those things together and performs the calculations.
+
+
+
+---
+
+2. The three main inputs
+
+The service gets information from two places.
+
+A. PositionRepository
+PositionRepository
+
+provides the actual holdings.
+
+For example:
+
+FZROX    $100,000
+SCHD      $50,000
+FTEC      $20,000
+
+The service asks:
+
+get_positions(snapshot_id)
+
+which ultimately calls:
+
+
+position_repository.get_by_snapshot_with_security(
+    snapshot_id
+)
+
+The repository's job is simply:
+
+"Give me the positions for this snapshot."
+
+It does not calculate allocations.
+
+B. AccountConfig
+
+The service also receives:
+
+account: AccountConfig
+
+This contains the portfolio's configuration.
+
+For example:
+
+account.bucket_mapping
+
+might say:
+
+FZROX → core_equity
+SCHD  → equity_income
+FTEC  → equity_growth
+
+And:
+
+account.bucket_weights
+
+might say:
+
+core_equity   → 60%
+equity_income → 30%
+equity_growth → 10%
+
+So there is a very important distinction:
+
+PositionRepository
+    = What do I actually own?
+
+AccountConfig
+    = How is the portfolio supposed to be structured?
+
+---
+3. The service sits between them
+
+The central class is:
+
+PortfolioAggregationService
+
+Its constructor receives both:
+
+```
+def __init__(
+    self,
+    position_repository: PositionRepository,
+    account: AccountConfig,
+):
+`
+So conceptually:
+
+`
+                    ┌─────────────────┐
+                    │ Position        │
+                    │ Repository      │
+                    └────────┬────────┘
+                             │
+                             │ actual positions
+                             ▼
+                    ┌──────────────────────┐
+                    │                      │
+                    │ PortfolioAggregation │
+                    │ Service              │
+                    │                      │
+                    └──────────┬───────────┘
+                               ▲
+                               │
+                    configuration
+                               │
+                    ┌──────────┴────────┐
+                    │   AccountConfig   │
+                    └───────────────────┘
+```
+
+This is the heart of the architecture.
+
+
+---
+4. First layer: retrieve positions
+
+The service has:
+
+get_positions(snapshot_id)
+
+This is deliberately a thin method.
+
+It doesn't calculate anything.
+
+It delegates:
+
+``
+return self.position_repository.get_by_snapshot_with_security(
+    snapshot_id
+)
+
+That gives the aggregation layer a collection of position objects.
+
+For example:
+
+Position
+  symbol = FZROX
+  current_value = $100,000
+
+Position
+  symbol = SCHD
+  current_value = $50,000
+
+---
+
+4. First layer: retrieve positions
+
+The service has:
+
+get_positions(snapshot_id)
+
+This is deliberately a thin method.
+
+It doesn't calculate anything.
+
+It delegates:
+
+```
+return self.position_repository.get_by_snapshot_with_security(
+    snapshot_id
+)
+```
+That gives the aggregation layer a collection of position objects.
+
+For example:
+
+Position
+  symbol = FZROX
+  current_value = $100,000
+
+Position
+  symbol = SCHD
+  current_value = $50,000
+
+---
+
+6. Third layer: calculate values
+
+Once positions are grouped, the service can calculate bucket values.
+
+calculate_bucket_values(snapshot_id)
+
+For example:
+
+FZROX    $100,000
+VTI       $50,000
+SCHD      $50,000
+
+becomes:
+
+core_equity     $150,000
+equity_income    $50,000
+
+At the same time:
+
+calculate_portfolio_value(snapshot_id)
+
+produces:
+
+$200,000
+
+So we now know:
+
+Portfolio = $200,000
+
+core_equity     = $150,000
+equity_income    = $50,000
+
+
+---
+7. Fourth layer: calculate actual weights
+
+Now the service converts dollars into percentages.
+
+calculate_bucket_weights(snapshot_id)
+
+The formula is:
+
+bucket market value
+──────────────────────
+portfolio market value
+
+So:
+
+core_equity:
+
+$150,000
+───────── = 75%
+$200,000
+
+and:
+
+equity_income:
+
+$50,000
+──────── = 25%
+$200,000
+
+We now have the actual portfolio structure.
+
+---
+
+8. Fifth layer: obtain target weights
+
+The service doesn't calculate target weights.
+
+It retrieves them:
+
+get_target_weights()
+
+which returns:
+
+self.account.bucket_weights
+
+For example:
+
+core_equity     60%
+equity_income   40%
+
+Now we can compare:
+
+                 Actual       Target
+                 ──────       ──────
+core_equity       75%          60%
+equity_income     25%          40%
+
+---
+
+9. Sixth layer: calculate drift
+
+This is where the aggregation engine starts producing information that later components can use.
+
+The service calculates:
+
+drift = actual_weight - target_weight
+
+Therefore:
+
+core_equity:
+
+75% - 60% = +15%
+
+equity_income:
+
+25% - 40% = -15%
+
+It also calculates:
+
+drift_value =
+    drift × portfolio_value
+
+So:
+
+core_equity:
+
+15% × $200,000 = +$30,000
+
+equity_income:
+
+-15% × $200,000 = -$30,000
+
+This is valuable because a later component doesn't have to redo the math.
+
+---
+
+10. The BucketAllocation model
+
+Rather than returning an unstructured dictionary, the service packages this information into:
+
+BucketAllocation
+
+A bucket therefore looks conceptually like:
+
+`
+BucketAllocation
+│
+├── name
+├── market_value
+├── actual_weight
+├── target_weight
+├── drift
+└── drift_value
+```
+
+For example:
+
+BucketAllocation
+    name          = "core_equity"
+    market_value  = $150,000
+    actual_weight = 75%
+    target_weight = 60%
+    drift         = +15%
+    drift_value   = +$30,000
+
+This is an important architectural boundary.
+
+The rest of CycleGuard doesn't need to know how the calculation was performed.
+
+It just receives a BucketAllocation.
+
+---
+
+11. Position allocation is another level
+
+The engine also goes one level deeper.
+
+It can calculate:
+
+calculate_position_bucket_weights(snapshot_id)
+
+This answers:
+
+"Within this bucket, how is the money distributed among the positions?"
+
+Suppose:
+
+core_equity = $150,000
+
+FZROX = $100,000
+VTI   = $50,000
+
+The service produces:
+
+FZROX → 66.67%
+VTI   → 33.33%
+
+Those results are represented by:
+
+PositionAllocation
+
+which contains:
+
+symbol
+bucket
+market_value
+weight
+
+So there are really two different types of allocation:
+
+`
+Portfolio
+    │
+    ├── Bucket allocation
+    │       │
+    │       ├── actual weight
+    │       ├── target weight
+    │       └── drift
+    │
+    └── Position allocation
+            │
+            └── weight within bucket
+
+```
+
+---
+
+
+12. The top-level PortfolioAllocation
+
+Finally, the service packages the entire result into:
+
+PortfolioAllocation
+
+Conceptually:
+
+``
+PortfolioAllocation
+│
+├── portfolio_value = $200,000
+│
+└── buckets
+      │
+      ├── core_equity
+      │      │
+      │      └── BucketAllocation
+      │
+      └── equity_income
+             │
+             └── BucketAllocation
+
+```
+
+This gives the rest of CycleGuard one clean object representing the portfolio's current allocation state.
+
+
+---
+
+13. Why this architecture is useful
+
+The most important benefit is separation of responsibilities.
+
+Repository
+"I retrieve data."
+AccountConfig
+"I define the intended portfolio structure."
+PortfolioAggregationService
+"I calculate what the portfolio actually looks like."
+Allocation models
+"I represent those calculated results."
+
+That means we don't end up with database code mixed with portfolio calculations or trading decisions.
+
+
+---
+
+
+14. What the engine does NOT do
+
+This is just as important.
+
+The aggregation engine does not say:
+
+BUY FZROX
+SELL SCHD
+MOVE $20,000 TO SGOV
+
+It only tells us:
+
+core_equity
+    actual = 75%
+    target = 60%
+    drift = +15%
+    drift_value = +$30,000
+
+Something else will decide what to do about that drift.
+
+
+
+
+
+
+
+
+
+---
+
+
+The complete Portfolio Aggregation flow
+
+Putting everything together:
+
+                  DATABASE
+                     │
+                     ▼
+             PositionRepository
+                     │
+                     │ positions
+                     ▼
+        ┌──────────────────────────┐
+        │ PortfolioAggregation     │
+        │ Service                  │
+        │                          │
+        │ 1. get_positions()       │
+        │           │              │
+        │           ▼              │
+        │ 2. map_positions...()    │
+        │           │              │
+        │           ▼              │
+        │ 3. bucket values         │
+        │           │              │
+        │           ▼              │
+        │ 4. bucket weights        │
+        │           │              │
+        │           ▼              │
+        │ 5. target weights        │
+        │           │              │
+        │           ▼              │
+        │ 6. drift                 │
+        │           │              │
+        │           ▼              │
+        │ 7. position allocations  │
+        └────────────┬─────────────┘
+                     │
+                     ▼
+             PortfolioAllocation
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+   BucketAllocation       PositionAllocation
+
+And AccountConfig feeds the service from the side:
+
+                         AccountConfig
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+          bucket_mapping             bucket_weights
+                 │                         │
+                 └────────────┬────────────┘
+                              ▼
+                 PortfolioAggregationService
+
+> The Portfolio Aggregation Engine takes actual positions plus portfolio configuration and transforms them into a structured, calculated representation of the portfolio's current allocation and drift.
 
 ---
 
@@ -1034,22 +1664,57 @@ Command Line Arguments
 
 To access the database via the command line:
 
-    psql -h localhost -p 5433 -U postgres -d cycleguard
+    psql -h localhost -p 5432 -U postgres -d cycleguard
+
+means "connect to the PostgreSQL database named cycleguard running on this computer, on port 5432, using the PostgreSQL user postgres."
+
+Here's each piece:
+
+|Part|Meaning|
+|psql|PostgreSQL's command-line client|
+|-h localhost|Connect to PostgreSQL on this computer|
+|-p 5432|Connect using PostgreSQL port 5432|
+|-U postgres|Connect as PostgreSQL user postgres|
+|-d cycleguard|Connect to the database named cycleguard|
 
 
-To access the database via psql, you need to use the -U flag to specify the username, -d to specify the database name, and -p to specify the port number.
 
-Password: When prompted, enter Nokia*90.
+
+
+
 
 
 Useful commands once connected:
 * List all tables: \dt
 * Inspect table schema (e.g., positions): \d positions
 * Run a query: SELECT * FROM snapshots;
-* Exit: \q
+* Exit: 
+```
+cycleguard-> \q
+```
 
+To access the database via psql, you need to use the -U flag to specify the username, -d to specify the database name, and -p to specify the port number.
+
+```
     psql -p 5433 -U cycleguard_user -d cycleguard
     Password: When prompted, enter Wilhelmina1364Rise
+
+    WARNING: Console code page (437) differs from Windows code page (1252)
+            8-bit characters might not work correctly. See psql reference
+            page "Notes for Windows users" for details.
+    Type "help" for help.
+
+    cycleguard=>
+
+```
+
+Use pg_dump with the --schema-only option. This exports the complete database structure—tables, columns, constraints, indexes, sequences, views, functions, etc.—without exporting the actual table data.
+
+```
+
+    pg_dump -h localhost -p 5433 -U cycleguard_user -d cycleguard --schema-only --file=E:\CycleGuard\src\database\cycleguard_schema.sql
+
+```
 
 
 To obtain all portfolio information for a single ticker, you need to perform an SQL JOIN between the tables in your database (positions, securities, snapshots, and accounts).
