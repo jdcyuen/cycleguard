@@ -266,3 +266,77 @@ class PositionRepository:
                 "Unable to count positions "
                 f"for import_history_id={import_history_id}"
             ) from exc
+
+
+    def get_by_snapshot_with_security(
+        self,
+        snapshot_id: int,
+    ) -> list[Position]:
+
+        """
+        Returns all positions for a snapshot with security symbol.
+        """
+
+        logger.info(
+            "Retrieving positions with security "
+            "for snapshot_id=%s",
+            snapshot_id,
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        p.id,
+                        p.account_id,
+                        p.security_id,
+                        p.snapshot_id,
+                        p.quantity,
+                        p.avg_cost,
+                        p.cost_basis_total,
+                        p.current_value,
+                        p.percent_of_account,
+                        p.daily_gain,
+                        p.daily_gain_pct,
+                        p.total_gain,
+                        p.total_gain_pct,
+                        s.symbol
+                    FROM cycleguard.positions p
+                    JOIN cycleguard.securities s
+                        ON p.security_id = s.id
+                    WHERE p.snapshot_id = %s
+                    ORDER BY p.security_id
+                    """,
+                    (snapshot_id,),
+                )
+
+                rows = cur.fetchall()
+
+                return [
+                    Position(
+                        id=row[0],
+                        account_id=row[1],
+                        security_id=row[2],
+                        snapshot_id=row[3],
+                        quantity=row[4],
+                        ave_cost=row[5],
+                        cost_basis_total=row[6],
+                        current_value=row[7],
+                        percent_of_account=row[8],
+                        daily_gain=row[9],
+                        daily_gain_pct=row[10],
+                        total_gain=row[11],
+                        total_gain_pct=row[12],
+                        symbol=row[13],
+                    )
+                    for row in rows
+                ]
+
+        except psycopg.Error as exc:
+            logger.exception(
+                "Failed retrieving positions with security."
+            )
+            raise PositionRepositoryError(
+                "Failed retrieving positions with security."
+            ) from exc

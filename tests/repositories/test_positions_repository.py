@@ -422,3 +422,102 @@ def test_count_by_import_history_id_database_error(
 
     mock_conn.commit.assert_not_called()
     mock_conn.rollback.assert_not_called()
+
+# ---------------------------------------------------------------------
+# get_by_snapshot_with_security()
+# ---------------------------------------------------------------------
+
+def test_get_by_snapshot_with_security_success(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchall.return_value = [
+        (
+            1,          # id
+            2,          # account_id
+            3,          # security_id
+            4,          # snapshot_id
+            100,        # quantity
+            50.0,       # avg_cost
+            5000.0,     # cost_basis_total
+            5500.0,     # current_value
+            10.5,       # percent_of_account
+            100.0,      # daily_gain
+            2.0,        # daily_gain_pct
+            500.0,      # total_gain
+            10.0,       # total_gain_pct
+            "FZROX",    # symbol
+        )
+    ]
+
+    positions = repository.get_by_snapshot_with_security(4)
+
+    cursor.execute.assert_called_once()
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "FROM cycleguard.positions" in sql
+    assert "JOIN cycleguard.securities" in sql
+    assert "p.security_id = s.id" in sql
+    assert "s.symbol" in sql
+    assert params == (4,)
+
+    assert len(positions) == 1
+
+    position = positions[0]
+
+    assert position.id == 1
+    assert position.account_id == 2
+    assert position.security_id == 3
+    assert position.snapshot_id == 4
+    assert position.current_value == 5500.0
+    assert position.symbol == "FZROX"
+
+
+def test_get_by_snapshot_with_security_returns_empty_list(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchall.return_value = []
+
+    positions = repository.get_by_snapshot_with_security(4)
+
+    assert positions == []
+
+    cursor.execute.assert_called_once()
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "JOIN cycleguard.securities" in sql
+    assert params == (4,)
+
+
+def test_get_by_snapshot_with_security_database_error(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.execute.side_effect = psycopg.Error()
+
+    with pytest.raises(
+        PositionRepositoryError,
+        match="Failed retrieving positions with security",
+    ):
+        repository.get_by_snapshot_with_security(1)
+
+    mock_conn.rollback.assert_not_called()
+    mock_conn.commit.assert_not_called()
