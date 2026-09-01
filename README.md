@@ -964,23 +964,23 @@ It doesn't calculate anything.
 
 It delegates:
 
-    ```
+    
     return self.position_repository.get_by_snapshot_with_security(
         snapsho t_id
     )
-    ```
+    
 
 That gives the aggregation layer a collection of position objects.
 
 For example:
 
-Position
-  symbol = FZROX
-  current_value = $100,000
+    Position
+    symbol = FZROX
+    current_value = $100,000
 
-Position
-  symbol = SCHD
-  current_value = $50,000
+    Position
+    symbol = SCHD
+    current_value = $50,000
 
 ---
 
@@ -988,15 +988,15 @@ Position
 
 Next comes:
 
-map_positions_to_buckets(snapshot_id)
+    map_positions_to_buckets(snapshot_id)
 
 This uses:
 
-self.get_bucket_mapping()
+    self.get_bucket_mapping()
 
 which ultimately returns:
 
-self.account.bucket_mapping
+    self.account.bucket_mapping
 
 So:
 
@@ -1021,11 +1021,11 @@ This is the first major transformation.
 
 We go from:
 
-list[Position]
+    list[Position]
 
 to:
 
-dict[str, list[Position]]
+    dict[str, list[Position]]
 
 ---
 
@@ -1037,29 +1037,29 @@ calculate_bucket_values(snapshot_id)
 
 For example:
 
-FZROX    $100,000
-VTI       $50,000
-SCHD      $50,000
+    FZROX    $100,000
+    VTI       $50,000
+    SCHD      $50,000
 
 becomes:
 
-core_equity     $150,000
-equity_income    $50,000
+    core_equity     $150,000
+    equity_income    $50,000
 
 At the same time:
 
-calculate_portfolio_value(snapshot_id)
+    calculate_portfolio_value(snapshot_id)
 
 produces:
 
-$200,000
+    $200,000
 
 So we now know:
 
-Portfolio = $200,000
+    Portfolio = $200,000
 
-core_equity     = $150,000
-equity_income    = $50,000
+    core_equity     = $150,000
+    equity_income    = $50,000
 
 
 ---
@@ -1067,29 +1067,27 @@ equity_income    = $50,000
 
 Now the service converts dollars into percentages.
 
-calculate_bucket_weights(snapshot_id)
+    calculate_bucket_weights(snapshot_id)
 
 The formula is:
 
-bucket market value
-──────────────────────
-portfolio market value
+    bucket market value
+    ──────────────────────
+    portfolio market value
 
 So:
 
 core_equity:
 
-$150,000
-───────── = 75%
-$200,000
+    $150,000
+    ───────── = 75%
+    $200,000
 
 and:
 
 equity_income:
 
-$50,000
-──────── = 25%
-$200,000
+
 
 We now have the actual portfolio structure.
 
@@ -1101,25 +1099,25 @@ The service doesn't calculate target weights.
 
 It retrieves them:
 
-get_target_weights()
+    get_target_weights()
 
 which returns:
 
-self.account.bucket_weights
+    self.account.bucket_weights
 
 For example:
 
-core_equity     60%
-equity_income   40%
+    core_equity     60%
+    equity_income   40%
 
 Now we can compare:
 
-```
-                 Actual       Target
-                 ──────       ──────
-core_equity       75%          60%
-equity_income     25%          40%
-```
+
+                    Actual       Target
+                    ──────       ──────
+    core_equity       75%          60%
+    equity_income     25%          40%
+
 
 ---
 
@@ -1129,32 +1127,32 @@ This is where the aggregation engine starts producing information that later com
 
 The service calculates:
 
-drift = actual_weight - target_weight
+    drift = actual_weight - target_weight
 
 Therefore:
 
-core_equity:
+    core_equity:
 
-75% - 60% = +15%
+    75% - 60% = +15%
 
-equity_income:
+    equity_income:
 
-25% - 40% = -15%
+    25% - 40% = -15%
 
 It also calculates:
 
-drift_value =
-    drift × portfolio_value
+    drift_value =
+        drift × portfolio_value
 
 So:
 
-core_equity:
+    core_equity:
 
-15% × $200,000 = +$30,000
+    15% × $200,000 = +$30,000
 
-equity_income:
+    equity_income:
 
--15% × $200,000 = -$30,000
+    -15% × $200,000 = -$30,000
 
 This is valuable because a later component doesn't have to redo the math.
 
@@ -1168,26 +1166,25 @@ BucketAllocation
 
 A bucket therefore looks conceptually like:
 
-```
-BucketAllocation
-│
-├── name
-├── market_value
-├── actual_weight
-├── target_weight
-├── drift
-└── drift_value
-```
+    BucketAllocation
+    │
+    ├── name
+    ├── market_value
+    ├── actual_weight
+    ├── target_weight
+    ├── drift
+    └── drift_value
+
 
 For example:
 
-BucketAllocation
-    name          = "core_equity"
-    market_value  = $150,000
-    actual_weight = 75%
-    target_weight = 60%
-    drift         = +15%
-    drift_value   = +$30,000
+    BucketAllocation
+        name          = "core_equity"
+        market_value  = $150,000
+        actual_weight = 75%
+        target_weight = 60%
+        drift         = +15%
+        drift_value   = +$30,000
 
 This is an important architectural boundary.
 
@@ -1203,23 +1200,23 @@ The engine also goes one level deeper.
 
 It can calculate:
 
-calculate_position_bucket_weights(snapshot_id)
+    calculate_position_bucket_weights(snapshot_id)
 
 This answers:
 
-"Within this bucket, how is the money distributed among the positions?"
+    "Within this bucket, how is the money distributed among the positions?"
 
 Suppose:
 
-core_equity = $150,000
+    core_equity = $150,000
 
-FZROX = $100,000
-VTI   = $50,000
+    FZROX = $100,000
+    VTI   = $50,000
 
 The service produces:
 
-FZROX → 66.67%
-VTI   → 33.33%
+    FZROX → 66.67%
+    VTI   → 33.33%
 
 Those results are represented by:
 
@@ -1235,20 +1232,19 @@ weight
 
 So there are really two different types of allocation:
 
-```
-Portfolio
-    │
-    ├── Bucket allocation
-    │       │
-    │       ├── actual weight
-    │       ├── target weight
-    │       └── drift
-    │
-    └── Position allocation
-            │
-            └── weight within bucket
 
-```
+    Portfolio
+        │
+        ├── Bucket allocation
+        │       │
+        │       ├── actual weight
+        │       ├── target weight
+        │       └── drift
+        │
+        └── Position allocation
+                │
+                └── weight within bucket
+
 
 ---
 
@@ -1261,22 +1257,22 @@ PortfolioAllocation
 
 Conceptually:
 
-```
-PortfolioAllocation
-│
-├── portfolio_value = $200,000
-│
-└── buckets
-      │
-      ├── core_equity
-      │      │
-      │      └── BucketAllocation
-      │
-      └── equity_income
-             │
-             └── BucketAllocation
 
-```
+    PortfolioAllocation
+    │
+    ├── portfolio_value = $200,000
+    │
+    └── buckets
+        │
+        ├── core_equity
+        │      │
+        │      └── BucketAllocation
+        │
+        └── equity_income
+                │
+                └── BucketAllocation
+
+
 
 This gives the rest of CycleGuard one clean object representing the portfolio's current allocation state.
 
@@ -1289,10 +1285,13 @@ The most important benefit is separation of responsibilities.
 
 Repository
 "I retrieve data."
+
 AccountConfig
 "I define the intended portfolio structure."
+
 PortfolioAggregationService
 "I calculate what the portfolio actually looks like."
+
 Allocation models
 "I represent those calculated results."
 
@@ -1308,17 +1307,17 @@ This is just as important.
 
 The aggregation engine does not say:
 
-BUY FZROX
-SELL SCHD
-MOVE $20,000 TO SGOV
+    BUY FZROX
+    SELL SCHD
+    MOVE $20,000 TO SGOV
 
 It only tells us:
 
-core_equity
-    actual = 75%
-    target = 60%
-    drift = +15%
-    drift_value = +$30,000
+    core_equity
+        actual = 75%
+        target = 60%
+        drift = +15%
+        drift_value = +$30,000
 
 Something else will decide what to do about that drift.
 
@@ -1336,6 +1335,8 @@ Something else will decide what to do about that drift.
 ### 15. The complete Portfolio Aggregation flow
 
 Putting everything together:
+
+```
 
                   DATABASE
                      │
@@ -1387,6 +1388,7 @@ And AccountConfig feeds the service from the side:
                  └────────────┬────────────┘
                               ▼
                  PortfolioAggregationService
+```
 
 > The Portfolio Aggregation Engine takes actual positions plus portfolio configuration and transforms them into a structured, calculated representation of the portfolio's current allocation and drift.
 
