@@ -59,7 +59,7 @@ The important architectural idea is that CycleGuard is not simply a portfolio tr
     - [1.10. Transaction Logic](#110-transaction-logic)
 - [2. Architecture](#2-architecture)
 - [3. Portfolio Aggregation Engine](#3-portfolio-aggregation-engine)
-- [4. Regime Engine](#4-regime-engine)
+- [4. Market Regime Engine](#4-market-regime-engine)
 - [5. Deployment Engine](#5-deployment-engine)
 
 ---
