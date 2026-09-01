@@ -1322,13 +1322,6 @@ It only tells us:
 Something else will decide what to do about that drift.
 
 
-
-
-
-
-
-
-
 ---
 
 
@@ -1377,8 +1370,11 @@ Putting everything together:
           ▼                     ▼
    BucketAllocation       PositionAllocation
 
+```
+
 And AccountConfig feeds the service from the side:
 
+```
                          AccountConfig
                               │
                  ┌────────────┴────────────┐
@@ -1393,6 +1389,11 @@ And AccountConfig feeds the service from the side:
 > The Portfolio Aggregation Engine takes actual positions plus portfolio configuration and transforms them into a structured, calculated representation of the portfolio's current allocation and drift.
 
 ---
+
+## Market Regime Engine
+
+> A modular, configurable framework that evaluates multiple independent market signals—including trend, breadth, volatility, leadership, credit, valuation (CAPE), momentum, and potentially rates—to determine the current market regime and regime score. Individual indicators are implemented as independent signal modules so additional indicators can be added without modifying the core regime engine.
+----
 
 ## Regime
 

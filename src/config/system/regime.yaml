@@ -11,7 +11,8 @@ regime_system:
   signals:
 
     trend:
-      proxy: "SPY"
+      inputs:
+        - "SPY"
       method: "price_vs_sma"
 
       thresholds:
@@ -21,7 +22,20 @@ regime_system:
 
 
     breadth:
-      proxy: "SP500_50DMA_PCT"
+      inputs:
+        - "XLC"
+        - "XLY"
+        - "XLP"
+        - "XLE"
+        - "XLF"
+        - "XLV"
+        - "XLI"
+        - "XLB"
+        - "XLRE"
+        - "XLK"
+        - "XLU"
+
+      method: "percent_above_sma"
 
       thresholds:
         strong: 65
@@ -30,7 +44,10 @@ regime_system:
 
 
     volatility:
-      proxy: "^VIX"
+      inputs:
+        - "^VIX"
+
+      method: "vix_level"
 
       thresholds:
         calm: 18
@@ -39,17 +56,26 @@ regime_system:
 
 
     leadership:
-      proxies:
+      inputs:
         - "SMH"
         - "QQQ"
       method: "relative_strength"
 
 
     credit:
-      proxies:
+      inputs:
         - "JNK"
         - "SHY"
       method: "credit_spread_proxy"
+
+    cape:
+      inputs:
+        - "CAPE"
+      method: "valuation"
+      thresholds:
+        expensive: 30
+        neutral: 25
+        cheap: 20
 
 
   # =========================

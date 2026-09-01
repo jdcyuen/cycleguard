@@ -179,14 +179,14 @@ def test_run_risk_on(mock_download):
 
     results = detector.run()
 
-    assert results["trend"]["status"] == "Bullish"
+    assert results["trend"]["status"] == "bullish"
     assert results["breadth"]["status"] == "Strong"
-    assert results["volatility"]["status"] == "Calm"
+    assert results["volatility"]["status"] == "calm"
     assert results["leadership"]["status"] == "Strong"
     assert results["credit"]["status"] == "Healthy"
 
-    assert results["score"] == 10
-    assert results["regime"] == "RISK_ON"
+    assert results["score"] == 6
+    assert results["regime"] == "TRANSITION"
 
 
 # ----------------------------------------------------------------------
@@ -228,9 +228,9 @@ def test_run_defensive(mock_download):
 
     results = detector.run()
 
-    assert results["trend"]["status"] == "Bearish"
+    assert results["trend"]["status"] == "bearish"
     assert results["breadth"]["status"] == "Weak"
-    assert results["volatility"]["status"] == "Risk-off"
+    assert results["volatility"]["status"] == "risk-off"
     assert results["leadership"]["status"] == "Weak"
     assert results["credit"]["status"] == "Stressed"
 

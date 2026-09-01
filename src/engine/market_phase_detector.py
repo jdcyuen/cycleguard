@@ -1,10 +1,14 @@
-# src/engine/market_phase_detector.py
+# src/engine/market_phase_detector.p
+
+
 
 import pandas as pd
 import yfinance as yf
 
-# from config.config_loader import ConfigLoader
 from config.config_manager import get_config
+from engine.regime.signals.trend import TrendSignal
+from engine.regime.signals.breadth import BreadthSignal
+from engine.regime.signals.volatility import VolatilitySignal
 
 
 class MarketPhaseDetector:
@@ -18,20 +22,7 @@ class MarketPhaseDetector:
         self.regime_config = self.config.get("regime_system", {})
         self.signals = self.regime_config.get("signals", {})
 
-        # Fast SPDR sector ETF proxy for Market Breadth
-        self.sector_etfs = [
-            "XLC",
-            "XLY",
-            "XLP",
-            "XLE",
-            "XLF",
-            "XLV",
-            "XLI",
-            "XLB",
-            "XLRE",
-            "XLK",
-            "XLU",
-        ]
+        
 
     def _fetch_daily_closes(self, tickers: list, period="1y") -> pd.DataFrame:
         """Batch download daily closing prices for a list of tickers to minimize network overhead."""
@@ -118,12 +109,39 @@ class MarketPhaseDetector:
         Executes the 5-input signal stack and aggregates a score to determine the Regime.
         """
         # Determine all tickers needed to fetch at once
-        spy = self.signals.get("trend", {}).get("proxy", "SPY")
-        vix = self.signals.get("volatility", {}).get("proxy", "^VIX")
+        trend_inputs = self.signals.get("trend", {}).get(
+            "inputs",
+            ["SPY"],
+        )
+
+        trend_proxy = trend_inputs[0]
+        volatility_inputs = self.signals.get(
+            "volatility",
+            {},
+        ).get(
+            "inputs",
+            ["^VIX"],
+        )
+
+        vix = volatility_inputs[0]
         leaders = self.signals.get("leadership", {}).get("proxies", ["SMH", "QQQ"])
         credit = self.signals.get("credit", {}).get("proxies", ["JNK", "SHY"])
 
-        all_tickers = list(set([spy, vix] + leaders + credit + self.sector_etfs))
+        breadth_config = self.signals.get("breadth", {})
+
+        breadth_inputs = breadth_config.get(
+            "inputs",
+            BreadthSignal.DEFAULT_PROXIES,
+        )
+
+        all_tickers = list(
+            set(
+                [trend_proxy, vix]
+                + leaders
+                + credit
+                + breadth_inputs
+            )
+        )
 
         # 1. Fetch Data
         closes = self._fetch_daily_closes(all_tickers, period="1y")
@@ -157,42 +175,40 @@ class MarketPhaseDetector:
             return results
 
         # 2. Evaluate Trend
-        if spy in closes.columns:
-            results["trend"]["value"] = latest[spy]
-            results["trend"]["dma50"] = dma50[spy]
-            results["trend"]["dma200"] = dma200[spy]
-            results["trend"]["status"] = self.get_trend_signal(
-                latest[spy], dma50[spy], dma200[spy]
+        if trend_proxy in closes.columns:
+            trend_signal = TrendSignal(self.signals.get("trend", {}))
+
+            results["trend"] = trend_signal.evaluate(
+                {
+                    "current": latest[trend_proxy],
+                    "dma50": dma50[trend_proxy],
+                    "dma200": dma200[trend_proxy],
+                }
             )
 
-        # 3. Evaluate Breadth (Sector proxy: % of 11 sectors above 50DMA)
-        passing_sectors = []
-        failing_sectors = []
-        valid_sectors = 0
-        for sec in self.sector_etfs:
-            if (
-                sec in closes.columns
-                and not pd.isna(latest[sec])
-                and not pd.isna(dma50[sec])
-            ):
-                valid_sectors += 1
-                if latest[sec] > dma50[sec]:
-                    passing_sectors.append(sec)
-                else:
-                    failing_sectors.append(sec)
+        # 3. Evaluate Breadth
+        breadth_signal = BreadthSignal(
+            self.signals.get("breadth", {})
+        )
 
-        if valid_sectors > 0:
-            pct_above_50 = (len(passing_sectors) / valid_sectors) * 100
-            results["breadth"]["value"] = pct_above_50
-            results["breadth"]["status"] = self.get_breadth_signal(pct_above_50)
-            results["breadth"]["passing"] = passing_sectors
-            results["breadth"]["failing"] = failing_sectors
-            results["breadth"]["valid_total"] = valid_sectors
+        results["breadth"] = breadth_signal.evaluate(
+            {
+                "latest": latest,
+                "dma50": dma50,
+            }
+        )
 
         # 4. Evaluate Volatility
         if vix in closes.columns:
-            results["volatility"]["value"] = latest[vix]
-            results["volatility"]["status"] = self.get_vix_signal(latest[vix])
+            volatility_signal = VolatilitySignal(
+                self.signals.get("volatility", {})
+            )
+
+            results["volatility"] = volatility_signal.evaluate(
+                {
+                    "value": latest[vix],
+                }
+            )
 
         # 5. Evaluate Leadership
         smh = "SMH"
