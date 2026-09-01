@@ -755,7 +755,7 @@ It sits at the top level of the CycleGuard architecture, coordinating multiple a
 
 >The Bucket Mapper tells CycleGuard what each position is. The Portfolio Aggregation Engine tells CycleGuard what the portfolio looks like as a whole.
 
-1. What is the Portfolio Aggregation Engine?
+### 1. What is the Portfolio Aggregation Engine?
 
 The Portfolio Aggregation Engine (PAE) takes the individual positions in an account and rolls them up into meaningful portfolio-level information.
 
@@ -799,7 +799,7 @@ https://chatgpt.com/c/6a8e5672-1c74-83e8-b61d-24f392781e0e
 
 The Portfolio Aggregation Engine itself is best understood as a small pipeline that converts raw position data into a structured view of the portfolio.
 
-1. The architecture
+### 1. The architecture
 
 At a high level:
 
@@ -832,22 +832,19 @@ PositionRepository → PortfolioAggregationService
        PositionAllocation
                    BucketAllocation
                               PortfolioAllocation
-
+```
 
 The key point is that PortfolioAggregationService is the coordinator. It doesn't own the database and it doesn't own the configuration. It brings those things together and performs the calculations.
 
-
-
 ---
 
-2. The three main inputs
+### 2. The three main inputs
 
 The service gets information from two places.
 
-A. PositionRepository
-PositionRepository
+#### A. PositionRepository
 
-provides the actual holdings.
+PositionRepository provides the actual holdings.
 
 For example:
 
@@ -872,7 +869,7 @@ The repository's job is simply:
 
 It does not calculate allocations.
 
-B. AccountConfig
+#### B. AccountConfig
 
 The service also receives:
 
@@ -909,7 +906,8 @@ AccountConfig
     = How is the portfolio supposed to be structured?
 
 ---
-3. The service sits between them
+
+### 3. The service sits between them
 
 The central class is:
 
@@ -923,10 +921,11 @@ def __init__(
     position_repository: PositionRepository,
     account: AccountConfig,
 ):
-`
+```
+
 So conceptually:
 
-`
+```
                     ┌─────────────────┐
                     │ Position        │
                     │ Repository      │
@@ -953,7 +952,7 @@ This is the heart of the architecture.
 
 
 ---
-4. First layer: retrieve positions
+### 4. First layer: retrieve positions
 
 The service has:
 
@@ -965,10 +964,11 @@ It doesn't calculate anything.
 
 It delegates:
 
-``
-return self.position_repository.get_by_snapshot_with_security(
-    snapshot_id
-)
+    ```
+    return self.position_repository.get_by_snapshot_with_security(
+        snapsho t_id
+    )
+    ```
 
 That gives the aggregation layer a collection of position objects.
 
@@ -984,38 +984,52 @@ Position
 
 ---
 
-4. First layer: retrieve positions
+### 5. Second layer: map positions into buckets
 
-The service has:
+Next comes:
 
-get_positions(snapshot_id)
+map_positions_to_buckets(snapshot_id)
 
-This is deliberately a thin method.
+This uses:
 
-It doesn't calculate anything.
+self.get_bucket_mapping()
 
-It delegates:
+which ultimately returns:
+
+self.account.bucket_mapping
+
+So:
 
 ```
-return self.position_repository.get_by_snapshot_with_security(
-    snapshot_id
-)
+Actual Position              Configuration
+───────────────              ─────────────
+FZROX ─────────────────────→ core_equity
+SCHD  ─────────────────────→ equity_income
 ```
-That gives the aggregation layer a collection of position objects.
 
-For example:
+The service then creates:
 
-Position
-  symbol = FZROX
-  current_value = $100,000
+```
+core_equity
+    └── FZROX
 
-Position
-  symbol = SCHD
-  current_value = $50,000
+equity_income
+    └── SCHD
+```
+
+This is the first major transformation.
+
+We go from:
+
+list[Position]
+
+to:
+
+dict[str, list[Position]]
 
 ---
 
-6. Third layer: calculate values
+### 6. Third layer: calculate values
 
 Once positions are grouped, the service can calculate bucket values.
 
@@ -1049,7 +1063,7 @@ equity_income    = $50,000
 
 
 ---
-7. Fourth layer: calculate actual weights
+### 7. Fourth layer: calculate actual weights
 
 Now the service converts dollars into percentages.
 
@@ -1081,7 +1095,7 @@ We now have the actual portfolio structure.
 
 ---
 
-8. Fifth layer: obtain target weights
+### 8. Fifth layer: obtain target weights
 
 The service doesn't calculate target weights.
 
@@ -1100,14 +1114,16 @@ equity_income   40%
 
 Now we can compare:
 
+```
                  Actual       Target
                  ──────       ──────
 core_equity       75%          60%
 equity_income     25%          40%
+```
 
 ---
 
-9. Sixth layer: calculate drift
+### 9. Sixth layer: calculate drift
 
 This is where the aggregation engine starts producing information that later components can use.
 
@@ -1144,7 +1160,7 @@ This is valuable because a later component doesn't have to redo the math.
 
 ---
 
-10. The BucketAllocation model
+### 10. The BucketAllocation model
 
 Rather than returning an unstructured dictionary, the service packages this information into:
 
@@ -1152,7 +1168,7 @@ BucketAllocation
 
 A bucket therefore looks conceptually like:
 
-`
+```
 BucketAllocation
 │
 ├── name
@@ -1181,7 +1197,7 @@ It just receives a BucketAllocation.
 
 ---
 
-11. Position allocation is another level
+### 11. Position allocation is another level
 
 The engine also goes one level deeper.
 
@@ -1216,9 +1232,10 @@ bucket
 market_value
 weight
 
+
 So there are really two different types of allocation:
 
-`
+```
 Portfolio
     │
     ├── Bucket allocation
@@ -1236,7 +1253,7 @@ Portfolio
 ---
 
 
-12. The top-level PortfolioAllocation
+### 12. The top-level PortfolioAllocation
 
 Finally, the service packages the entire result into:
 
@@ -1244,7 +1261,7 @@ PortfolioAllocation
 
 Conceptually:
 
-``
+```
 PortfolioAllocation
 │
 ├── portfolio_value = $200,000
@@ -1266,7 +1283,7 @@ This gives the rest of CycleGuard one clean object representing the portfolio's 
 
 ---
 
-13. Why this architecture is useful
+### 13. Why this architecture is useful
 
 The most important benefit is separation of responsibilities.
 
@@ -1285,7 +1302,7 @@ That means we don't end up with database code mixed with portfolio calculations 
 ---
 
 
-14. What the engine does NOT do
+### 14. What the engine does NOT do
 
 This is just as important.
 
@@ -1316,7 +1333,7 @@ Something else will decide what to do about that drift.
 ---
 
 
-The complete Portfolio Aggregation flow
+### 15. The complete Portfolio Aggregation flow
 
 Putting everything together:
 
