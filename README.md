@@ -1,11 +1,11 @@
 # Local Project path
-    * E:\CycleGuard
+    E:\CycleGuard
 
 # Github repository
-    * https://github.com/jdcyuen/cycleguard.git
+    https://github.com/jdcyuen/cycleguard.git
 
 # CycleGuard Project Documentation
-    * https://github.com/jdcyuen/cycleguard/blob/main/docs/system_design.md
+    https://github.com/jdcyuen/cycleguard/blob/main/docs/system_design.md
 
 
 ---
@@ -44,7 +44,27 @@ CycleGuard is a rules-based portfolio management and risk-control engine that in
 
 The important architectural idea is that CycleGuard is not simply a portfolio tracker. It is intended to evolve from an accurate record of the portfolio into a system that analyzes risk and market conditions and recommends—or eventually executes—portfolio actions.
 
-## CycleGuard Ingestion Pipeline
+## Table of Contents
+
+- [1. Ingestion Pipeline](#1-ingestion-pipeline)
+    - [1.1. Fidelity provides the source data](#11-fidelity-provides-the-source-data)
+    - [1.2. The CLI starts the ingestion](#12-the-cli-starts-the-ingestion)
+    - [1.3. Supported Inputs](#13-supported-inputs)
+    - [1.4. The Ingestion Pipeline's Structure](#14-the-ingestion-pipelines-structure)
+    - [1.5. Validation](#15-validation)
+    - [1.6. Record Import](#16-record-import)
+    - [1.7. Finalizing Persistence](#17-finalizing-persistence)
+    - [1.8. The import_history Table](#18-the-import_history-table)
+    - [1.9. Snapshotting](#19-snapshotting)
+    - [1.10. Transaction Logic](#110-transaction-logic)
+- [2. Architecture](#2-architecture)
+- [3. Portfolio Aggregation Engine](#3-portfolio-aggregation-engine)
+- [4. Regime Engine](#4-regime-engine)
+- [5. Deployment Engine](#5-deployment-engine)
+
+---
+
+## 1. Ingestion Pipeline
 
 The CycleGuard ingestion pipeline is the process by which transaction and position data is imported from Fidelity into the CycleGuard database. The ingestion pipeline is a multi-step process that includes loading the CSV data, validating the data, resolving the account, recording the import, and persisting the data to the database.
 
@@ -109,7 +129,7 @@ In both cases, the goal is to preserve the fidelity of the imported data while m
 
 ---
 
-### 1. Fidelity provides the source data
+## 1.1 Fidelity provides the source data
 
 The process begins outside CycleGuard.
 
@@ -133,7 +153,7 @@ python -m cli.ingest_positions --file positions.csv
 
 ---
 
-### 2. The CLI starts the ingestion
+## 1.2 The CLI starts the ingestion
 
 The CLI is the entry point into the pipeline.
 
@@ -163,7 +183,7 @@ Ingestion Service
 ```
 ---
 
-### 3. The loader reads the CSV
+## 1.3 The loader reads the CSV
 
 The ingestion service passes the CSV file to the loader.
 
@@ -180,7 +200,7 @@ CycleGuard data objects
 ```
 ---
 
-### 4. The validator validates the data
+## 1.4 The validator validates the data
 
 The loaded data is then passed to the validator.
 
@@ -204,7 +224,7 @@ Invalid input should not result in partially imported portfolio data.
 
 ---
 
-### 5. CycleGuard resolves the account
+## 1.5 CycleGuard resolves the account
 
 The pipeline determines which CycleGuard account the Fidelity data belongs to.
 
@@ -225,7 +245,7 @@ The database account ID is then used by the records created during the import.
 
 ---
 
-###  6. The import is recorded
+## 1.6 The import is recorded
 
 Before the actual portfolio records are persisted, CycleGuard creates an import_history record.
 
@@ -250,7 +270,7 @@ This is a key part of CycleGuard's auditability.
 
 ---
 
-### 7. The data is persisted
+## 1.7 The data is persisted
 
 The ingestion service then calls the appropriate persistence logic.
 
@@ -319,7 +339,7 @@ import_history_id
 ```
 
 ---
-### 8. TransactionManager controls the database transaction
+## 1.8 TransactionManager controls the database transaction
 
 This is an important distinction in the architecture.
 
@@ -348,7 +368,7 @@ If an exception occurs during the import, the database transaction is rolled bac
 That means CycleGuard does not intentionally leave half an import committed.
 
 ---
-### 9. Import history is completed
+## 1.9 Import history is completed
 
 If persistence succeeds, the import history record is updated.
 
@@ -369,7 +389,7 @@ The important point is that import history provides the audit trail for the inge
 
 ---
 
-### 10. The import is audited
+## 1.10 The import is audited
 
 Your current architecture also performs an import audit after persistence.
 
@@ -392,7 +412,7 @@ The import isn't considered successfully completed simply because the database a
 
 ---
 
-### 11. Commit or rollback
+## 1.11 Commit or rollback
 
 If all validations succeed, the transaction is committed.
 
@@ -419,7 +439,7 @@ This is an atomic operation from the perspective of the database. Either the ent
 
 ---
 
-### 12. Success is reported
+## 1.12 Success is reported
 
 The final step is to report success to the user.
 
@@ -430,7 +450,7 @@ CLI → Success message
 
 ```
 ---
-## What happens when something goes wrong?
+## 1.13 What happens when something goes wrong?
 
 There are two different situations that are important to distinguish.
 
@@ -475,7 +495,7 @@ By default, the import_history record remains so there is an audit trail of what
 
 ---
 
-### 13. The ingestion pipeline is designed for traceability and correctness.
+## 1.14 The ingestion pipeline is designed for traceability and correctness.
 
 * **Import history** traces each import to a specific CSV file.
 
@@ -489,7 +509,7 @@ By default, the import_history record remains so there is an audit trail of what
 
 This design makes CycleGuard imports auditable, reliable, and safe to run.
 
-### The complete pipeline
+## 1.15 The complete pipeline
 ```python
                        FIDELITY
                           │
@@ -548,7 +568,7 @@ This makes ingestion the foundation of CycleGuard: everything that comes later�
 
 ---
 
-## Positions
+## 1.16 Positions
 
 In CycleGuard, a position represents a security that is currently held in an investment account. A position describes what the account owns, rather than an individual transaction that occurred in the account.
 
@@ -577,7 +597,7 @@ Once imported, the positions are stored in CycleGuard's positions table. They be
 
 ---
 
-## Transactions
+## 1.17 Transactions
 
 In CycleGuard, a transaction represents a financial event or activity that occurred in an investment account. Unlike a position, which describes what the account currently holds, a transaction describes something that happened to the account.
 
@@ -603,7 +623,7 @@ Ingestion Pipeline
 
 ```
 ---
-## Snapshots
+## 1.18 Snapshots
 
 In CycleGuard, a snapshot represents the state of an investment account's holdings at a specific point in time. It provides a historical record of what the account looked like at that time, including the positions and their values.
 
@@ -635,7 +655,7 @@ Ingestion Pipeline
 
 ---
 
-## CLI
+## 1.19 CLI
 From the cli, you can import positions and transactions into the database. From your Fidelity account, you can download transaction and position history from your account. Run these commands from the project root directory: E:\CycleGuard
 
 
@@ -714,7 +734,7 @@ Example:
     * `python scripts\technical_indicators.py SPMO --period 6mo --interval 1d --export`
 
 
-## Bucket Mapper
+## 2. Bucket Mapper
 
 The Bucket Mapper is the bridge between “what securities does the portfolio contain?” and “what role does each security play in the portfolio?”
 
@@ -744,7 +764,7 @@ A regime says:
 
 ---
 
-## Portfolio Aggregation Engine
+## 3 Portfolio Aggregation Engine
 
 
 The Portfolio Aggregation Engine is the system that answers:
@@ -755,7 +775,7 @@ It sits at the top level of the CycleGuard architecture, coordinating multiple a
 
 >The Bucket Mapper tells CycleGuard what each position is. The Portfolio Aggregation Engine tells CycleGuard what the portfolio looks like as a whole.
 
-### 1. What is the Portfolio Aggregation Engine?
+## 3.1. What is the Portfolio Aggregation Engine?
 
 The Portfolio Aggregation Engine (PAE) takes the individual positions in an account and rolls them up into meaningful portfolio-level information.
 
@@ -799,7 +819,7 @@ https://chatgpt.com/c/6a8e5672-1c74-83e8-b61d-24f392781e0e
 
 The Portfolio Aggregation Engine itself is best understood as a small pipeline that converts raw position data into a structured view of the portfolio.
 
-### 1. The architecture
+## 3.2. The architecture
 
 At a high level:
 
@@ -838,11 +858,11 @@ The key point is that PortfolioAggregationService is the coordinator. It doesn't
 
 ---
 
-### 2. The three main inputs
+## 3.3. The three main inputs
 
 The service gets information from two places.
 
-#### A. PositionRepository
+### 3.3.1. PositionRepository
 
 PositionRepository provides the actual holdings.
 
@@ -869,7 +889,7 @@ The repository's job is simply:
 
 It does not calculate allocations.
 
-#### B. AccountConfig
+### 3.3.2. AccountConfig
 
 The service also receives:
 
@@ -907,7 +927,7 @@ AccountConfig
 
 ---
 
-### 3. The service sits between them
+### 3.3.3. The service sits between them
 
 The central class is:
 
@@ -952,7 +972,7 @@ This is the heart of the architecture.
 
 
 ---
-### 4. First layer: retrieve positions
+## 3.4. First layer: retrieve positions
 
 The service has:
 
@@ -984,7 +1004,7 @@ For example:
 
 ---
 
-### 5. Second layer: map positions into buckets
+## 3.5. Second layer: map positions into buckets
 
 Next comes:
 
@@ -1029,7 +1049,7 @@ to:
 
 ---
 
-### 6. Third layer: calculate values
+## 3.6. Third layer: calculate values
 
 Once positions are grouped, the service can calculate bucket values.
 
@@ -1063,7 +1083,7 @@ So we now know:
 
 
 ---
-### 7. Fourth layer: calculate actual weights
+## 3.7. Fourth layer: calculate actual weights
 
 Now the service converts dollars into percentages.
 
@@ -1093,7 +1113,7 @@ We now have the actual portfolio structure.
 
 ---
 
-### 8. Fifth layer: obtain target weights
+## 3.8. Fifth layer: obtain target weights
 
 The service doesn't calculate target weights.
 
@@ -1121,7 +1141,7 @@ Now we can compare:
 
 ---
 
-### 9. Sixth layer: calculate drift
+## 3.9. Sixth layer: calculate drift
 
 This is where the aggregation engine starts producing information that later components can use.
 
@@ -1158,7 +1178,7 @@ This is valuable because a later component doesn't have to redo the math.
 
 ---
 
-### 10. The BucketAllocation model
+## 3.10. The BucketAllocation model
 
 Rather than returning an unstructured dictionary, the service packages this information into:
 
@@ -1194,7 +1214,7 @@ It just receives a BucketAllocation.
 
 ---
 
-### 11. Position allocation is another level
+## 3.11. Position allocation is another level
 
 The engine also goes one level deeper.
 
@@ -1249,7 +1269,7 @@ So there are really two different types of allocation:
 ---
 
 
-### 12. The top-level PortfolioAllocation
+## 3.12. The top-level PortfolioAllocation
 
 Finally, the service packages the entire result into:
 
@@ -1279,7 +1299,7 @@ This gives the rest of CycleGuard one clean object representing the portfolio's 
 
 ---
 
-### 13. Why this architecture is useful
+## 3.13. Why this architecture is useful
 
 The most important benefit is separation of responsibilities.
 
@@ -1301,7 +1321,7 @@ That means we don't end up with database code mixed with portfolio calculations 
 ---
 
 
-### 14. What the engine does NOT do
+## 3.14. What the engine does NOT do
 
 This is just as important.
 
@@ -1325,7 +1345,7 @@ Something else will decide what to do about that drift.
 ---
 
 
-### 15. The complete Portfolio Aggregation flow
+## 3.15. The complete Portfolio Aggregation flow
 
 Putting everything together:
 
@@ -1390,11 +1410,521 @@ And AccountConfig feeds the service from the side:
 
 ---
 
-## Market Regime Engine
+## 4 Market Regime Engine
 
 > A modular, configurable framework that evaluates multiple independent market signals—including trend, breadth, volatility, leadership, credit, valuation (CAPE), momentum, and potentially rates—to determine the current market regime and regime score. Individual indicators are implemented as independent signal modules so additional indicators can be added without modifying the core regime engine.
+
+```
+                    PHASE 4
+             MARKET REGIME ENGINE
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+     Market Data                Configuration
+          │                         │
+          └────────────┬────────────┘
+                       ▼
+              Signal Registry
+                       │
+      ┌────────────────┼────────────────┐
+      │                │                │
+      ▼                ▼                ▼
+   Trend            Breadth          Volatility
+   Signal            Signal            Signal
+      │                │                │
+      ├───────┬────────┼────────┬───────┤
+      ▼       ▼        ▼        ▼       ▼
+ Leadership Credit   CAPE    Momentum  Rates
+      │       │        │        │       │
+      └───────┴────────┴────────┴───────┘
+                       │
+                       ▼
+                Signal Aggregator
+                       │
+                       ▼
+                 Regime Scorer
+                       │
+                       ▼
+               Regime Classifier
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+       RISK_ON     TRANSITION    DEFENSIVE
+```
+----
+## 4.1 Market Regime Engine Architecture
+
+
+#### 4.1.1 Purpose
+
+The Market Regime Engine determines the current overall market environment by evaluating a collection of independent market signals and then combining those signal results into a single market regime.
+
+Its job is not to decide what to buy or sell.
+
+Instead, it answers:
+
+"What kind of market are we currently in?"
+
+For example:
+
+    RISK_ON
+    TRANSITION
+    RISK_OFF
+
+That regime becomes an important input to later CycleGuard components such as the Deployment Engine and Rules Engine.
+
 ----
 
+#### 4.1.2 Where It Fits in CycleGuard
+
+The Market Regime Engine sits between market data and portfolio decision-making.
+
+```
+                     MARKET DATA
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   Market Data Layer  │
+              │                     │
+              │ Prices              │
+              │ Moving averages     │
+              │ VIX                 │
+              │ CAPE                │
+              │ Credit data         │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │  MARKET REGIME      │
+              │      ENGINE         │
+              │                     │
+              │  SignalFactory      │
+              │       ↓             │
+              │  SignalAggregator   │
+              │       ↓             │
+              │  RegimeClassifier   │
+              └──────────┬──────────┘
+                         │
+                         ▼
+                Market Regime
+             ┌──────────────────┐
+             │ RISK_ON          │
+             │ TRANSITION       │
+             │ RISK_OFF         │
+             └────────┬─────────┘
+                      │
+                      ▼
+             ┌────────────────────┐
+             │ Deployment Engine  │
+             └────────┬───────────┘
+                      │
+                      ▼
+                Portfolio Actions
+```
+The important separation is:
+
+Market Regime Engine determines the environment.
+
+Deployment Engine determines what to do about that environment.
+
+----
+
+#### 4.1.3 High-Level Architecture
+
+The engine consists of four primary components:
+
+    RegimeEngine
+        │
+        ├── SignalFactory
+        │
+        ├── SignalAggregator
+        │
+        └── RegimeClassifier
+
+The individual signals sit underneath the aggregator:
+
+    SignalAggregator
+        │
+        ├── TrendSignal
+        ├── BreadthSignal
+        ├── VolatilitySignal
+        ├── LeadershipSignal
+        ├── CreditSignal
+        └── CapeSignal
+
+----
+
+#### 4.1.4 RegimeEngine
+
+The RegimeEngine is the orchestrator.
+
+Its responsibility is intentionally simple:
+
+1. Read signal configuration.
+2. Create the configured signals.
+3. Pass market data to the signals.
+4. Collect their results.
+5. Pass those results to the classifier.
+6. Return the signals and resulting regime.
+
+Conceptually:
+
+
+```
+signal_results = aggregator.evaluate(data)
+
+regime = classifier.classify(signal_results)
+
+return {
+    "signals": signal_results,
+    "regime": regime,
+}
+```
+
+The engine therefore does not contain the logic for determining whether the market is bullish, bearish, healthy, etc.
+
+That logic belongs to the individual signals.
+
+----
+#### 4.1.5 SignalFactory
+
+The SignalFactory is a simple factory pattern implementation. Its job is to create the signals requested in the configuration.
+
+For example, if the config says:
+
+```yaml
+signals:
+  - type: trend
+  - type: breadth
+```
+
+`SignalFactory` will:
+
+Create a TrendSignal instance
+Create a BreadthSignal instance
+Return a list of those two signals
+It is intentionally simple and stateless. It does not evaluate signals or hold market data.
+
+----
+#### 4.1.6 SignalAggregator
+
+The SignalAggregator is the component that collects results from individual signals and combines them.
+
+Conceptually:
+
+```
+Input = list of evaluated signals
+
+Output = dictionary of all signal results
+```
+
+Importantly, the aggregator does **not** decide whether the market is bullish, bearish, healthy, etc.
+
+That is the job of the RegimeClassifier.
+
+The aggregator simply:
+
+Receives results from TrendSignal, BreadthSignal, VolatilitySignal, etc.
+Organizes them into a single dictionary.
+Passes that dictionary to the classifier.
+
+Example structure:
+
+```python
+{
+    "trend": {
+        "name": "trend",
+        "status": "bullish",
+        "value": 0.7,
+    },
+    "breadth": {
+        "name": "breadth",
+        "status": "strong",
+        "value": 0.85,
+    },
+    "volatility": {
+        "name": "volatility",
+        "status": "calm",
+        "value": 0.2,
+    },
+    # ... all other signals
+}
+```
+
+The aggregator is intentionally simple. It does not perform complex logic—just collection and formatting.
+
+----
+#### 4.1.7 The Six Market Signals
+
+The current architecture contains six configured signals. In CycleGuard, a signal is a small, specialized piece of logic that looks at a specific aspect of the market and converts raw market data into a standardized market condition.
+
+Think of a signal as answering one question.
+
+Example
+
+    Your Market Regime Engine currently has six signals:
+
+    | Signal | Question it answers | Example output |
+    |--------|--------------------|----------------|
+    | Trend  | Is the broad market above/below its major moving averages? | bullish |
+    | Breadth | How broadly is the market participating? | Strong |
+    | Volatility | Is market volatility elevated? | Calm |
+    | Leadership | Are important growth/risk assets leading? | Strong |
+    | Credit | Are credit markets healthy or stressed? | Healthy |
+    | CAPE   | Is valuation supportive or restrictive? | Elevated |
+
+So the architecture is:
+```
+                    Raw Market Data
+                          │
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+       Trend           Breadth          Volatility
+          │               │                │
+          ▼               ▼                ▼
+      bullish           Strong            Calm
+          
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+      Leadership        Credit             CAPE
+          │               │                │
+          ▼               ▼                ▼
+        Strong          Healthy          Elevated
+                          │
+                          ▼
+                Signal Aggregator
+                          │
+                          ▼
+                 Regime Classifier
+                          │
+                          ▼
+                     RISK_ON
+```
+
+
+
+#### 4.1.7.1 Trend Signal
+
+Measures broad market trend using the configured proxy, currently SPY.
+
+Conceptually:
+
+    ```
+    SPY price
+    │
+    ├── compared with 50 DMA
+    │
+    └── compared with 200 DMA
+    ```
+
+It produces:
+
+    ```
+    bullish
+    neutral
+    bearish
+    ```
+
+The signal uses its configured proxy rather than hard-coding the market instrument.
+
+#### 4.1.7.2 Breadth Signal
+
+Breadth asks:
+
+> How many of the selected market sectors are trading above their 50-day moving average?
+
+The current default proxy group contains the 11 major sector ETFs:
+    XLC
+    XLY
+    XLP
+    XLE
+    XLF
+    XLV
+    XLI
+    XLB
+    XLRE
+    XLK
+    XLU
+
+
+Measures market breadth by counting how many stocks in the configured universe are above their 50-day moving averages.
+
+The signal evaluates:
+
+    A list of input symbols (usually ETF constituents).
+    Each symbol’s latest price.
+    Each symbol’s 50-day moving average.
+
+It categorizes the result as:
+
+    * strong if all stocks are above their 50-day moving averages
+    * weak if no stocks are above their 50-day moving averages
+    * mixed otherwise
+
+This signal is **not** reliant on SPY. It can run independently using any universe of stocks defined in the configuration.
+
+Conceptually:
+
+    Universe of stocks
+           │
+           ▼
+    [Symbol A > 50 DMA?]
+    [Symbol B > 50 DMA?]
+    [Symbol C > 50 DMA?]
+           │
+           ▼
+    Count = 24 out of 25 → Strong
+
+Output categories:
+
+    strong
+    mixed
+    weak
+
+The breadth signal is a pure equity-based signal and does not depend on SPY, interest rates, or credit spreads.
+
+
+#### 4.1.7.3 Volatility Signal
+
+Uses the VIX to determine whether volatility conditions are supportive or defensive.
+
+Conceptually:
+
+    VIX
+     │
+     ├── low → calm
+     ├── intermediate → elevated/transition
+     └── high → risk-off
+
+The thresholds are configuration-driven.
+
+This gives the regime engine an explicit measurement of market stress.    
+
+#### 4.1.7.4 Leadership Signal
+
+Leadership measures whether the configured leading assets are participating in the market trend.
+
+The current configuration includes instruments such as:
+
+    QQQ
+    SMH
+
+The signal checks their relationship to their 50-day moving averages.
+
+For example:
+
+    QQQ > 50 DMA  → participating
+    SMH > 50 DMA  → participating
+
+Possible outcomes:
+
+    Strong
+    Mixed
+    Weak
+
+This is different from breadth.
+
+Breadth asks:
+
+> How broad is participation?
+
+Leadership asks:
+
+Are the important growth/leadership areas participating?
+
+That distinction is useful for CycleGuard.
+
+
+
+#### 4.1.7.5 Credit Signal
+
+Credit provides another risk measurement.
+
+It compares configured credit/risk assets, currently using the relationship between the configured instruments such as:
+
+    JNK
+    SHY
+
+The signal compares the current ratio with its 50-day ratio.
+
+Conceptually:
+
+    Current JNK/SHY
+           vs.
+    50-day JNK/SHY
+
+Result:
+
+    Healthy
+    Stressed
+
+This gives the regime engine information that equity price trends alone cannot provide.
+
+
+#### 4.1.7.6 Cape Signal
+
+CAPE provides a valuation perspective.
+
+Unlike trend, breadth, volatility, and credit, CAPE is not primarily measuring short-term market momentum.
+
+It answers a different question:
+
+> How expensive is the market relative to its historical earnings valuation?
+
+This gives CycleGuard a longer-term valuation context.
+
+Importantly, the CAPE signal is still treated like every other signal by the architecture:
+
+    market data
+        ↓
+    CapeSignal
+        ↓
+    status
+        ↓
+    SignalAggregator
+
+The classifier can then incorporate that status into regime determination if the configuration specifies it.
+
+-----
+#### 4.1.8 Regime Classifier
+
+The RegimeClassifier is the final piece of the Market Regime Engine. Its job is to:
+
+Take the dictionary of signal results from SignalAggregator
+
+Apply logic to determine the current market regime
+
+Return the regime name
+
+Conceptually:
+
+```
+Input = Signal results dictionary
+
+Output = Regime name
+```
+
+The classifier contains the rules that translate the six signals into one of the four market regimes.
+
+-----
+
+#### 4.1.9 Configuration-Driven Classification
+#### 4.1.10 All Conditions Must Match
+#### 4.1.11 Configuration Order Matters
+#### 4.1.12 TRANSITION Is the Safety Net
+#### 4.1.13 Data Flow
+##### 4.1.13.1 Example
+#### 4.1.14 Why This Architecture Is Valuable
+#### 4.1.15 Relationship to the Portfolio Engine
+#### 4.1.16 Architectural Principle
+
+-----
+
+The next engine should consume its output and translate the market regime into portfolio-level decisions.
+
+For CycleGuard, I would make the next engine the Deployment Engine.
+
+----
 ## Regime
 
 A regime says:
