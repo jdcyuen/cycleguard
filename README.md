@@ -848,24 +848,24 @@ PositionRepository provides the actual holdings.
 
 For example:
 
-FZROX    $100,000
-SCHD      $50,000
-FTEC      $20,000
+    FZROX    $100,000
+    SCHD      $50,000
+    FTEC      $20,000
 
 The service asks:
 
-get_positions(snapshot_id)
+    get_positions(snapshot_id)
 
 which ultimately calls:
 
 
-position_repository.get_by_snapshot_with_security(
-    snapshot_id
-)
+    position_repository.get_by_snapshot_with_security(
+        snapshot_id
+    )
 
 The repository's job is simply:
 
-"Give me the positions for this snapshot."
+    "Give me the positions for this snapshot."
 
 It does not calculate allocations.
 
@@ -873,19 +873,19 @@ It does not calculate allocations.
 
 The service also receives:
 
-account: AccountConfig
+    account: AccountConfig
 
 This contains the portfolio's configuration.
 
 For example:
 
-account.bucket_mapping
+    account.bucket_mapping
 
 might say:
 
-FZROX → core_equity
-SCHD  → equity_income
-FTEC  → equity_growth
+    FZROX → core_equity
+    SCHD  → equity_income
+    FTEC  → equity_growth
 
 And:
 
@@ -893,9 +893,9 @@ account.bucket_weights
 
 might say:
 
-core_equity   → 60%
-equity_income → 30%
-equity_growth → 10%
+    core_equity   → 60%
+    equity_income → 30%
+    equity_growth → 10%
 
 So there is a very important distinction:
 
@@ -911,17 +911,17 @@ AccountConfig
 
 The central class is:
 
-PortfolioAggregationService
+    PortfolioAggregationService
 
 Its constructor receives both:
 
-```
-def __init__(
-    self,
-    position_repository: PositionRepository,
-    account: AccountConfig,
-):
-```
+
+    def __init__(
+        self,
+        position_repository: PositionRepository,
+        account: AccountConfig,
+    ):
+
 
 So conceptually:
 
@@ -956,7 +956,7 @@ This is the heart of the architecture.
 
 The service has:
 
-get_positions(snapshot_id)
+    get_positions(snapshot_id)
 
 This is deliberately a thin method.
 
@@ -1148,11 +1148,11 @@ So:
 
     core_equity:
 
-    15% × $200,000 = +$30,000
+        15% × $200,000 = +$30,000
 
     equity_income:
 
-    -15% × $200,000 = -$30,000
+        -15% × $200,000 = -$30,000
 
 This is valuable because a later component doesn't have to redo the math.
 
@@ -1220,14 +1220,14 @@ The service produces:
 
 Those results are represented by:
 
-PositionAllocation
+    PositionAllocation
 
 which contains:
 
-symbol
-bucket
-market_value
-weight
+    symbol
+    bucket
+    market_value
+    weight
 
 
 So there are really two different types of allocation:
@@ -1253,7 +1253,7 @@ So there are really two different types of allocation:
 
 Finally, the service packages the entire result into:
 
-PortfolioAllocation
+    PortfolioAllocation
 
 Conceptually:
 
@@ -1283,17 +1283,17 @@ This gives the rest of CycleGuard one clean object representing the portfolio's 
 
 The most important benefit is separation of responsibilities.
 
-Repository
-"I retrieve data."
+    Repository
+        "I retrieve data."
 
-AccountConfig
-"I define the intended portfolio structure."
+    AccountConfig
+        "I define the intended portfolio structure."
 
-PortfolioAggregationService
-"I calculate what the portfolio actually looks like."
+    PortfolioAggregationService
+        "I calculate what the portfolio actually looks like."
 
-Allocation models
-"I represent those calculated results."
+    Allocation models
+        "I represent those calculated results."
 
 That means we don't end up with database code mixed with portfolio calculations or trading decisions.
 
