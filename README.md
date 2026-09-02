@@ -826,27 +826,27 @@ For example, suppose your Roth IRA contains:
 
 The raw ingestion system knows:
 
-> FZROX = $25,000
-> FTEC = $14,000
-> SOXX = $12,000
-> MU = $7,000
-> FDRXX = $20,000
+    FZROX = $25,000
+    FTEC = $14,000
+    SOXX = $12,000
+    MU = $7,000
+FDRXX = $20,000
 
 Bucket Mapper adds:
 
-> FZROX → Core Equity
-> FTEC → Equity Growth
-> SOXX → High Beta
-> MU → High Beta
-> FDRXX → Defensive
+    FZROX → Core Equity
+    FTEC → Equity Growth
+    SOXX → High Beta
+    MU → High Beta
+    FDRXX → Defensive
 
 The Portfolio Aggregation Engine then produces:
 
-> Core Equity = $25,000
-> Equity Growth = $14,000
-> High Beta = $19,000
-> Defensive = $20,000
-> Total Portfolio = $78,000
+    Core Equity = $25,000
+    Equity Growth = $14,000
+    High Beta = $19,000
+    Defensive = $20,000
+    Total Portfolio = $78,000
 
 ---
 https://chatgpt.com/c/6a8e5672-1c74-83e8-b61d-24f392781e0e
