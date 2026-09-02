@@ -1586,6 +1586,198 @@ The individual signals sit underneath the aggregator:
         ├── CreditSignal
         └── CapeSignal
 
+##### 4.1.3.1 What is a signal?
+
+In CycleGuard, a signal is a small, specialized piece of logic that looks at a specific aspect of the market and converts raw market data into a standardized market condition.
+
+Think of a signal as answering one question.
+
+Example
+
+| Signal         | Question it answers                                        | Example output |
+| -------------- | ---------------------------------------------------------- | -------------- |
+| **Trend**      | Is the broad market above/below its major moving averages? | `bullish`      |
+| **Breadth**    | How broadly is the market participating?                   | `Strong`       |
+| **Volatility** | Is market volatility elevated?                             | `Calm`         |
+| **Leadership** | Are important growth/risk assets leading?                  | `Strong`       |
+| **Credit**     | Are credit markets healthy or stressed?                    | `Healthy`      |
+| **CAPE**       | Is valuation supportive or restrictive?                    | `Elevated`     |
+
+So the architecture is:
+
+```
+                    Raw Market Data
+                          │
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+       Trend           Breadth          Volatility
+          │               │                │
+          ▼               ▼                ▼
+      bullish           Strong            Calm
+          
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+      Leadership        Credit             CAPE
+          │               │                │
+          ▼               ▼                ▼
+        Strong          Healthy          Elevated
+                          │
+                          ▼
+                Signal Aggregator
+                          │
+                          ▼
+                 Regime Classifier
+                          │
+                          ▼
+                     RISK_ON
+
+```
+
+A signal is NOT a regime
+
+This distinction is important.
+
+A signal is an individual observation:
+
+Trend = bullish
+Breadth = Strong
+Credit = Healthy
+
+
+A regime is the conclusion drawn from the collection of signals:
+
+RISK_ON
+
+So:
+
+> Signals provide the evidence. The Regime Engine interprets the evidence.
+
+##### 4.1.3.2 Why make signals separate?
+
+Because each signal has one responsibility.
+
+For example, your TrendSignal currently evaluates price relative to moving averages.
+
+    Conceptually:
+
+        TrendSignal.evaluate(data)
+            ↓
+        SPY price
+        SPY 50-DMA
+        SPY 200-DMA
+            ↓
+        "bullish"
+
+Your BreadthSignal does something completely different:
+
+    BreadthSignal.evaluate(data)
+            ↓
+    sector prices
+    sector 50-DMAs
+            ↓
+    percentage above 50-DMA
+            ↓
+    "Strong"
+
+
+And CreditSignal evaluates yet another thing:
+
+    CreditSignal.evaluate(data)
+            ↓
+    JNK / SHY relationship
+            ↓
+    "Healthy"
+
+Each can therefore be developed and tested independently.
+
+
+In software terms
+
+A signal is essentially a market-condition detector.
+
+Your architecture has a common interface:
+
+    class MarketSignal:
+        def evaluate(self, data):
+            ...
+
+Then you have implementations:
+
+    MarketSignal
+        │
+        ├── TrendSignal
+        ├── BreadthSignal
+        ├── VolatilitySignal
+        ├── LeadershipSignal
+        ├── CreditSignal
+        └── CapeSignal
+
+The SignalFactory creates the appropriate signal from your YAML configuration:
+
+    regime.yaml
+        │
+        ▼
+    SignalFactory
+        │
+        ├── trend → TrendSignal
+        ├── breadth → BreadthSignal
+        ├── volatility → VolatilitySignal
+        ├── leadership → LeadershipSignal
+        ├── credit → CreditSignal
+        └── cape → CapeSignal
+
+The SignalAggregator then evaluates all of them:
+
+    signal_results = aggregator.evaluate(data)
+
+Producing something conceptually like:
+
+    {
+        "trend": {
+        "status": "bullish"
+        },
+        "breadth": {
+            "status": "Strong"
+        },
+        "volatility": {
+            "status": "Calm"
+        },
+        "leadership": {
+            "status": "Strong"
+        },
+        "credit": {
+            "status": "Healthy"
+        },
+        "cape": {
+            "status": "Elevated"
+        }
+    }
+
+The RegimeClassifier consumes that collection of signals and determines the regime.
+
+The key CycleGuard concept
+    MARKET DATA
+        ↓
+    SIGNALS
+        ↓
+    MARKET REGIME
+        ↓
+    DEPLOYMENT DECISION
+        ↓
+    PORTFOLIO ACTION
+
+So when we say "the next engine consumes the regime output," we're talking about moving one level up the hierarchy:
+
+    ***Signals → Regime → Deployment***
+
+The signal is the lowest-level market interpretation in this part of CycleGuard.
+
+
+
+
+
+
+
 ----
 
 #### 4.1.4 RegimeEngine
