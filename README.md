@@ -52,11 +52,17 @@ The important architectural idea is that CycleGuard is not simply a portfolio tr
     - [1.3. Supported Inputs](#13-supported-inputs)
     - [1.4. The Ingestion Pipeline's Structure](#14-the-ingestion-pipelines-structure)
     - [1.5. Validation](#15-validation)
+    
     - [1.6. Record Import](#16-record-import)
     - [1.7. Finalizing Persistence](#17-finalizing-persistence)
     - [1.8. The import_history Table](#18-the-import_history-table)
     - [1.9. Snapshotting](#19-snapshotting)
     - [1.10. Transaction Logic](#110-transaction-logic)
+    - [1.11. Rollback](#111-rollback)
+        - [1.11.1 The Rollback Strategy](#1111-the-rollback-strategy)
+        - [1.11.2 Why Rollback Exists](#1112-why-rollback-exists)
+        - [1.11.3 How Rollback Works](#1113-how-rollback-works)
+        - [1.11.4 CLI](#1114-cli)
 - [2. Bucket Mapper](#2-bucket-mapper)
 - [3. Portfolio Aggregation Engine](#3-portfolio-aggregation-engine)
     - [3.1 What is the Portfolio Aggregation Engine?](#31-what-is-the-portfolio-aggregation-engine)
@@ -94,7 +100,22 @@ The important architectural idea is that CycleGuard is not simply a portfolio tr
             - [4.1.7.5 Credit Signal](#4175-credit-signal)
             - [4.1.7.6 Cape Signal](#4176-cape-signal)
         - [4.1.8 Regime Classifier](#418-regime-classifier)
+        - [4.1.9 Configuration-Driven Classification](#419-configuration-driven-classification)
+        - [4.1.10 All Conditions Must Match](#4110-all-conditions-must-match)
+        - [4.1.11 Configuration Order Matters](#4111-configuration-order-matters)
+        - [4.1.12 TRANSITION Is the Safety Net](#4112-transition-is-the-safety-net)
+        - [4.1.13 Data Flow](#4113-data-flow)
+        - [4.1.13.1  Example of Data Flow](#41131-example-of-data-flow)
+        - [4.1.14 Why This Architecture Is Valuable](#4114-why-this-architecture-is-valuable)
+        - [4.1.15  Relationship to the Portfolio Engine](#4115-relationship-to-the-portfolio-engine)
+        - [4.1.16 Architectural Principle](#4116-architectural-principle)
 - [5. Deployment Engine](#5-deployment-engine)
+- [6. Target-Weight Drift Engine](#6-target-weight-drift-engine)
+- [7. Analytics Engine](#7-analytics-engine)
+- [8. CycleGuard Rules Engine](#8-cycleguard-rules-engine)
+- [9. CycleGuard Score Engine](#9-cycleguard-score-engine)
+- [10. Streamlit Dashboard](#10-streamlit-dashboard)
+
 
 ---
 
@@ -2151,6 +2172,34 @@ The next engine should consume its output and translate the market regime into p
 For CycleGuard, I would make the next engine the Deployment Engine.
 
 ----
+
+## 5. Deployment Engine
+
+----
+
+## 6. Target-Weight Drift Engine
+
+
+
+## 7. Analytics Engine
+
+
+
+## 8. CycleGuard Rules Engine
+
+
+
+
+## 9. CycleGuard Score Engine
+
+
+## 10. Streamlit Dashboard
+
+
+
+
+----
+
 ## Regime
 
 A regime says:
