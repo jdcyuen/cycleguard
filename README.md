@@ -1639,14 +1639,14 @@ This distinction is important.
 
 A signal is an individual observation:
 
-Trend = bullish
-Breadth = Strong
-Credit = Healthy
+    Trend = bullish
+    Breadth = Strong
+    Credit = Healthy
 
 
-A regime is the conclusion drawn from the collection of signals:
+A **regime** is the conclusion drawn from the collection of signals:
 
-RISK_ON
+    ***RISK_ON***
 
 So:
 
