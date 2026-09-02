@@ -52,7 +52,7 @@ The important architectural idea is that CycleGuard is not simply a portfolio tr
     - [1.3. Supported Inputs](#13-supported-inputs)
     - [1.4. The Ingestion Pipeline's Structure](#14-the-ingestion-pipelines-structure)
     - [1.5. Validation](#15-validation)
-    
+
     - [1.6. Record Import](#16-record-import)
     - [1.7. Finalizing Persistence](#17-finalizing-persistence)
     - [1.8. The import_history Table](#18-the-import_history-table)
@@ -2156,14 +2156,270 @@ The classifier contains the rules that translate the six signals into one of the
 -----
 
 #### 4.1.9 Configuration-Driven Classification
+
+
+The classifier does not hard-code regime rules.
+
+Instead, the rules live in:
+
+    src/config/system/regime.yaml
+
+
+This is a major architectural decision.
+
+Conceptually:
+
+    regimes:
+
+    RISK_ON:
+        conditions:
+        trend: bullish
+        breadth: Strong
+        volatility: calm
+        leadership: Strong
+        credit: Healthy
+
+    TRANSITION:
+        conditions:
+        ...
+
+    RISK_OFF:
+        conditions:
+        ...
+
+The exact conditions are controlled by the YAML configuration.
+
+Therefore the **engine code doesn't need to change simply because the investment rules change.**
+
+
 #### 4.1.10 All Conditions Must Match
+
+The classifier uses an AND relationship.
+
+For a regime to match:
+
+    Trend       ──┐
+    Breadth     ──┤
+    Volatility  ──┤
+    Leadership  ──┼── ALL must match
+    Credit      ──┤
+    CAPE        ──┘
+                    │
+                    ▼
+                REGIME
+
+For example:
+
+    RISK_ON
+
+    trend       = bullish       ✓
+    breadth     = Strong        ✓
+    volatility  = calm          ✓
+    leadership  = Strong        ✓
+    credit      = Healthy       ✓
+
+Therefore:
+
+    RISK_ON
+
+If even one required condition does not match, that regime is not selected.
+
+
 #### 4.1.11 Configuration Order Matters
+
+Regimes are evaluated in YAML/configuration order.
+
+The classifier effectively does:
+
+    for regime in configured_regimes:
+
+        if all_conditions_match:
+            return regime
+
+The first matching regime wins.
+
+This means the configuration should be ordered deliberately when regimes could potentially overlap.
+
 #### 4.1.12 TRANSITION Is the Safety Net
+
+
+If none of the configured regimes match:
+
+    RISK_ON       ✗
+    RISK_OFF      ✗
+    other regimes ✗
+        │
+        ▼
+    TRANSITION
+
+The fallback is:
+
+    TRANSITION
+
+This is important.
+
+The system does not have to force an ambiguous market into either bullish or bearish.
+
+That is particularly useful for a portfolio-management system.
+
+
 #### 4.1.13 Data Flow
+
+The complete execution flow looks like this:
+
+
+    Market Data
+        │
+        ▼
+    RegimeEngine.evaluate()
+        │
+        ▼
+    SignalAggregator
+        │
+        ├──────────────┐
+        ▼              ▼
+    Trend          Breadth
+        │              │
+        ├──────┐       │
+        ▼      ▼       ▼
+    Volatility Leadership Credit
+        │      │       │
+        └──────┴───────┴──────┐
+                                ▼
+                            CAPE
+                                │
+                                ▼
+                    Signal Results Dictionary
+                                │
+                                ▼
+                        RegimeClassifier
+                                │
+                                ▼
+                        Configured Rules
+                                │
+                                ▼
+                        Market Regime
+
+
+
 ##### 4.1.13.1 Example
+
+
+Suppose the engine receives:
+
+    SPY       = 105
+    SPY 50DMA = 100
+    SPY 200DMA = 100
+
+    VIX       = 15
+
+    QQQ       = 105
+    QQQ 50DMA = 100
+
+    SMH       = 105
+    SMH 50DMA = 100
+
+    JNK       = 105
+    SHY       = 100
+    ...
+
+The individual signals might produce:
+
+    Trend       → bullish
+    Breadth     → Strong
+    Volatility  → calm
+    Leadership  → Strong
+    Credit      → Healthy
+    CAPE        → ...
+
+The classifier then evaluates the configured conditions.
+
+If the RISK_ON conditions are satisfied:
+
+             ┌───────────────┐
+             │    RISK_ON    │
+             └───────────────┘
+
+If the market is mixed:
+
+             ┌───────────────┐
+             │   TRANSITION  │
+             └───────────────┘
+
+
+
 #### 4.1.14 Why This Architecture Is Valuable
+
+The architecture gives CycleGuard separation of concerns.
+
+| Component        | Responsibility                      |
+| ---------------- | ----------------------------------- |
+| Market data      | Provides observations               |
+| Signal           | Interprets one aspect of the market |
+| SignalFactory    | Creates signals                     |
+| SignalAggregator | Executes signals                    |
+| RegimeClassifier | Determines regime                   |
+| RegimeEngine     | Orchestrates the process            |
+| `regime.yaml`    | Defines investment/regime rules     |
+
+
+That means we can change one layer without unnecessarily changing the others.
+
+For example, changing:
+
+    VIX threshold
+
+doesn't require rewriting RegimeEngine.
+
+Adding:
+
+    Treasury yield-curve signal
+
+doesn't require rewriting RegimeClassifier.
+
+Changing:
+
+    RISK_ON conditions
+
+doesn't require changing signal implementation.
+
+
 #### 4.1.15 Relationship to the Portfolio Engine
+
+The most important distinction going forward is:
+
+                 MARKET REGIME ENGINE
+                         │
+                         │
+                  "What is happening?"
+                         │
+                         ▼
+                     RISK_ON
+                    TRANSITION
+                     RISK_OFF
+                         │
+                         ▼
+                 DEPLOYMENT ENGINE
+                         │
+                         │
+                  "What should we do?"
+                         │
+                         ▼
+                 Capital deployment
+                         │
+                         ▼
+                 Portfolio allocation
+
+
+The Market Regime Engine does not rebalance the portfolio.
+
+It provides the environmental context that later engines can use.
+
+
+
 #### 4.1.16 Architectural Principle
+
+> **Signals measure. The classifier decides. The engine orchestrates. Configuration defines the rules.**
 
 -----
 
