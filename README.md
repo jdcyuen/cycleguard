@@ -2648,19 +2648,19 @@ CycleGuard intentionally separates investment decisions from transaction generat
 
 For example, suppose CycleGuard determines:
 
-Crash Level: Level 1
-Deployment Amount: $10,000
-Reason: Market drawdown triggered Level 1
+    Crash Level: Level 1
+    Deployment Amount: $10,000
+    Reason: Market drawdown triggered Level 1
 
 The Deployment Engine has completed its job.
 
 It does not need to decide:
 
-SELL $10,000 SGOV
-BUY $4,000 FZROX
-BUY $3,000 SCHD
-BUY $2,000 FZILX
-BUY $1,000 IEMG
+    SELL $10,000 SGOV
+    BUY $4,000 FZROX
+    BUY $3,000 SCHD
+    BUY $2,000 FZILX
+    BUY $1,000 IEMG
 
 Those are trade-planning decisions.
 
@@ -3065,7 +3065,7 @@ This is different from detecting the deployment event.
 
 For example:
 
-`
+```text
 Deployment Trigger
        │
        ▼
@@ -3352,7 +3352,7 @@ The future CycleGuard Score Engine will provide another input to deployment deci
 
 The architecture should eventually look like:
 
-`
+```text
 Market Regime Engine
           │
           │
