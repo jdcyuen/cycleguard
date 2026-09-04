@@ -36,6 +36,10 @@ class YFinanceDataProvider(IMarketDataProvider):
         return df
 
 
+
+# CrashManager is the crash detection/calculation component.
+# It takes market price data and determines the current drawdown from the cycle peak.
+
 # -------------------------
 # ENGINE (SRP / OCP / DIP)
 # -------------------------
@@ -46,7 +50,7 @@ class CrashManager:
         self.config = config if config else get_config()
         self.ticker = self.config["system"]["market"]["benchmark_ticker"]
         self.recovery_threshold = self.config["system"]["market"]["recovery_threshold"]
-        self.levels = self.config["system"]["deployment"]["levels"]
+
 
         # Dependency Injection (DIP)
         self.data_provider = data_provider if data_provider else YFinanceDataProvider()
@@ -75,28 +79,30 @@ class CrashManager:
             df["drawdown"] = (df["close"] - df["cycle_peak"]) / df["cycle_peak"]
         return df
 
-    def get_signal(self, drawdown: float) -> str:
-        # Sort levels by severity (largest drop first)
-        # sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
-        sorted_levels = sorted(
-            self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=False
-        )
 
-        for level_name, deploy_pct in sorted_levels:
-            if level_name == "Level 4" and drawdown <= -0.40:
-                return "Level 4"
-            elif level_name == "Level 3" and drawdown <= -0.30:
-                return "Level 3"
-            elif level_name == "Level 2" and drawdown <= -0.20:
-                return "Level 2"
-            elif level_name == "Level 1" and drawdown <= -0.10:
-                return "Level 1"
+    # def get_signal(self, drawdown: float) -> str:
+    #     # Sort levels by severity (largest drop first)
+    #     # sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
+    #     sorted_levels = sorted(
+    #         self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=False
+    #     )
 
-        return None
+    #     for level_name, deploy_pct in sorted_levels:
+    #         if level_name == "Level 4" and drawdown <= -0.40:
+    #             return "Level 4"
+    #         elif level_name == "Level 3" and drawdown <= -0.30:
+    #             return "Level 3"
+    #         elif level_name == "Level 2" and drawdown <= -0.20:
+    #             return "Level 2"
+    #         elif level_name == "Level 1" and drawdown <= -0.10:
+    #             return "Level 1"
+
+    #     return None
+
 
     def run(self):
-        """Orchestrates the pipeline using the injected data provider."""
-        # DIP: Calling the injected provider instead of yfinance directly
+    
+        """Run crash detection and return the current market drawdown."""
         df = self.data_provider.fetch_data(
             self.ticker, self.config["system"]["market"]["start_date"]
         )
@@ -106,18 +112,15 @@ class CrashManager:
 
         if df.empty:
             return {
-                "price": 0,
+                "close": 0,
                 "cycle_peak": 0,
                 "drawdown": 0,
-                "signal": None,
             }
 
         latest = df.iloc[-1]
-        signal = self.get_signal(latest["drawdown"])
 
         return {
             "close": latest["close"],
             "cycle_peak": latest["cycle_peak"],
             "drawdown": latest["drawdown"],
-            "signal": signal,
         }

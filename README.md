@@ -1948,7 +1948,103 @@ So the architecture is:
                      RISK_ON
 ```
 
+The Market Regime Engine establishes the interface that every regime signal must implement. It defines a class:
 
+```
+class MarketSignal(ABC):
+    """
+    Base contract for all CycleGuard market regime signals.
+    """
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Return the unique name of the signal."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate(self, data: Any) -> dict:
+        """
+        Evaluate the signal using supplied market data.
+
+        Returns:
+            A dictionary containing the signal result.
+        """
+        raise NotImplementedError
+```
+It establishes the interface that every regime signal must implement. Each signal must have:
+
+    A `name` property.
+
+    An `evaluate()` method that accepts market data and returns a result.
+
+This ensures that:
+
+    All signals expose the same interface.
+
+    The SignalAggregator can collect results consistently.
+
+    The RegimeClassifier receives standardized input.
+
+This makes CycleGuard modular and easy to extend: to add a new signal, you simply create a new class that implements the MarketSignal interface.
+
+For example:
+
+A trend implementation could therefore look like:
+
+```
+class TrendSignal(MarketSignal):
+
+    @property
+    def name(self) -> str:
+        return "trend"
+
+    def evaluate(self, data: Any) -> dict:
+        return {
+            "signal": "bullish",
+            "score": 80,
+            "confidence": 0.85,
+        }
+```
+The important architectural point is that the regime engine doesn't need to know how TrendSignal works.
+
+It only needs to know:
+
+    MarketSignal
+        │
+        ├── name
+        └── evaluate(data)
+
+This abstraction is valuable because new signals can be added without changing the core regime engine.
+
+For example, later you could add:
+
+    class CreditSpreadSignal(MarketSignal):
+        ...
+
+and register it with the engine without modifying the existing trend, breadth, or volatility implementations
+
+The clean separation is:
+
+    MarketSignal
+        ↓
+    Individual market condition
+
+    Signal Aggregator
+        ↓
+    Combines signals
+
+    Regime Classifier
+        ↓
+    Determines regime
+
+    Regime Output
+        ↓
+    Consumed by the next CycleGuard engine
+
+That separation is particularly important for what comes next: the next engine should consume the regime output rather than directly consuming the individual market signals.
+
+So this MarketSignal class is essentially the plug-in interface for the signal layer of the Market Regime Engine.
 
 #### 4.1.7.1 Trend Signal
 
@@ -2430,6 +2526,77 @@ For CycleGuard, I would make the next engine the Deployment Engine.
 ----
 
 ## 5. Deployment Engine
+
+> The Regime Engine determines the market environment. The Deployment Engine determines what CycleGuard should do with available capital.
+
+
+    Market Data
+        │
+        ▼
+    Market Regime Engine
+        │
+        │  regime = RISK_ON
+        │  confidence = 82
+        │  score = 78
+        ▼
+    Deployment Engine
+        │
+        │  "Given this regime, should we deploy cash?"
+        │
+        ▼
+    Deployment Decision
+        │
+        ├── deploy / hold / reduce
+        ├── deployment percentage
+        ├── eligible buckets
+        ├── eligible securities
+        └── dollar amounts
+        │
+        ▼
+    Target-Weight / Trade Engine
+        │
+        ▼
+    Trade List
+
+
+#### 5.1 Purpose
+
+| Engine               | Role                        |
+| -------------------- | --------------------------- |
+| Market Regime Engine | Evaluates market              |
+| **Deployment Engine**| Decides whether to deploy     |
+| Trade Engine         | Decides what to trade         |
+| Target-Weight Engine | Adjusts portfolio structure |
+
+
+
+#### 5.2 Core Logic
+
+The Deployment Engine decides:
+
+1. **Should we deploy cash at all?**
+
+   Based on:
+
+   - regime
+   - confidence
+   - regime score
+   - previous regime behavior
+
+2. **If so, how much?**
+
+   - Full deployment (100%)
+   - Partial deployment (e.g., 60%, 50%, 30%)
+   - Reduced allocation (less than target)
+   - Hold (no change)
+
+3. **Which buckets are eligible?**
+
+   Not all buckets may be equally attractive in a given regime.
+
+
+
+
 
 ----
 

@@ -154,6 +154,43 @@ def test_calculate_bucket_values():
         "defensive": 25000,
     }
 
+def test_get_available_capital():
+    position_repository = MagicMock()
+    account = MagicMock()
+
+    position_fdrxx = MagicMock()
+    position_fdrxx.symbol = "FDRXX"
+    position_fdrxx.current_value = Decimal("137000")
+
+    position_sgov = MagicMock()
+    position_sgov.symbol = "SGOV"
+    position_sgov.current_value = Decimal("82000")
+
+    position_fzrox = MagicMock()
+    position_fzrox.symbol = "FZROX"
+    position_fzrox.current_value = Decimal("100000")
+
+    position_repository.get_by_snapshot_with_security.return_value = [
+        position_fdrxx,
+        position_sgov,
+        position_fzrox,
+    ]
+
+    account.bucket_mapping = {
+        "FDRXX": "defensive",
+        "SGOV": "defensive",
+        "FZROX": "core_equity",
+    }
+
+    service = PortfolioAggregationService(
+        position_repository,
+        account,
+    )
+
+    result = service.get_available_capital(123)
+
+    assert result == Decimal("219000")
+
 def test_calculate_portfolio_value():
     position_repository = MagicMock()
     account = MagicMock()

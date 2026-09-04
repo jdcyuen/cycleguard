@@ -21,10 +21,10 @@ levels:
     drawdown: -0.40
     deploy_pct: 0.09
 
-
+# =========================
 # DEPLOYMENT BEHAVIOR RULES
 # =========================
-# =========================
+
 execution_rules:
 
   prioritization:

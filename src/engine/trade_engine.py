@@ -1,4 +1,4 @@
-# trades.py
+# tradepy
 
 import csv
 from datetime import datetime
@@ -7,41 +7,9 @@ from abc import ABC, abstractmethod
 # from config.config_loader import ConfigLoader
 from config.config_manager import get_config
 
-
-# -------------------------
-# INTERFACE (DIP)
-# -------------------------
-class ITradeLogger(ABC):
-    """Abstract interface for trade logging."""
-
-    @abstractmethod
-    def log_trades(self, trades: list, trade_type: str, reason: str):
-        pass
-
-
-# -------------------------
-# IMPLEMENTATION (SRP)
-# -------------------------
-class CSVTradeLogger(ITradeLogger):
-    """Responsible ONLY for persisting trades to a CSV file."""
-
-    def __init__(self, log_path):
-        self.log_path = log_path
-
-    def log_trades(self, trades, trade_type, reason):
-        with open(self.log_path, "a", newline="") as f:
-            writer = csv.writer(f)
-
-            for asset, amt in trades:
-                writer.writerow(
-                    [
-                        datetime.now().strftime("%Y-%m-%d"),
-                        asset,  # symbol
-                        trade_type,  # action
-                        round(amt, 2),  # amount
-                        reason,  # signal type
-                    ]
-                )
+from models.trade import Trade
+from models.trade_plan import TradePlan
+from engine.trade_logger_interface import ITradeLogger
 
 
 # -------------------------
@@ -97,7 +65,13 @@ class TradeEngine:
 
             if sell_amt > 0:
                 sell_amt = round(sell_amt, 2)
-                sells.append((asset, sell_amt))
+                sells.append(
+                    Trade(
+                        symbol=asset,
+                        action="SELL",
+                        amount=sell_amt,
+                    )
+                )
                 remaining -= sell_amt
 
             if remaining <= 0:
@@ -115,38 +89,66 @@ class TradeEngine:
                 for s in self.stock_bucket:
                     adj_amount = self.apply_position_limits(portfolio, s, split)
                     if adj_amount > 0:
-                        buys.append((s, round(adj_amount, 2)))
+                        buys.append(
+                            Trade(
+                                symbol=s,
+                                action="BUY",
+                                amount=round(adj_amount, 2),
+                            )
+                        )
             else:
                 adj_amount = self.apply_position_limits(portfolio, ticker, amount)
                 if adj_amount > 0:
-                    buys.append((ticker, round(adj_amount, 2)))
+                    buys.append(
+                        Trade(
+                            symbol=ticker,
+                            action="BUY",
+                            amount=round(adj_amount, 2),
+                        )
+                    )
 
         return deploy_amount, sells, buys
 
-    def apply_trades(self, portfolio, sells, buys):
-        for asset, amt in sells:
-            portfolio[asset] = round(portfolio.get(asset, 0) - amt, 2)
-        for asset, amt in buys:
-            portfolio[asset] = round(portfolio.get(asset, 0) + amt, 2)
-        return portfolio
+    def generate_trade_plan(self, level, portfolio):
+
+        deploy_amount, sells, buys = self.generate_crash_trades(
+            level,
+            portfolio,
+        )
+
+        return TradePlan(
+            deployment_amount=deploy_amount,
+            reason=level,
+            sells=sells,
+            buys=buys,
+        )
 
     def execute_crash(self, level, portfolio):
+
         """Orchestrates the crash deployment and records history."""
-        deploy_amount, sells, buys = self.generate_crash_trades(level, portfolio)
+        plan = self.generate_trade_plan(
+            level,
+            portfolio,
+        )
 
         # Log trades via the injected logger
         if self.logger:
-            self.logger.log_trades(sells, "SELL", level)
-            self.logger.log_trades(buys, "BUY", level)
 
-        # Apply trades
-        portfolio = self.apply_trades(portfolio, sells, buys)
+            self.logger.log_trades(
+                plan.sells,
+                plan.reason,
+            )
+
+            self.logger.log_trades(
+                plan.buys,
+                plan.reason,
+            )
 
         return {
             "level": level,
-            "deploy_amount": deploy_amount,
-            "sells": sells,
-            "buys": buys,
+            "deploy_amount": plan.deployment_amount,
+            "sells": plan.sells,
+            "buys": plan.buys,
             "portfolio": portfolio,
         }
 

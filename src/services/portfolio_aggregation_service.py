@@ -84,6 +84,22 @@ class PortfolioAggregationService:
             for bucket, positions in buckets.items()
         }
 
+    def get_available_capital(
+        self,
+        snapshot_id: int,
+    ) -> Decimal:
+        """
+        Return the value of assets in the defensive bucket,
+        which represents available deployment capital.
+        """
+
+        bucket_values = self.calculate_bucket_values(snapshot_id)
+
+        return bucket_values.get(
+            "defensive",
+            Decimal("0"),
+        )
+
     def calculate_position_bucket_weights(
         self,
         snapshot_id: int,
