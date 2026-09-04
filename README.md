@@ -110,6 +110,30 @@ The important architectural idea is that CycleGuard is not simply a portfolio tr
         - [4.1.15  Relationship to the Portfolio Engine](#4115-relationship-to-the-portfolio-engine)
         - [4.1.16 Architectural Principle](#4116-architectural-principle)
 - [5. Deployment Engine](#5-deployment-engine)
+    - [5.1 Purpose](#51-purpose)
+    - [5.2 Where the Deployment Engine Fits](#52-where-the-deployment-engine-fits)
+    - [5.3 Deployment vs. Trading](#53-deployment-vs-trading)
+    - [5.4 Core Responsibility](#54-core-responsibility)
+    - [5.5 How the Deployment Engine Works](#55-how-the-deployment-engine-works)
+    - [5.6 Deployment Strategies](#56-deployment-strategies)
+    - [5.6.1 Regime-Based Deployment](#561-regime-based-deployment)
+    - [5.6.2 Crash-Based Deployment](#562-crash-based-deployment)
+    - [5.7 Crash Deployment](#57-crash-deployment)
+    - [5.8 Drawdown Detection](#58-drawdown-detection)
+        - [5.8.1 Drawdown Calculation](#581-drawdown-calculation)
+        - [5.8.2 Crash Levels](#582-crash-levels)
+        - [5.8.3 Crash Deployment Levels](#583-crash-deployment-levels)
+    - [5.9 Cash Is a Deployment Resource](#59-cash-is-a-deployment-resource)
+    - [5.10 Cash Deployment Policy](#510-cash-deployment-policy)
+    - [5.11 Deployment Engine Does Not Mutate the Portfolio](#511-deployment-engine-does-not-mutate-the-portfolio)
+    - [5.12 TradePlan Boundary](#512-tradeplan-boundary)
+    - [5.13 User Review Is an Architectural Boundary](#513-user-review-is-an-architectural-boundary)
+    - [5.14 Current TradeEngine Relationship](#514-current-tradeengine-relationship)
+    - [5.15 Trade Logging](#515-trade-logging)
+    - [5.16 Separation of Responsibilities](#516-separation-of-responsibilities)
+    - [5.17 Relationship to the Drift Engine](#517-relationship-to-the-drift-engine)
+    - [5.18 Relationship to the Market Regime Engine](#518-relationship-to-the-market-regime-engine)
+    - [5.19 Future Score Integration](#519-future-score-integration)
 - [6. Target-Weight Drift Engine](#6-target-weight-drift-engine)
 - [7. Analytics Engine](#7-analytics-engine)
 - [8. CycleGuard Rules Engine](#8-cycleguard-rules-engine)
@@ -2568,35 +2592,789 @@ For CycleGuard, I would make the next engine the Deployment Engine.
 | Trade Engine         | Decides what to trade         |
 | Target-Weight Engine | Adjusts portfolio structure |
 
+The Deployment Engine is the CycleGuard component responsible for deciding when and how much capital should be deployed into the portfolio.
+
+Its primary responsibility is to transform a market or portfolio condition into a Deployment Decision.
+
+The Deployment Engine answers questions such as:
+
+* Should CycleGuard deploy capital?
+How much capital should be deployed?
+* Why is the capital being deployed?
+Which deployment mechanism should be used?
+* Regime-based deployment
+* Crash deployment
+* Other future deployment strategies
+* What level of deployment has been triggered?
+
+The Deployment Engine does not determine the final BUY/SELL transactions.
+
+That responsibility belongs downstream to the Trade Planning / Trade Engine.
+
+#### 5.2 Where the Deployment Engine Fits
+
+The Deployment Engine sits between CycleGuard's market/risk analysis and its trade-generation infrastructure.
+
+The high-level architecture is:
+
+```text
+Market / Portfolio State
+          ↓
+      Regime / Rules / Scores
+          ↓
+   Deployment Decision
+          ↓
+   Allocation / Drift
+          ↓
+       TradePlan
+          ↓
+     User Approval
+          ↓
+      Actual Trade
+          ↓
+    Transaction Ingestion
+          ↓
+     Updated Portfolio
+```
+
+The important architectural boundary is:
+
+> Deployment decides how much capital to deploy. Trade planning decides what transactions are required to implement that deployment.
 
 
-#### 5.2 Core Logic
+#### 5.3 Deployment vs. Trading
 
-The Deployment Engine decides:
+CycleGuard intentionally separates investment decisions from transaction generation.
 
-1. **Should we deploy cash at all?**
+For example, suppose CycleGuard determines:
 
-   Based on:
+Crash Level: Level 1
+Deployment Amount: $10,000
+Reason: Market drawdown triggered Level 1
 
-   - regime
-   - confidence
-   - regime score
-   - previous regime behavior
+The Deployment Engine has completed its job.
 
-2. **If so, how much?**
+It does not need to decide:
 
-   - Full deployment (100%)
-   - Partial deployment (e.g., 60%, 50%, 30%)
-   - Reduced allocation (less than target)
-   - Hold (no change)
+SELL $10,000 SGOV
+BUY $4,000 FZROX
+BUY $3,000 SCHD
+BUY $2,000 FZILX
+BUY $1,000 IEMG
 
-3. **Which buckets are eligible?**
+Those are trade-planning decisions.
 
-   Not all buckets may be equally attractive in a given regime.
+The architecture therefore separates:
+
+```text
+DEPLOYMENT DECISION
+        │
+        │ "Deploy $10,000"
+        ▼
+TRADE PLANNING
+        │
+        │ "Here are the transactions required"
+        ▼
+TRADE PLAN
+```
+
+This separation is important because it prevents the Deployment Engine from becoming responsible for portfolio construction, security selection, and brokerage execution.
 
 
 
+#### 5.4 Core Responsibility
 
+The core responsibility of the Deployment Engine is to transform market/portfolio conditions into deployment decisions.
+
+```text
+Market / Portfolio Condition
+            │
+            ▼
+      Deployment Logic
+            │
+            ▼
+    Deployment Decision
+```
+
+A deployment decision should contain information such as:`
+
+- deployment amount
+- deployment level
+- deployment reason
+- deployment strategy
+
+Conceptually:
+
+```text
+DeploymentDecision(
+    amount=Decimal("10000.00"),
+    level="Level 1",
+    reason="Market drawdown exceeded Level 1 threshold",
+    strategy="crash",
+)
+```
+
+The exact implementation can evolve, but the architectural principle remains the same.
+
+#### 5.5 How the Deployment Engine Works
+
+The Deployment Engine operates by transforming market/portfolio conditions into deployment decisions.
+
+1. **Input**: Accepts market/portfolio conditions
+2. **Logic**: Applies deployment rules/strategies
+3. **Output**: Generates deployment decision
+
+This process can be summarized as:
+
+```text
+Input Conditions     →   Deployment Logic     →   Deployment Decision
+(market/portfolio)       (rules, strategies)      (amount, level, reason)
+```
+
+The Deployment Engine can support multiple deployment strategies, such as:
+
+- **Regime-based deployment** - deploy based on current market regime
+- **Crash deployment** - deploy during market crashes
+- **Drift-based deployment** - deploy when portfolio deviates from targets
+
+Each strategy has its own logic for determining:
+
+- Whether to deploy
+- How much to deploy
+- Which buckets/assets are eligible
+- The reason for deployment
+
+The Deployment Engine serves as the central hub for all deployment-related decisions, ensuring that:
+
+- Deployment decisions are consistent with market conditions
+- Deployment strategies can be easily added or modified
+- Deployment decisions are clearly documented
+- Deployment decisions are separated from trade-level details
+
+This architectural separation makes the system more maintainable, testable, and easier to understand.
+
+#### 5.6 Deployment Strategies
+##### 5.6.1 Regime-Based Deployment
+
+Regime-based deployment is a strategy that adjusts deployment decisions based on the current market regime. 
+
+The Deployment Engine can support multiple deployment strategies, such as:
+
+- Regime-based deployment - deploy based on current market regime
+- Crash deployment - deploy during market crashes
+- Drift-based deployment - deploy when portfolio deviates from targets
+
+Each strategy has its own logic for determining:
+
+- Whether to deploy
+- How much to deploy
+- Which buckets/assets are eligible
+- The reason for deployment
+
+The Deployment Engine serves as the central hub for all deployment-related decisions, ensuring that:
+
+- Deployment decisions are consistent with market conditions
+- Deployment strategies can be easily added or modified
+- Deployment decisions are clearly documented
+- Deployment decisions are separated from trade-level details
+
+This architectural separation makes the system more maintainable, testable, and easier to understand.
+
+##### 5.6.2 Crash-Based Deployment
+
+Crash-based deployment is a strategy that adjusts deployment decisions based on the current market regime. 
+
+The Deployment Engine can support multiple deployment strategies, such as:
+
+- Regime-based deployment - deploy based on current market regime
+- Crash deployment - deploy during market crashes
+- Drift-based deployment - deploy when portfolio deviates from targets
+
+Each strategy has its own logic for determining:
+
+- Whether to deploy
+- How much to deploy
+- Which buckets/assets are eligible
+- The reason for deployment
+
+The Deployment Engine serves as the central hub for all deployment-related decisions, ensuring that:
+
+- Deployment decisions are consistent with market conditions
+- Deployment strategies can be easily added or modified
+- Deployment decisions are clearly documented
+- Deployment decisions are separated from trade-level details
+
+This architectural separation makes the system more maintainable, testable, and easier to understand.
+
+#### 5.7 Crash Deployment
+
+Crash deployment is a separate deployment mechanism designed to deploy capital when the market experiences significant declines.
+
+The current TradeEngine implementation supports crash deployment levels.
+
+Conceptually:
+
+```text
+Market Drawdown
+      │
+      ▼
+Crash Detection
+      │
+      ▼
+Crash Level
+      │
+      ├── Level 1
+      ├── Level 2
+      ├── Level 3
+      └── ...
+      │
+      ▼
+Deployment Amount
+```
+
+For example:
+
+```text
+Level 1
+   ↓
+Deploy $X
+
+Level 2
+   ↓
+Deploy $Y
+
+Level 3
+   ↓
+Deploy $Z
+```
+
+The crash deployment mechanism therefore provides a disciplined way of deploying cash during market declines rather than relying on discretionary decisions.
+
+
+#### 5.8 Drawdown Detection
+
+Drawdown detection is the mechanism that determines whether the market has experienced a significant decline triggering crash deployment.
+
+The current TradeEngine implementation supports crash deployment levels.
+
+Conceptually:
+
+```text
+Market Drawdown
+      │
+      ▼
+Crash Detection
+      │
+      ▼
+Crash Level
+      │
+      ├── Level 1
+      ├── Level 2
+      ├── Level 3
+      └── ...
+      │
+      ▼
+Deployment Amount
+```
+
+For example:
+
+```text
+Level 1
+   ↓
+Deploy $X
+
+Level 2
+   ↓
+Deploy $Y
+
+Level 3
+   ↓
+Deploy $Z
+```
+
+The crash deployment mechanism therefore provides a disciplined way of deploying cash during market declines rather than relying on discretionary decisions.
+
+#### 5.8.1 Drawdown Calculation
+
+Drawdown calculation is the mechanism that determines whether the market has experienced a significant decline triggering crash deployment.
+
+The current TradeEngine implementation supports crash deployment levels.
+
+Conceptually:
+
+```text
+Market Drawdown
+      │
+      ▼
+Crash Detection
+      │
+      ▼
+Crash Level
+      │
+      ├── Level 1
+      ├── Level 2
+      ├── Level 3
+      └── ...
+      │
+      ▼
+Deployment Amount
+```
+
+For example:
+
+```text
+Level 1
+   ↓
+Deploy $X
+
+Level 2
+   ↓
+Deploy $Y
+
+Level 3
+   ↓
+Deploy $Z
+```
+
+The crash deployment mechanism therefore provides a disciplined way of deploying cash during market declines rather than relying on discretionary decisions.
+
+
+#### 5.8.2 Crash Levels
+
+Crash levels are the thresholds that determine whether the market has experienced a significant decline triggering crash deployment.
+
+The current TradeEngine implementation supports crash deployment levels.
+
+Conceptually:
+
+```text
+Market Drawdown
+      │
+      ▼
+Crash Detection
+      │
+      ▼
+Crash Level
+      │
+      ├── Level 1
+      ├── Level 2
+      ├── Level 3
+      └── ...
+      │
+      ▼
+Deployment Amount
+```
+
+For example:
+
+```text
+Level 1
+   ↓
+Deploy $X
+
+Level 2
+   ↓
+Deploy $Y
+
+Level 3
+   ↓
+Deploy $Z
+```
+
+The crash deployment mechanism therefore provides a disciplined way of deploying cash during market declines rather than relying on discretionary decisions.
+
+
+#### 5.8.3 Crash Deployment Levels
+
+Crash levels are the thresholds that determine whether the market has experienced a significant decline triggering crash deployment.
+
+The current TradeEngine implementation supports crash deployment levels.
+
+Conceptually:
+
+```text
+Market Drawdown
+      │
+      ▼
+Crash Detection
+      │
+      ▼
+Crash Level
+      │
+      ├── Level 1
+      ├── Level 2
+      ├── Level 3
+      └── ...
+      │
+      ▼
+Deployment Amount
+```
+
+For example:
+
+```text
+Level 1
+   ↓
+Deploy $X
+
+Level 2
+   ↓
+Deploy $Y
+
+Level 3
+   ↓
+Deploy $Z
+```
+
+The crash deployment mechanism therefore provides a disciplined way of deploying cash during market declines rather than relying on discretionary decisions.
+
+#### 5.9 Cash Is a Deployment Resource
+
+CycleGuard does not treat every dollar in the portfolio as deployable.
+
+The current architecture uses the portfolio's defensive bucket as the source of available deployment capital.
+
+Conceptually:
+
+```text
+Portfolio
+   │
+   ├── Core Equity
+   ├── Equity Income
+   ├── Equity Growth
+   ├── Foreign Equity
+   ├── Alternatives
+   └── Defensive
+          │
+          ▼
+     Deployment Capital
+```
+
+This is important because CycleGuard's portfolio architecture already defines the purpose of each bucket.
+
+The Deployment Engine should therefore consume the portfolio's bucket information rather than inventing a separate concept such as an AVAILABLE_CAPITAL bucket.
+
+#### 5.10 Cash Deployment Policy
+
+The Cash Deployment Policy is a planned component of Phase 5.
+
+It will determine how much of the available defensive capital can actually be released when a deployment event occurs.
+
+This is different from detecting the deployment event.
+
+For example:
+
+`
+Deployment Trigger
+       │
+       ▼
+Deploy $20,000
+       │
+       ▼
+Cash Deployment Policy
+       │
+       ├── Required reserve
+       ├── Maximum deployment
+       ├── Staging rules
+       └── Available defensive capital
+       │
+       ▼
+Approved Deployment Amount
+```
+
+
+This distinction allows CycleGuard to separate:
+
+    Why should we deploy?
+
+from:
+
+    How much cash are we willing to release?
+
+#### 5.11 Deployment Engine Does Not Mutate the Portfolio
+
+A critical design decision is that the Deployment Engine is proposal-oriented.
+
+It should not directly modify the portfolio.
+
+For example, this is not the intended behavior:
+
+    portfolio["SGOV"] -= 10000
+    portfolio["FZROX"] += 10000
+
+Instead:
+
+```text
+Current Portfolio
+       │
+       ▼
+Deployment Engine
+       │
+       ▼
+Deployment Decision
+       │
+       ▼
+Trade Planning
+       │
+       ▼
+TradePlan
+```
+
+The actual portfolio changes only after the transactions occur externally and are subsequently captured by CycleGuard's transaction ingestion pipeline.
+
+#### 5.12 TradePlan Boundary
+
+The TradePlan is the boundary between CycleGuard's decision-making and the user's actual brokerage activity.
+
+The current architecture is:
+
+```text
+DeploymentDecision
+       │
+       ▼
+TradeEngine
+       │
+       ▼
+TradePlan
+       │
+       ├── deployment_amount
+       ├── sells
+       ├── buys
+       └── reason
+
+```
+
+A TradePlan contains proposed Trade objects.
+
+A Trade contains:
+
+    symbol
+    action
+    amount
+
+For example:
+
+    SELL SGOV $10,000
+    BUY FZROX $5,000
+    BUY SCHD  $3,000
+    BUY IEMG  $2,000
+
+The TradePlan is a proposal.
+
+CycleGuard does not send these trades directly to Fidelity.
+
+
+#### 5.13 User Review Is an Architectural Boundary
+
+CycleGuard is designed as a decision-support and portfolio-management system, not an autonomous brokerage execution system.
+
+The intended workflow is:
+
+```text
+CycleGuard
+    │
+    ▼
+Deployment Decision
+    │
+    ▼
+TradePlan
+    │
+    ▼
+USER REVIEW
+    │
+    ├── Approve
+    ├── Modify
+    └── Reject
+    │
+    ▼
+FIDELITY
+    │
+    ▼
+Actual Transactions
+    │
+    ▼
+CycleGuard Transaction Ingestion
+```
+
+This creates an important safety boundary.
+
+CycleGuard can calculate and recommend trades without having authority to execute them.
+
+
+#### 5.14 Current TradeEngine Relationship
+
+The current TradeEngine is responsible for turning deployment information into a proposed set of transactions.
+
+It contains functionality for:
+
+    * calculating portfolio value
+    * applying position limits
+    * generating crash trades
+    * generating a TradePlan
+    * executing the deployment workflow in the sense of orchestrating proposal generation and logging
+    * calculating remaining deployment capital
+
+The important recent architectural change is that the TradeEngine no longer has an apply_trades() method.
+
+That method would have mutated the portfolio.
+
+It was removed because the portfolio should represent observed portfolio state, not a simulated state created by the trade engine.
+
+
+#### 5.15 Trade Logging
+
+Trade logging has been separated from the TradeEngine.
+
+The architecture is now:
+
+```text
+TradeEngine
+     │
+     ▼
+ITradeLogger
+     │
+     ▼
+CSVTradeLogger
+```
+
+ITradeLogger defines the logging contract.
+
+CSVTradeLogger provides the current implementation.
+
+The logger records proposed trades and their reason.
+
+This keeps logging concerns separate from deployment and trade-generation logic.
+
+
+#### 5.16 Separation of Responsibilities
+
+CycleGuard deliberately assigns different responsibilities to different engines.
+
+|Component|Responsibility|
+|--------|----------------|
+|Ingestion Engine|Obtain portfolio/transaction data|
+|Portfolio Aggregation Engine|Construct the current portfolio view|
+|Bucket Mapper|Map securities to portfolio buckets|
+|Market Regime Engine|Determine the current market regime|
+|Deployment Engine|Decide whether/how much capital should be deployed|
+|Cash Deployment Policy|Determine how much available cash can be released|
+|Target-Weight / Drift Engine|Determine where portfolio capital should be allocated|
+|Trade Engine|Convert allocation requirements into proposed trades|
+|TradePlan|Represent the proposed transactions|
+|Transaction Ingestion|Capture what actually happened|
+|Analytics Engine|Analyze portfolio behavior and results|
+|Rules Engine|Apply deterministic portfolio rules|
+|Score Engine|Calculate portfolio/market scores|
+|Deployment Priority Score|Rank/quantify deployment urgency|
+|AI Analyst|Explain, analyze, challenge, and recommend|
+
+This separation is one of the most important architectural characteristics of CycleGuard.
+
+
+
+#### 5.17 Relationship to the Drift Engine
+
+The Deployment Engine and Target-Weight / Drift Engine have different jobs.
+
+**Deployment Engine**
+
+    Answers:
+
+    > How much money should we deploy?
+
+**Drift Engine**
+
+    Answers:
+
+    > Where does that money need to go?
+
+For example:
+
+```text
+Deployment Engine
+       │
+       ▼
+Deploy $20,000
+       │
+       ▼
+Drift Engine
+       │
+       ├── FZROX is underweight → $8,000
+       ├── SCHD is underweight  → $5,000
+       ├── FZILX is underweight → $4,000
+       └── IEMG is underweight  → $3,000
+       │
+       ▼
+Trade Engine
+       │
+       ▼
+TradePlan
+```
+
+This prevents deployment logic from becoming entangled with portfolio allocation logic.
+
+#### 5.18 Relationship to the Market Regime Engine
+
+The Market Regime Engine and Deployment Engine are also separate.
+
+The Market Regime Engine answers:
+
+> **What kind of market environment are we currently in?**
+
+The Deployment Engine answers:
+
+> **What should CycleGuard do with capital given that environment?**
+
+Therefore:
+
+```text
+Market Data
+    │
+    ▼
+Market Regime Engine
+    │
+    ▼
+RISK_ON / NEUTRAL / RISK_OFF / CRISIS
+    │
+    ▼
+Deployment Engine
+    │
+    ▼
+Deployment Decision
+```
+
+The Deployment Engine should consume regime information rather than duplicate regime classification logic.
+
+#### 5.19 Future Score Integration
+
+The future CycleGuard Score Engine will provide another input to deployment decisions.
+
+The architecture should eventually look like:
+
+`
+Market Regime Engine
+          │
+          │
+          ▼
+     ┌───────────┐
+     │           │
+     │  Scores   │
+     │           │
+     └─────┬─────┘
+           │
+           ▼
+Deployment Priority Score
+           │
+           ▼
+Deployment Engine
+```
+
+Importantly, the Score Engine and Deployment Priority Score are separate architectural concepts.
+
+The Score Engine is the broader scoring framework.
+
+The Deployment Priority Score is a specific deployment-oriented output that can consume information from that framework.
 
 ----
 
