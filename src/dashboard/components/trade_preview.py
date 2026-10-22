@@ -5,7 +5,14 @@
 import streamlit as st
 
 
-def render_trade_preview(portfolio, latest_market, crash_manager, config, phase_data=None):
+def render_trade_preview(
+    portfolio,
+    latest_market,
+    crash_manager,
+    config,
+    phase_data=None,
+    crash_decision=None,
+):
     # Panel styling & container
     with st.container(border=True):
         st.subheader("📋 Trade Preview")
@@ -13,7 +20,7 @@ def render_trade_preview(portfolio, latest_market, crash_manager, config, phase_
         total_value = sum(portfolio.values())
         drawdown = latest_market.get("drawdown", 0)
 
-        signal = crash_manager.get_signal(drawdown)
+        signal = crash_decision if crash_decision and crash_decision.action == "DEPLOY" else None
 
         if not signal:
             if phase_data and phase_data.get("regime") == "RISK_ON":
@@ -42,22 +49,13 @@ def render_trade_preview(portfolio, latest_market, crash_manager, config, phase_
                         st.write(f"SELL {asset}: ${amt:,.0f}")
 
                     st.markdown("### 🟢 Buy (Deployment)")
-                    buy_targets = config.get("buy_targets", {}).get("Level 1", {})
-                    buy_orders = []
-                    for asset, weight in buy_targets.items():
-                        buy_amount = surplus * weight
-                        buy_orders.append((asset, buy_amount))
-
-                    for asset, amt in buy_orders:
-                        st.write(f"BUY {asset}: ${amt:,.0f}")
                     return
 
             st.write("🟢 No trades needed at this time")
             return
 
-        deployment_levels = config.get("deployment", {}).get("levels", {})
-        deploy_pct = deployment_levels.get(signal, 0)
-        deploy_amount = total_value * deploy_pct
+        deploy_pct = crash_decision.deployment_pct
+        deploy_amount = crash_decision.deployment_amount
 
         st.write(f"**Signal:** {signal}")
         st.write(f"**Deploy Amount:** ${deploy_amount:,.0f}")
@@ -90,12 +88,4 @@ def render_trade_preview(portfolio, latest_market, crash_manager, config, phase_
         # -------------------------
         st.markdown("### 🟢 Buy (Deployment)")
 
-        buy_targets = config.get("buy_targets", {}).get(signal, {})
-
-        buy_orders = []
-        for asset, weight in buy_targets.items():
-            buy_amount = deploy_amount * weight
-            buy_orders.append((asset, buy_amount))
-
-        for asset, amt in buy_orders:
-            st.write(f"BUY {asset}: ${amt:,.0f}")
+        

@@ -3,6 +3,25 @@
 
 
 import streamlit as st
+from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+
+'''
+portfolio							The existing JSON-backed portfolio data used to display holdings and calculate portfolio values.							
+latest_market						Latest market data used for price and drawdown displays.
+crash_manager						Existing crash-signal manager. The panel uses crash_manager.run() for crash and recovery-related signals.					
+recovery_manager					Existing recovery manager used for recovery-related decisions or information.
+config								CycleGuard configuration, including crash-deployment and funding settings.
+load_rebalance_state				Existing callback or function for retrieving rebalance state.
+phase_data							Existing market-phase information used by the action panel.
+deployment_orchestration_service	The configured service that coordinates the regime and crash deployment evaluations, obtains the latest database snapshot, and checks that it is current.									
+market_regime_data					The current market-regime input data already passed to RegimeEngine.evaluate(). The orchestration service receives this data to evaluate the deployment recommendation.
+
+'''
 
 
 def render_action_panel(
@@ -13,6 +32,8 @@ def render_action_panel(
     config,
     load_rebalance_state,
     phase_data,
+    deployment_orchestration_service,
+    market_regime_data,
 ):
     # -------------------------
     # PANEL STYLING & CONTAINER
@@ -30,7 +51,28 @@ def render_action_panel(
         target_cash_limit = 0.15 * total_value
         surplus = max(0, discretionary_cash - target_cash_limit)
 
-        signal = crash_manager.get_signal(drawdown)
+        crash_data = crash_manager.run()
+        drawdown = crash_data.get("drawdown", 0)
+
+		#Passing snapshot_id=None lets the service resolve the latest database snapshot 
+		#and enforce its same-day freshness rule.
+        try:
+            crash_decision = deployment_orchestration_service.evaluate(
+                snapshot_id=None,
+                market_data=market_regime_data,
+            )
+        except ValueError as exc:
+            st.error(f"Deployment recommendation unavailable: {exc}")
+            return None
+        except Exception:
+            logger.exception(
+                "Unexpected error evaluating deployment recommendation"
+            )
+            st.error(
+                "Deployment recommendation unavailable because of an "
+                "unexpected internal error. Check the application logs."
+            )
+            return None
 
         action_text = ""
         details = []
@@ -38,13 +80,22 @@ def render_action_panel(
         # -------------------------
         # CRASH ACTIONS
         # -------------------------
-        if signal:
-            deployment_levels = config.get("deployment", {}).get("levels", {})
-            deploy_pct = deployment_levels.get(signal, 0)
+        if crash_decision.action == "DEPLOY":
+            deploy_pct = crash_decision.deployment_pct
+            deploy_amount = crash_decision.deployment_amount
 
-            deploy_amount = total_value * deploy_pct
-
-            action_text = f"⚠️ {signal} Triggered"
+            if crash_decision.source == "crash":
+                action_text = (
+                    f"Crash Deployment Triggered ({deploy_pct:.0%})"
+                )
+            elif crash_decision.source == "regime":
+                action_text = (
+                    f"Regime-Based Deployment Recommended ({deploy_pct:.0%})"
+                )
+            else:
+                action_text = (
+                    f"Deployment Recommended ({deploy_pct:.0%})"
+                )
 
             # Funding sources
             funding_priority = config.get("funding", {}).get("priority", [])
@@ -52,13 +103,7 @@ def render_action_panel(
                 details.append(f"Sell from: {', '.join(funding_priority[:2])}")
 
             # Deployment
-            details.append(f"Deploy approximately **${deploy_amount:,.0f}** into equities")
-
-            # Buy targets
-            buy_targets = config.get("buy_targets", {}).get(signal, {})
-            if buy_targets:
-                top_targets = list(buy_targets.keys())[:3]
-                details.append(f"Buy priority: {', '.join(top_targets)}")
+            details.append(f"Drawdown: **{drawdown:.2%}** → Deploy **{deploy_pct:.0%}** of available capital = **${deploy_amount:,.0f}**")
 
         # -------------------------
         # RECOVERY ACTIONS
@@ -114,22 +159,16 @@ def render_action_panel(
                         sell_str = " | ".join([f"Sell {t}: \${amt:,.0f}" for t, amt in sell_orders.items()])
                         details.append(f"**Recommended Action:** Systematically redeploy your **\${surplus:,.0f}** surplus into core equities over the next 4-8 weeks.")
                         details.append(f"**Funding Order:** {sell_str}")
-                        
-                        # Generate Buy targets using Level 1 core weights as default
-                        buy_targets = config.get("buy_targets", {}).get("Level 1", {})
-                        if buy_targets:
-                            buy_str = " | ".join([f"Buy {t}: \${(surplus * weight):,.0f}" for t, weight in buy_targets.items()])
-                            details.append(f"**Deployment Targets:** {buy_str}")
                     else:
                         details.append(f"✅ Discretionary cash is perfectly optimized at {(discretionary_cash/total_value):.1%} (${discretionary_cash:,.0f}).")
                 elif regime == "DEFENSIVE":
                     action_text = "🛡️ Capital Protection Phase"
                     details.append("Bearish metrics detected. Avoid massive new equity purchases.")
-                    details.append(f"Hold Cash and wait for deep discounts or Trend recovery. (Score: {phase_data.get('score', 0)}/10)")
+                    details.append("Hold Cash and wait for deep discounts or Trend recovery.")
                 else:
                     action_text = "🟡 Transition Phase"
                     details.append("Market signals are currently mixed.")
-                    details.append(f"Maintain current positions. Proceed with caution on new capital. (Score: {phase_data.get('score', 0)}/10)")
+                    details.append("Maintain current positions. Proceed with caution on new capital.")
 
         # -------------------------
         # DISPLAY
@@ -145,10 +184,12 @@ def render_action_panel(
         with st.expander("🔍 Debug Info"):
             st.write(f"Total Portfolio Value: ${total_value:,.2f}")
             st.write(f"Drawdown: {drawdown:.2%}")
-            st.write(f"Signal: {signal}")
+            st.write(f"Crash Drawdown: {drawdown:.2%}")
             st.write("---")
             st.write(f"**Funding Priority Accounts:** {', '.join(funding_priority)}")
             cash_breakdown = " + ".join([f"{t}: \${portfolio.get(t,0):,.0f}" for t in funding_priority if portfolio.get(t,0) > 0])
             st.write(f"**Discretionary Cash Amount:** \${discretionary_cash:,.2f} &nbsp;&nbsp; *( Breakdown: {cash_breakdown} )*")
             st.write(f"**Target 15% Cash Limit:** \${target_cash_limit:,.2f} &nbsp;&nbsp; *( 15% × Total Portfolio Value of \${total_value:,.0f} )*")
             st.write(f"**Calculated Cash Surplus:** \${surplus:,.2f} &nbsp;&nbsp; *( \${discretionary_cash:,.2f} - \${target_cash_limit:,.2f} )*")
+
+        return crash_decision

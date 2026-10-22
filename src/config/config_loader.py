@@ -118,6 +118,8 @@ class ConfigLoader:
                     institution=account_data["institution"],
                     bucket_mapping=data.get("bucket_mapping", {}),
                     bucket_weights=data.get("bucket_weights", {}),
+                    security_targets=data.get("security_targets", {}),
+                    tolerance=data["tolerance"],
                     position_limits=PositionLimits(
                         max_position_pct=data.get(
                             "position_limits", {}

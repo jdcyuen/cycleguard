@@ -27,6 +27,11 @@ bucket_weights:
   high_beta: 0.03
   foreign_equity: 0.03
   alternatives: 0.02
+
+tolerance: 0.05
+
+security_targets:
+    FTEC: 0.07
 """
 
 
@@ -116,6 +121,10 @@ def test_load_file_parses_yaml(config_dir):
             "foreign_equity": 0.03,
             "alternatives": 0.02,
         },
+        tolerance = 0.05,
+        security_targets={
+            "FTEC": 0.07,
+        },
         position_limits=PositionLimits(
             max_position_pct=0.10,
             overrides={},
@@ -126,9 +135,11 @@ def test_load_file_parses_yaml(config_dir):
             enable_recovery_trims=True,
             enable_dynamic_deployment=True,
         ),
+		config_path=str(file.resolve()),
     )
 
 def test_bucket_weights_total_100_percent(config_dir):
+    print(f'config_dir: {config_dir}')
     loader = AccountConfigLoader(config_dir)
     account = loader.get("rollover_ira")
     assert sum(account.bucket_weights.values()) == pytest.approx(1.0)
@@ -150,6 +161,11 @@ account:
 bucket_weights:
   defensive: 0.50
   fixed_income: 0.30
+
+tolerance: 0.05
+
+security_targets:
+    FTEC: 0.07
 """
 )
 
@@ -176,6 +192,11 @@ account:
 
 position_limits:
   max_position_pct: 1.50
+
+tolerance: 0.05
+
+security_targets:
+    FTEC: 0.07
 """
     )
 
@@ -207,6 +228,11 @@ position_limits:
   max_position_pct: 0.10
   overrides:
     FZROX: 1.50
+
+tolerance: 0.05
+
+security_targets:
+    FTEC: 0.07
 """
     )
 
@@ -246,6 +272,11 @@ bucket_weights:
   foreign_equity: 0.03
   alternatives: 0.02
 
+tolerance: 0.05
+
+security_targets:
+    FTEC: 0.07
+
 position_limits:
   max_position_pct: 0.10
   overrides:
@@ -275,3 +306,4 @@ settings:
 
     assert account.settings.rebalance_frequency == "monthly"
     assert account.settings.allow_fractional_shares is True
+    assert account.tolerance == 0.05

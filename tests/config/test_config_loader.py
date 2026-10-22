@@ -1,4 +1,4 @@
-import os
+﻿import os
 from config.config_loader import ConfigLoader
 from models.account_config import AccountConfig
 
@@ -31,7 +31,7 @@ def test_config_has_buckets():
 
     system = config["system"]
 
-    assert "bucket" in system or "bucket.yaml" in system
+    assert "buckets" in system or "buckets.yaml" in system
 
 
 # -----------------------------
@@ -72,8 +72,8 @@ def test_account_bucket_weights():
 
     accounts = config["accounts"]
 
-    assert accounts["rollover_ira"].bucket_weights["core_equity"] == 0.20
-    assert accounts["rollover_ira"].bucket_weights["fixed_income"] == 0.30
+    assert accounts["rollover_ira"].bucket_weights["core_equity"] == 0.12
+    assert accounts["rollover_ira"].bucket_weights["fixed_income"] == 0.22
 
 
 def test_account_position_limits():
@@ -137,9 +137,9 @@ def test_account_config_contains_bucket_weights():
 
     account = config["accounts"]["rollover_ira"]
 
-    assert account.bucket_weights["defensive"] == 0.15
-    assert account.bucket_weights["fixed_income"] == 0.30
-    assert account.bucket_weights["core_equity"] == 0.20
+    assert account.bucket_weights["defensive"] == 0.13
+    assert account.bucket_weights["fixed_income"] == 0.22
+    assert account.bucket_weights["core_equity"] == 0.12
 
 def test_account_config_contains_position_limits():
     loader = ConfigLoader(get_test_config_path())
@@ -185,7 +185,7 @@ def test_config_load_exposes_rollover_ira_configuration():
     account = config["accounts"]["rollover_ira"]
 
     assert account.name == "rollover_ira"
-    assert account.bucket_weights["core_equity"] == 0.20
+    assert account.bucket_weights["core_equity"] == 0.12
     assert account.position_limits.max_position_pct == 0.10
     assert account.position_limits.overrides["FZROX"] == 0.20
     assert account.settings.rebalance_frequency == "monthly"

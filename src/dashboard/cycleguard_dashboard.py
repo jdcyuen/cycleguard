@@ -4,6 +4,8 @@ import sys
 import os
 from pathlib import Path
 
+from engine.regime.regime_engine import RegimeEngine
+
 # =========================
 # SYSTEM PATHS & FIX
 # =========================
@@ -29,6 +31,34 @@ from src.engine.market_phase_detector import MarketPhaseDetector
 from src.data.market_data import get_market_data
 
 from src.config.config_manager import get_config
+
+import logging
+
+from repositories.account_repo import AccountRepository
+from repositories.snapshot_repo import SnapshotRepository
+from repositories.position_repo import PositionRepository
+
+from services.portfolio_aggregation_service import (
+    PortfolioAggregationService,
+)
+from services.deployment_orchestration_service import (
+    DeploymentOrchestrationService,
+)
+from engine.deployment.regime_deployment_engine import (
+    RegimeDeploymentEngine,
+)
+from engine.deployment.crash_deployment_engine import (
+    CrashDeploymentEngine,
+)
+from engine.allocation.allocation_engine import AllocationEngine
+from engine.allocation.current_weight_proportional_strategy import (
+    CurrentWeightProportionalStrategy,
+)
+from database.connection import DBConnection
+from config.account_config_loader import AccountConfigLoader
+
+
+logger = logging.getLogger(__name__)
 
 
 # -------------------------
@@ -74,7 +104,12 @@ def load_rebalance_state():
 
     return combined_state
 
-
+@st.cache_resource
+def get_deployment_db_connection():
+    db_connection = DBConnection()
+    connection = db_connection.connect()
+    return db_connection, connection
+	
 # -------------------------
 # INIT
 # -------------------------
@@ -83,10 +118,73 @@ portfolio = load_portfolio()
 
 crash_manager = CrashManager(config)
 recovery_manager = RecoveryManager(config)
+
 market_phase_detector = MarketPhaseDetector(config)
+regime_config = config["regime"]["regime_system"]
+regime_engine = RegimeEngine(regime_config)
 
 latest_market = get_market_data()
-phase_data = market_phase_detector.run()
+market_regime_data = market_phase_detector.get_regime_data()
+regime_result = regime_engine.evaluate(market_regime_data)
+
+# -------------------------
+# DEPLOYMENT ORCHESTRATION
+# -------------------------
+db_connection, db_conn = get_deployment_db_connection()
+
+account = AccountConfigLoader().get("rollover_ira")
+if account is None:
+    st.error(
+        "Deployment recommendations unavailable: "
+        "account configuration 'rollover_ira' could not be loaded."
+    )
+    st.stop()
+
+account_repository = AccountRepository(db_conn)
+snapshot_repository = SnapshotRepository(db_conn)
+position_repository = PositionRepository(db_conn)
+
+portfolio_service = PortfolioAggregationService(
+    position_repository,
+    account,
+)
+
+deployment_config = regime_config.get("deployment", {})
+
+deployment_policy = {
+    regime: value
+    for regime, value in deployment_config.items()
+    if regime in {"RISK_ON", "TRANSITION", "DEFENSIVE", "CRISIS"}
+}
+
+regime_deployment_engine = RegimeDeploymentEngine(
+    deployment_policy=deployment_policy,
+)
+
+crash_deployment_engine = CrashDeploymentEngine(
+    config.get("crash_deployment", {}),
+)
+
+allocation_engine = AllocationEngine(
+    CurrentWeightProportionalStrategy()
+)
+
+deployment_orchestration_service = DeploymentOrchestrationService(
+    portfolio_service=portfolio_service,
+    regime_engine=regime_engine,
+    crash_manager=crash_manager,
+    regime_deployment_engine=regime_deployment_engine,
+    crash_deployment_engine=crash_deployment_engine,
+    account=account,
+    allocation_engine=allocation_engine,
+    account_repository=account_repository,
+    snapshot_repository=snapshot_repository,
+)
+
+phase_data = {
+    **regime_result["signals"],
+    "regime": regime_result["regime"],
+}
 
 # -------------------------
 # SIMULATION TOGGLE
@@ -95,7 +193,13 @@ st.sidebar.title("🛠️ Developer Tools")
 simulate_crash = st.sidebar.checkbox("🚨 Simulate Market Crash")
 if simulate_crash:
     phase_data = {
-        "trend": {"status": "Bearish", "value": 410.0, "dma200": 480.0, "dma50": 460.0},
+        "trend": {
+            "status": "bearish",
+            "proxy": "SPY",
+            "value": 410.0,
+            "dma50": 460.0,
+            "dma200": 480.0,
+        },
         "breadth": {
             "status": "Weak",
             "value": 0.0,
@@ -115,25 +219,23 @@ if simulate_crash:
             ],
             "valid_total": 11,
         },
-        "volatility": {"status": "Risk-off", "value": 45.2},
+        "volatility": {
+            "status": "risk-off",
+            "value": 45.2,
+        },
         "leadership": {
             "status": "Weak",
-            "value": 0,
-            "qqq": 375.0,
-            "qqq_50": 402.0,
-            "smh": 180.0,
-            "smh_50": 195.0,
+            "above_50": 0,
+            "total": 2,
         },
         "credit": {
             "status": "Stressed",
-            "value": 0.05,
-            "jnk": 90.0,
-            "shy": 85.0,
-            "ratio_current": 1.058,
-            "ratio_50": 1.074,
+        },
+        "cape": {
+            "status": "expensive",
+            "value": 35.0,
         },
         "regime": "DEFENSIVE",
-        "score": 0,
     }
 
     # Also fake the crash manager signal
@@ -171,7 +273,7 @@ with st.container(border=True):
     icon = phase_colors.get(phase, "⚪")
 
     st.subheader(
-        f"{icon} Market Phase: {phase} (Score: {phase_data.get('score', 0)}/10)"
+        f"{icon} Market Regime: {phase}"
     )
 
     phase_descriptions = {
@@ -181,7 +283,7 @@ with st.container(border=True):
     }
     st.info(phase_descriptions.get(phase, "Evaluating market conditions..."))
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
         trend = phase_data.get("trend", {})
         st.metric("📈 Trend (SPY)", trend.get("status", "Unknown"))
@@ -197,6 +299,9 @@ with st.container(border=True):
     with col5:
         credit = phase_data.get("credit", {})
         st.metric("💳 Credit Stress", credit.get("status", "Unknown"))
+    with col6:
+        cape = phase_data.get("cape", {})
+        st.metric("💰 Valuation (CAPE)", cape.get("status", "Unknown"))
 
     with st.expander("🔍 Signal Logic & Raw Data"):
         breadth = phase_data.get("breadth", {})
@@ -205,40 +310,41 @@ with st.container(border=True):
         b_fail = breadth.get("failing", [])
 
         if b_pass == b_tot:
-            fail_str = " (All are healthy)"
+            fail_str = " (All are above their 50DMA)"
         elif b_pass == 0:
-            fail_str = " (All are crashing)"
+            fail_str = " (None are above their 50DMA)"
         else:
-            fail_str = f", {', '.join(b_fail)} are not"
+            fail_str = f" ({', '.join(b_fail)} are below their 50DMA)"
 
         breadth_live = (
-            f"{b_pass}/{b_tot} Select Sector SPDR ETFs are above their 50DMA{fail_str}"
+            f"{b_pass}/{b_tot} sectors are above their 50DMA{fail_str}"
         )
         leader = phase_data.get("leadership", {})
         credit = phase_data.get("credit", {})
 
         st.markdown(
             f"""
-        ### 10-Point Grading System Breakdowns
-        **1. 📈 Trend (SPY):** {"🟩 SPY > 50DMA and 200DMA (+2 pts)" if trend.get("status") == "Bullish" else ("🟨 SPY > 200DMA but < 50DMA (+1 pt)" if trend.get("status") == "Neutral" else "🟥 SPY < 200DMA (0 pts)")}.<br>
+        ### Regime Signal Details
+       **1. 📈 Trend ({trend.get("evidence", {}).get("comparison", {}).get("proxy", "SPY")}):** {trend.get("evidence", {}).get("why", "No explanation available.")}.<br>
         Live Reading: SPY=\${trend.get("value", 0):.2f} | 50DMA=\${trend.get("dma50", 0):.2f} | 200DMA=\${trend.get("dma200", 0):.2f}
         
-        **2. 📊 Breadth (Sectors):** {"🟩 > 60% of Sectors > 50DMA (+2 pts)" if breadth.get("status") == "Strong" else ("🟨 40-60% of Sectors > 50DMA (+1 pt)" if breadth.get("status") == "Improving" else "🟥 < 40% of Sectors > 50DMA (0 pts)")}.<br>
+        **2. 📊 Breadth (Sectors):** {breadth.get("evidence", {}).get("why", "No explanation available.")}<br>
         Live Reading: {breadth_live}
         
-        **3. 🌪 Volatility (VIX):** {"🟩 VIX < 18 (+2 pts)" if vol.get("status") == "Calm" else ("🟨 VIX 18-25 (+1 pt)" if vol.get("status") == "Neutral" else "🟥 VIX > 25 (0 pts)")}.<br>
+        **3. 🌪 Volatility (VIX):** {vol.get("evidence", {}).get("why", "No explanation available.")}<br>
         Live Reading: {vol.get("value", 0):.2f}
         
-        **4. 🚀 Leadership (SMH & QQQ):** {"🟩 Both SMH & QQQ > 50DMA (+2 pts)" if leader.get("status") == "Strong" else ("🟨 One > 50DMA (+1 pt)" if leader.get("status") == "Mixed" else "🟥 Both < 50DMA (0 pts)")}.<br>
-        Live Reading: QQQ=\${leader.get("qqq", 0):.2f} (50DMA=\${leader.get("qqq_50", 0):.2f}) | SMH=\${leader.get("smh", 0):.2f} (50DMA=\${leader.get("smh_50", 0):.2f})
+        **4. 🚀 Leadership (SMH & QQQ):** {leader.get("evidence", {}).get("why", "No explanation available.")}<br>
+        Live Reading: {leader.get("above_50", 0)} of {leader.get("total", 0)} leadership proxies are above their 50DMA
         
-        **5. 💳 Credit Stress (JNK/SHY):** {"🟩 Ratio > 50DMA (+2 pts)" if credit.get("status") == "Healthy" else "🟥 Ratio < 50DMA (0 pts)"}.<br>
-        Live Reading: JNK=\${credit.get("jnk", 0):.2f} | SHY=\${credit.get("shy", 0):.2f} | Current Ratio={credit.get("ratio_current", 0):.3f} (50DMA={credit.get("ratio_50", 0):.3f})
+        **5. 💳 Credit Stress (JNK/SHY):** {credit.get("evidence", {}).get("why", "No explanation available.")}<br>
+        Live Reading: Current Ratio={credit.get("ratio_current", 0):.3f} (50DMA={credit.get("ratio_50", 0):.3f})
 
+        **6. 💰 Valuation (CAPE):** {phase_data.get("cape", {}).get("evidence", {}).get("why", "No explanation available.")}<br>
+        Live Reading: CAPE={cape.get("value", 0):.2f}
         
         ---
-        **Total Current Score:** {phase_data.get("score", 0)} / 10
-        *(RISK_ON: >= 7 | TRANSITION: 4-6 | DEFENSIVE: <= 3)*
+        *(Market regime is determined by the configured RegimeEngine conditions.)*
         """,
             unsafe_allow_html=True,
         )
@@ -274,8 +380,21 @@ with st.container(border=True):
 # =========================
 with st.container(border=True):
     st.subheader("⚠️ Crash / Recovery Signals")
-    signal = crash_manager.get_signal(latest_market["drawdown"])
-    st.write(f"Current Signal: **{signal if signal else 'None'}**")
+    crash_data = crash_manager.run()
+    drawdown = crash_data.get("drawdown", 0)
+    st.write(f"Current Drawdown: **{drawdown:.2%}**")
+
+    # Drawdown = (Current Price - Cycle Peak) / Cycle Peak
+    if drawdown <= -0.40:       # 40% from peak
+        signal = "Level 4"
+    elif drawdown <= -0.30:     # 30% from peak
+        signal = "Level 3"
+    elif drawdown <= -0.20:     # 20% from peak
+        signal = "Level 2"
+    elif drawdown <= -0.10:     # 10% from peak
+        signal = "Level 1"
+    else:
+        signal = None
 
     if signal:
         descriptions = {
@@ -286,11 +405,10 @@ with st.container(border=True):
         }
         st.info(descriptions.get(signal, "Deploying cash into the market discount."))
 
-
 # =========================
 # ACTION PANEL
 # =========================
-render_action_panel(
+crash_decision = render_action_panel(
     portfolio,
     latest_market,
     crash_manager,
@@ -298,6 +416,8 @@ render_action_panel(
     config,
     load_rebalance_state,
     phase_data,
+    deployment_orchestration_service,
+    market_regime_data,
 )
 
 

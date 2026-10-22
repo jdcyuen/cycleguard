@@ -84,23 +84,21 @@ bucket_mapping:
 bucket_weights:
 
   defensive: 0.05
-
   fixed_income: 0.00
-
   tips_ladder: 0.00
-
   core_equity: 0.35
-
   equity_income: 0.00
-
   equity_growth: 0.25
-
   high_beta: 0.35
-
   foreign_equity: 0.00
-
   alternatives: 0.00
 
+tolerance: 0.05
+
+security_targets:
+  FTEC: 0.05
+  SOXX: 0.04 
+  SPMO: 0.03
 
 # =========================
 # POSITION LIMITS

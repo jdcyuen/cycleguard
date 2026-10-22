@@ -102,6 +102,9 @@ bucket_mapping:
 # Conservative Account Allocation Model
 # =========================
 #
+# Risk Profile		RISK_ON		TRANSITION	DEFENSIVE	  CRISIS
+# Conservative		43/55/2		40/58/2		  35/62/3		  30/65/5
+#
 # Defines the desired percentage of the total account value that
 # should be allocated to each investment bucket.
 #
@@ -125,23 +128,29 @@ bucket_mapping:
 
 bucket_weights:
 
-  defensive: 0.15
-
-  fixed_income: 0.30
-
+  defensive: 0.13
+  fixed_income: 0.22
   tips_ladder: 0.10
-
-  core_equity: 0.20
-
-  equity_income: 0.10
-
-  equity_growth: 0.07
-
+  core_equity: 0.12
+  equity_income: 0.15
+  equity_growth: 0.12
   high_beta: 0.03
+  foreign_equity: 0.08
+  alternatives: 0.05
 
-  foreign_equity: 0.03
+# tolerance:
+#   The acceptable drift percentage for any security before an action
+#   is recommended.
+# Meaning: 0.05 = ±5 percentage points around each target.
+# For example, a 7% FTEC target has a 2%–12% tolerance range
+tolerance: 0.05
 
-  alternatives: 0.02
+# Tells CycleGuard the desired portfolio-level allocation for specific securities.
+# CycleGuard's desired allocation for FTEC is 5% of the entire rollover IRA portfolio.
+security_targets:
+  FTEC: 0.05
+  SOXX: 0.04 
+  SPMO: 0.03
 
 
 # =========================
@@ -170,17 +179,12 @@ bucket_weights:
 position_limits:
 
   max_position_pct: 0.10
-
   overrides:
 
     FZROX: 0.20
-
     SMH: 0.15
-
     SCHD: 0.15
-
     SGOV: 0.25
-
     FXNAX: 0.25
 
 
@@ -201,9 +205,6 @@ position_limits:
 settings:
 
   rebalance_frequency: "monthly"
-
   allow_fractional_shares: true
-
   enable_recovery_trims: true
-
   enable_dynamic_deployment: true

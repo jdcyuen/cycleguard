@@ -129,6 +129,14 @@ class AccountConfigLoader:
             "bucket_weights",
             {},
         )
+
+        tolerance = config["tolerance"]
+        
+        security_targets = config.get(
+            "security_targets",
+            {},
+        )
+
         if bucket_weights and not math.isclose(
             sum(bucket_weights.values()),
             1.0,
@@ -205,6 +213,9 @@ class AccountConfigLoader:
             institution=account["institution"],
             bucket_mapping=bucket_mapping,
             bucket_weights=bucket_weights,
+            tolerance=tolerance,
+            security_targets=security_targets,
             position_limits=position_limits,
             settings=settings,
+            config_path=str(file.resolve()),
         )
