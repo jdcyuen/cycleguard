@@ -1,7 +1,8 @@
 import unittest
 import pandas as pd
 from unittest.mock import MagicMock
-from engine.crash_manager import CrashManager, IMarketDataProvider
+from engine.crash_manager import CrashManager
+from data.providers.idata_provider import IDataProvider
 
 
 class TestCrashManager(unittest.TestCase):
@@ -26,7 +27,7 @@ class TestCrashManager(unittest.TestCase):
         }
 
         # Inject a mock data provider to comply with DIP
-        self.mock_provider = MagicMock(spec=IMarketDataProvider)
+        self.mock_provider = MagicMock(spec=IDataProvider)
         self.cm = CrashManager(self.mock_config, data_provider=self.mock_provider)
 
     def test_detect_cycle_peak(self):

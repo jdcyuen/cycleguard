@@ -553,4 +553,51 @@ def test_delete_by_import_history_id():
 
     assert not conn.commit.called
     assert not conn.rollback.called
+	
+
+def test_get_latest_by_account(repository, mock_conn):
+    """Retrieve the newest import for one account and type."""
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = (
+        mock_cursor
+    )
+
+    mock_cursor.fetchone.return_value = (
+        42,
+        2,
+        "positions",
+        "Fidelity",
+        "positions.csv",
+        "hash42",
+        date(2026, 10, 20),
+        datetime(2026, 10, 20, 9, 0, 0),
+        10,
+        10,
+        0,
+        "RUNNING",
+        None,
+        None,
+    )
+
+    result = repository.get_latest_by_account(
+        account_id=2,
+        import_type="positions",
+    )
+
+    assert isinstance(result, ImportHistory)
+    assert result.id == 42
+    assert result.account_id == 2
+    assert result.import_type == "positions"
+
+    # A RUNNING record must still be returned, not skipped.
+    assert result.status == "RUNNING"
+
+    mock_cursor.execute.assert_called_once()
+    sql, params = mock_cursor.execute.call_args.args
+
+    assert "WHERE account_id = %s" in sql
+    assert "AND import_type = %s" in sql
+    assert "ORDER BY import_timestamp DESC, id DESC" in sql
+    assert params == (2, "positions")
+
 

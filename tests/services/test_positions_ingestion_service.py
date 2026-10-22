@@ -501,6 +501,100 @@ def test_positions_import_failure_during_persist_raises_error(
 
     service._position_repo.insert.assert_called_once()
 
+
+@patch(
+    "services.base_ingestion_service.calculate_file_hash",
+    return_value="test-file-hash",
+)
+def test_positions_ingestion_persists_when_bucket_mapping_warning_exists(
+    mock_file_hash,
+    service,
+):
+    from models.import_audit import ImportAuditStatus
+
+    account = SimpleNamespace(
+        id=123,
+        name="Joint WROS TOD",
+        institution="Fidelity",
+        account_number="123456",
+    )
+
+    warning = (
+        "Unmapped symbols for account 'Joint WROS TOD': UNKNOWN. "
+        "Assign each symbol to a valid bucket in "
+        "src/config/accounts/joint_wros_tod.yaml. "
+        "Valid buckets are defined in "
+        "src/config/system/buckets.yaml."
+    )
+
+    service._bucket_mapping_validator = MagicMock()
+    service._bucket_mapping_validator.validate.return_value = [warning]
+
+    service._account_repo.get_by_name.return_value = account
+    service._import_history_repo.exists.return_value = False
+
+    service._import_history_repo.insert.return_value = SimpleNamespace(
+        id=123,
+        account_id=123,
+        import_type="positions",
+        status="RUNNING",
+    )
+
+    service._import_history_repo.update.side_effect = lambda history: history
+
+    service._loader.load.return_value = pd.DataFrame(
+        [
+            {
+                "symbol": "UNKNOWN",
+                "description": "Unmapped test security",
+                "quantity": 10,
+                "average_cost_basis": 100,
+                "cost_basis_total": 1000,
+                "current_value": 1100,
+                "percent_of_account": 10,
+                "todays_gain_loss_dollar": 10,
+                "todays_gain_loss_percent": 1,
+                "total_gain_loss_dollar": 100,
+                "total_gain_loss_percent": 10,
+            }
+        ]
+    )
+
+    service._snapshot_repo.get_by_account_and_date.return_value = None
+    service._snapshot_repo.create.return_value = Snapshot(
+        id=456,
+        account_id=123,
+        snapshot_date="2026-01-01",
+        import_history_id=123,
+    )
+
+    service._security_resolution_service.resolve.return_value = Security(
+        id=99,
+        symbol="UNKNOWN",
+        description="Unmapped test security",
+    )
+
+    service._import_audit_service.audit.return_value = SimpleNamespace(
+        status=ImportAuditStatus.PASS,
+        message="Audit passed",
+    )
+
+    result = service.ingest(
+        csv_file="positions.csv",
+        name="Joint WROS TOD",
+        snapshot_date="2026-01-01",
+    )
+
+    assert result.status == "SUCCESS"
+    assert len(result.warnings) == 1
+    assert "UNKNOWN" in result.warnings[0]
+    assert "src/config/accounts/joint_wros_tod.yaml" in result.warnings[0]
+    assert "src/config/system/buckets.yaml" in result.warnings[0]
+
+    service._bucket_mapping_validator.validate.assert_called_once()
+    service._position_repo.insert.assert_called_once()
+    service._import_audit_service.audit.assert_called_once_with(123)
+
 @patch(
     "services.base_ingestion_service.calculate_file_hash",
     return_value="test-file-hash",

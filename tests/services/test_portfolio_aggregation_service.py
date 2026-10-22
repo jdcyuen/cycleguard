@@ -109,9 +109,51 @@ def test_map_positions_to_buckets_raises_for_unmapped_symbol():
 
     with pytest.raises(
         ValueError,
-        match="No bucket mapping found for symbol UNKNOWN",
+        match="Missing bucket mappings for symbol\\(s\\): UNKNOWN",
     ):
         service.map_positions_to_buckets(123)
+		
+def test_bucket_mapping_validation_reports_path_and_all_missing_symbols(
+    caplog,
+):
+    position_repository = MagicMock()
+    account = MagicMock()
+
+    account.bucket_mapping = {}
+    account.config_path = r"E:\CycleGuard\src\config\accounts\test.yaml"
+
+    position_a = MagicMock()
+    position_a.symbol = "UNKNOWN_A"
+
+    position_b = MagicMock()
+    position_b.symbol = "UNKNOWN_B"
+
+    position_repository.get_by_snapshot_with_security.return_value = [
+        position_a,
+        position_b,
+    ]
+
+    service = PortfolioAggregationService(
+        position_repository,
+        account,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Missing bucket mappings",
+    ) as exc_info:
+        service.map_positions_to_buckets(123)
+
+    message = str(exc_info.value)
+
+    assert "UNKNOWN_A" in message
+    assert "UNKNOWN_B" in message
+    assert account.config_path in message
+    assert "src/config/system/buckets.yaml" in message
+
+    assert "UNKNOWN_A" in caplog.text
+    assert "UNKNOWN_B" in caplog.text
+    assert account.config_path in caplog.text
 
 def test_calculate_bucket_values():
     position_repository = MagicMock()
@@ -501,7 +543,7 @@ def test_get_bucket_allocation_raises_for_unmapped_symbol():
 
     with pytest.raises(
         ValueError,
-        match="No bucket mapping found for symbol UNKNOWN",
+        match="Missing bucket mappings for symbol\\(s\\): UNKNOWN",
     ):
         service.get_bucket_allocation(123)
     
@@ -767,7 +809,62 @@ def test_calculate_position_bucket_weights_with_zero_bucket_value():
     assert result["core_equity"][0].symbol == "FZROX"
     assert result["core_equity"][0].weight == Decimal("0")
 
+def test_calculate_position_portfolio_weights():
+    position_repository = MagicMock()
+    account = MagicMock()
 
+    position_fzrox = MagicMock()
+    position_fzrox.symbol = "FZROX"
+    position_fzrox.current_value = Decimal("100000")
+
+    position_schd = MagicMock()
+    position_schd.symbol = "SCHD"
+    position_schd.current_value = Decimal("50000")
+
+    position_repository.get_by_snapshot_with_security.return_value = [
+        position_fzrox,
+        position_schd,
+    ]
+
+    service = PortfolioAggregationService(
+        position_repository,
+        account,
+    )
+
+    result = service.calculate_position_portfolio_weights(123)
+
+    assert result["FZROX"] == (
+        Decimal("100000") / Decimal("150000")
+    )
+    assert result["SCHD"] == (
+        Decimal("50000") / Decimal("150000")
+    )
+	
+def test_calculate_position_portfolio_weights_raises_for_unmapped_symbol():
+    position_repository = MagicMock()
+    account = MagicMock()
+    account.bucket_mapping = {}
+    account.config_path = r"E:\CycleGuard\src\config\accounts\test.yaml"
+
+    position = MagicMock()
+    position.symbol = "UNKNOWN"
+    position.current_value = Decimal("10000")
+
+    position_repository.get_by_snapshot_with_security.return_value = [
+        position,
+    ]
+
+    service = PortfolioAggregationService(
+        position_repository,
+        account,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Missing bucket mappings for symbol\\(s\\): UNKNOWN",
+    ):
+        service.calculate_position_portfolio_weights(123)
+    
 def test_get_portfolio_allocation():
     position_repository = MagicMock()
     account = MagicMock()

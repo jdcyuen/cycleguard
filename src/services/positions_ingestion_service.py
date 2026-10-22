@@ -27,6 +27,7 @@ from services.security_resolution_service import (SecurityResolutionService,)
 
 from repositories.transaction_repo import TransactionRepository
 from services.import_audit_service import ImportAuditService
+from services.position_bucket_mapping_validator import PositionBucketMappingValidator
 
 logger = get_logger(__name__)
 
@@ -54,6 +55,7 @@ class PositionsIngestionService(BaseIngestionService):
         loader,
         validator,
         transaction_manager,
+        bucket_mapping_validator=None,
     ):
 
         super().__init__(
@@ -69,6 +71,14 @@ class PositionsIngestionService(BaseIngestionService):
         self._snapshot_repo = snapshot_repo
         self._position_repo = position_repo
         self._security_resolution_service = security_resolution_service
+        self._bucket_mapping_validator = bucket_mapping_validator
+
+    def preflight_validate(self, dataframe, account) -> list[str]:
+        """Check incoming position symbols against the account YAML mapping."""
+        if self._bucket_mapping_validator is None:
+            return []
+
+        return self._bucket_mapping_validator.validate(dataframe, account)
 
     @property
     def import_type(self) -> str:
@@ -110,6 +120,7 @@ class PositionsIngestionService(BaseIngestionService):
                 validator=PositionsValidator(),
                 security_resolution_service=security_resolution_service,
                 transaction_manager=transaction_manager,
+                bucket_mapping_validator=PositionBucketMappingValidator(),
             )
 
         except Exception as exc:

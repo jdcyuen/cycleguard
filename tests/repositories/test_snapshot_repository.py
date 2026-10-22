@@ -1,18 +1,18 @@
-from unittest.mock import MagicMock
-
+﻿
+import psycopg
 import pytest
+from datetime import date
 
 from repositories.snapshot_repo import (
     SnapshotRepository,
 )
 from models.snapshot import Snapshot
 
-import psycopg
-
 from repositories.snapshot_repo import (
     SnapshotRepositoryError,
 )
-
+from datetime import date
+from unittest.mock import MagicMock
 
 
 @pytest.fixture
@@ -197,6 +197,7 @@ def test_create_returns_snapshot(
 
     assert isinstance(result, Snapshot)
     assert result.id == 456
+    assert result.account_id == 0
     assert result.snapshot_date == "2025-01-31"
     assert result.import_history_id == 123
 
@@ -338,6 +339,37 @@ def test_create_database_error(
     )
 
     mock_conn.rollback.assert_not_called()
+
+
+def test_get_latest_by_account_returns_latest_snapshot(
+    repository,
+    mock_cursor,
+    mock_conn,
+):
+    mock_cursor.fetchone.return_value = (
+        456,
+        12,
+        date(2026, 10, 2),
+        789,
+    )
+
+    result = repository.get_latest_by_account(
+        account_id=12,
+    )
+
+    assert isinstance(result, Snapshot)
+    assert result.id == 456
+    assert result.account_id == 12
+    assert result.snapshot_date == date(2026, 10, 2)
+    assert result.import_history_id == 789
+
+    sql, params = mock_cursor.execute.call_args.args
+    assert "WHERE account_id = %s" in sql
+    assert "ORDER BY snapshot_date DESC, id DESC" in sql
+    assert "LIMIT 1" in sql
+    assert params == (12,)
+
+    mock_conn.commit.assert_not_called()
 
 
 

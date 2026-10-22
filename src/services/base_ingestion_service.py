@@ -59,6 +59,10 @@ class BaseIngestionService(ABC):
         self._import_audit_service = import_audit_service
         self._transaction_manager = transaction_manager
 
+    def preflight_validate(self, dataframe, account) -> list[str]:
+        """Optional validation before dry-run returns or data persistence."""
+        return []
+
     def ingest(
         self,
         csv_file: str,
@@ -114,6 +118,8 @@ class BaseIngestionService(ABC):
         self._validator.validate(dataframe)
         logger.info("Validation successful")
 
+        warnings = self.preflight_validate(dataframe, account)
+
         if dry_run:
             logger.info("Dry run requested.")
 
@@ -131,7 +137,7 @@ class BaseIngestionService(ABC):
                 snapshot_id=None,
                 elapsed_ms=0,
                 status="SUCCESS",
-                warnings=[],
+                warnings=warnings,
             )
 
         history = ImportHistory(
@@ -235,7 +241,7 @@ class BaseIngestionService(ABC):
             snapshot_id=snapshot_id,
             elapsed_ms=0,
             status="SUCCESS",
-            warnings=[],
+            warnings=warnings,
         )
 
     def _get_account(

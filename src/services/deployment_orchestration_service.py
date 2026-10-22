@@ -1,11 +1,19 @@
-from models.deployment import DeploymentDecision
+import logging
+from decimal import Decimal
+from models.deployment_evaluation import DeploymentEvaluation
 
 from engine.deployment.crash_deployment_engine import CrashDeploymentEngine
 from engine.regime.regime_engine import RegimeEngine
 from services.portfolio_aggregation_service import (
     PortfolioAggregationService,
 )
+from engine.allocation.allocation_engine import AllocationEngine
+from repositories.snapshot_repo import SnapshotRepository
+from repositories.account_repo import AccountRepository
 
+from datetime import date
+
+logger = logging.getLogger(__name__)
 
 class DeploymentOrchestrationService:
     """
@@ -20,12 +28,20 @@ class DeploymentOrchestrationService:
         crash_manager,
         regime_deployment_engine,
         crash_deployment_engine,
+        account,
+        allocation_engine: AllocationEngine,
+        account_repository: AccountRepository | None = None,
+        snapshot_repository: SnapshotRepository | None = None,
     ):
         self.portfolio_service = portfolio_service
         self.regime_engine = regime_engine
         self.crash_manager = crash_manager
         self.regime_deployment_engine = regime_deployment_engine
         self.crash_deployment_engine = crash_deployment_engine
+        self.account = account
+        self.allocation_engine = allocation_engine
+        self.account_repository = account_repository
+        self.snapshot_repository = snapshot_repository
 
     # DeploymentOrchestrationService.evaluate() gathers available capital, obtains 
     # both the normal regime-based and crash-based deployment decisions, then applies 
@@ -33,14 +49,49 @@ class DeploymentOrchestrationService:
     # if there is no crash deployment, the regime decision wins.
     def evaluate(
         self,
-        snapshot_id: int,
+        snapshot_id: int | None,
         market_data: dict,
-    ) -> DeploymentDecision:
+    ) -> DeploymentEvaluation:
+        
+        """
+        Coordinates the deployment evaluation lifecycle.
 
-         # 1. Validate inputs
-        if not isinstance(snapshot_id, int) or snapshot_id <= 0:
+        Steps:
+        1. Validate inputs and verify that the account's latest portfolio
+        snapshot is dated today.
+        2. Determine available deployment capital from positive defensive-bucket
+        drift.
+        3. Evaluate the regime-based deployment recommendation.
+        4. Evaluate the crash-based deployment recommendation.
+        5. Give crash deployment priority when its action is DEPLOY.
+        6. Otherwise, return the regime-based recommendation if dynamic
+        deployment is enabled; return HOLD if it is disabled.
+
+        Args:
+            snapshot_id: Optional snapshot ID. If None, the service resolves
+                the account's latest snapshot. Any supplied ID is replaced
+                by the verified latest snapshot ID. The latest snapshot must
+                be dated today.
+            market_data: Dictionary of market data used for regime evaluation.
+
+        Returns:
+            The final DeploymentEvaluation. A crash deployment takes priority
+            over the regime-based recommendation.
+
+        Raises:
+            ValueError: If the inputs are invalid, required repositories or
+                account data are missing, or today's snapshot cannot be verified.
+        """
+
+
+        # 1. Validate inputs
+        if snapshot_id is not None and (
+            not isinstance(snapshot_id, int)
+            or isinstance(snapshot_id, bool)
+            or snapshot_id <= 0
+        ):
             raise ValueError(
-                "Snapshot ID must be a positive integer"
+                "Snapshot ID must be a positive integer or None"
             )
 
         if not isinstance(market_data, dict):
@@ -48,11 +99,96 @@ class DeploymentOrchestrationService:
                 "Market data must be a dictionary"
             )
 
-        # 2. Get available capital
-        available_capital = (
-            self.portfolio_service.get_available_capital(
-                snapshot_id
+
+        try:
+            if self.account_repository is None or self.snapshot_repository is None:
+                logger.error(
+                    "Deployment repositories are not configured for account '%s'",
+                    self.account.name,
+                )
+                raise ValueError(
+                    "Deployment repositories are not configured."
+                )
+
+            account_record = self.account_repository.get_by_name(
+                self.account.name
             )
+
+            if account_record is None or account_record.id is None:
+                logger.error(
+                    "No database account found for account '%s'",
+                    self.account.name,
+                )
+                raise ValueError(
+                    "No database account found. "
+                    "Please download and import the latest portfolio CSV."
+                )
+
+            latest_snapshot = self.snapshot_repository.get_latest_by_account(
+                account_record.id
+            )
+
+            if latest_snapshot is None:
+                logger.warning(
+                    "No portfolio snapshot found for account '%s' (account_id=%s)",
+                    self.account.name,
+                    account_record.id,
+                )
+                raise ValueError(
+                    "No portfolio snapshot found. "
+                    "Please download and import the latest portfolio CSV."
+                )
+
+            if latest_snapshot.snapshot_date != date.today():
+                logger.warning(
+                    "Stale portfolio snapshot for account '%s': "
+                    "snapshot_date=%s, today=%s",
+                    self.account.name,
+                    latest_snapshot.snapshot_date,
+                    date.today(),
+                )
+                raise ValueError(
+                    "The latest portfolio snapshot is not from today. "
+                    "Please download and import the latest portfolio CSV."
+                )
+
+            snapshot_id = latest_snapshot.id
+
+            logger.info(
+                "Using latest portfolio snapshot for account '%s': "
+                "snapshot_id=%s, snapshot_date=%s",
+                self.account.name,
+                snapshot_id,
+                latest_snapshot.snapshot_date,
+            )
+
+        except ValueError:
+            raise
+
+        except Exception:
+            logger.exception(
+                "Failed to validate portfolio snapshot freshness "
+                "for account '%s'",
+                self.account.name,
+            )
+            raise ValueError(
+                "Unable to verify the latest portfolio snapshot. "
+                "Please try again or download and import the latest portfolio CSV."
+            )
+
+        
+
+        # 2. Get deployable capital from defensive bucket surplus
+        bucket_allocations = self.portfolio_service.get_bucket_allocation(snapshot_id)    
+        defensive_allocation = bucket_allocations.get("defensive")
+
+        available_capital = (
+            max(
+                defensive_allocation.drift_value,
+                Decimal("0"),
+            )
+            if defensive_allocation
+            else Decimal("0")
         )
 
         # 3. Determine the current market regime
@@ -82,6 +218,118 @@ class DeploymentOrchestrationService:
         if crash_decision.action == "DEPLOY":
             return crash_decision
 
-        # 8. Otherwise use the regime decision
+
+        # 8. Check if dynamic deployment is enabled
+        # Dynamic deployment in CycleGuard means: 
+        # CycleGuard can automatically determine when market conditions are favorable enough to recommend 
+        # moving available cash/defensive assets into investments, rather than waiting for a fixed 
+        # calendar-based rebalance.
+        # Crash deployment always gets priority.
+        #     ● enable_dynamic_deployment = False suppresses normal regime deployment.
+        #     ● enable_dynamic_deployment = True allows the existing regime deployment logic.
+        if not self.account.settings.enable_dynamic_deployment:
+            return DeploymentEvaluation(
+                action="HOLD",
+                deployment_pct=Decimal("0"),
+                deployment_amount=Decimal("0"),
+				source="regime",
+            )
+
+        # 9. Otherwise use the regime decision
         return regime_decision
-        # TODO: This logic will need to be updated when the crash deployment engine is implemented
+
+    def allocate_deployment(
+        self,
+        snapshot_id: int,
+        deployment_amount: Decimal,
+    ) -> dict[str, Decimal]:
+        """
+        Allocate an approved deployment amount across eligible securities.
+        """
+
+        try:
+            if not isinstance(snapshot_id, int) or snapshot_id <= 0:
+                raise ValueError(
+                    "Snapshot ID must be a positive integer"
+                )
+
+            if not isinstance(deployment_amount, Decimal):
+                raise TypeError(
+                    "Deployment amount must be a Decimal"
+                )
+
+            if not deployment_amount.is_finite():
+                raise ValueError(
+                    "Deployment amount must be finite"
+                )
+
+            if deployment_amount < Decimal("0"):
+                raise ValueError(
+                    "Deployment amount cannot be negative"
+                )
+
+            if deployment_amount == Decimal("0"):
+                return {}
+
+            actual_targets = (
+                self.portfolio_service
+                .calculate_position_portfolio_weights(
+                    snapshot_id
+                )
+            )
+
+            portfolio_value = (
+                self.portfolio_service.get_portfolio_value(
+                    snapshot_id
+                )
+            )
+
+            desired_targets = {
+                symbol: Decimal(str(target))
+                for symbol, target
+                in self.account.security_targets.items()
+            }
+
+            eligible_securities = [
+                symbol
+                for symbol in desired_targets
+                if self.account.bucket_mapping.get(symbol)
+                != "defensive"
+            ]
+
+            logger.info(
+                "Allocating approved deployment: "
+                "snapshot_id=%s, deployment_amount=%s, "
+                "eligible_security_count=%s",
+                snapshot_id,
+                deployment_amount,
+                len(eligible_securities),
+            )
+
+            allocations = self.allocation_engine.allocate_deployment(
+                deployment_amount=deployment_amount,
+                actual_targets=actual_targets,
+                desired_targets=desired_targets,
+                portfolio_value=portfolio_value,
+                eligible_securities=eligible_securities,
+            )
+
+            logger.info(
+                "Approved deployment allocated: "
+                "snapshot_id=%s, approved_amount=%s, "
+                "actual_allocated_amount=%s",
+                snapshot_id,
+                deployment_amount,
+                sum(allocations.values(), Decimal("0")),
+            )
+
+            return allocations
+
+        except Exception:
+            logger.exception(
+                "Failed to allocate approved deployment: "
+                "snapshot_id=%s, deployment_amount=%s",
+                snapshot_id,
+                deployment_amount,
+            )
+            raise

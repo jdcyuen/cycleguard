@@ -241,6 +241,68 @@ class SnapshotRepository:
                 f"account_id={account_id} "
                 f"on {snapshot_date}"
             ) from exc
+
+    def get_latest_by_account(
+        self,
+        account_id: int,
+    ) -> Optional[Snapshot]:
+        """
+        Returns the most recent snapshot for an account
+        based on snapshot_date, or None if no snapshot exists.
+        """
+
+        sql = """
+            SELECT
+                id,
+				account_id,
+                snapshot_date,
+                import_history_id
+            FROM cycleguard.snapshots
+            WHERE account_id = %s
+            ORDER BY snapshot_date DESC, id DESC
+            LIMIT 1
+        """
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (account_id,),
+                )
+
+                row = cur.fetchone()
+
+            if row is None:
+                logger.debug(
+                    "No snapshots found for account_id=%s",
+                    account_id,
+                )
+                return None
+
+            logger.debug(
+                "Found latest snapshot id=%s for account_id=%s on %s",
+                row[0],
+                account_id,
+                row[1],
+            )
+
+            return Snapshot(
+                id=row[0],
+				account_id=row[1],
+                snapshot_date=row[2],
+                import_history_id=row[3],
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "Failed retrieving latest snapshot for account_id=%s",
+                account_id,
+            )
+
+            raise SnapshotRepositoryError(
+                f"Unable to retrieve latest snapshot "
+                f"for account_id={account_id}"
+            ) from exc
     
     def delete_by_import_history_id(
         self,

@@ -1,40 +1,9 @@
 # crash_manager.py
 
-import yfinance as yf
 import pandas as pd
-from abc import ABC, abstractmethod
-
-# from config.config_loader import ConfigLoader
 from config.config_manager import get_config
-
-
-# -------------------------
-# INTERFACE (DIP)
-# -------------------------
-class IMarketDataProvider(ABC):
-    """Abstract interface for market data sources."""
-
-    @abstractmethod
-    def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
-        pass
-
-
-# -------------------------
-# IMPLEMENTATION (SRP)
-# -------------------------
-class YFinanceDataProvider(IMarketDataProvider):
-    """Responsible ONLY for fetching data from yfinance."""
-
-    def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
-        df = yf.download(ticker, start=start_date, progress=False, auto_adjust=False)
-
-        if df.empty:
-            return pd.DataFrame(columns=["close"])
-
-        df = df[["Close"]].dropna()
-        df.columns = ["close"]
-        return df
-
+from data.providers.idata_provider import IDataProvider
+from data.providers.yfinance_data_provider import YFinanceDataProvider
 
 
 # CrashManager is the crash detection/calculation component.
@@ -46,11 +15,10 @@ class YFinanceDataProvider(IMarketDataProvider):
 class CrashManager:
     """Responsible ONLY for calculating drawdown and crash signals."""
 
-    def __init__(self, config=None, data_provider: IMarketDataProvider = None):
+    def __init__(self, config=None, data_provider: IDataProvider = None):
         self.config = config if config else get_config()
         self.ticker = self.config["system"]["market"]["benchmark_ticker"]
         self.recovery_threshold = self.config["system"]["market"]["recovery_threshold"]
-
 
         # Dependency Injection (DIP)
         self.data_provider = data_provider if data_provider else YFinanceDataProvider()
@@ -79,29 +47,7 @@ class CrashManager:
             df["drawdown"] = (df["close"] - df["cycle_peak"]) / df["cycle_peak"]
         return df
 
-
-    # def get_signal(self, drawdown: float) -> str:
-    #     # Sort levels by severity (largest drop first)
-    #     # sorted_levels = sorted(self.levels.items(), key=lambda x: x[1], reverse=True)
-    #     sorted_levels = sorted(
-    #         self.levels.items(), key=lambda x: x[1]["drawdown"], reverse=False
-    #     )
-
-    #     for level_name, deploy_pct in sorted_levels:
-    #         if level_name == "Level 4" and drawdown <= -0.40:
-    #             return "Level 4"
-    #         elif level_name == "Level 3" and drawdown <= -0.30:
-    #             return "Level 3"
-    #         elif level_name == "Level 2" and drawdown <= -0.20:
-    #             return "Level 2"
-    #         elif level_name == "Level 1" and drawdown <= -0.10:
-    #             return "Level 1"
-
-    #     return None
-
-
-    def run(self):
-    
+    def run(self):  
         """Run crash detection and return the current market drawdown."""
         df = self.data_provider.fetch_data(
             self.ticker, self.config["system"]["market"]["start_date"]

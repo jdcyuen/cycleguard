@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from uuid import uuid4
 
 from datetime import date
@@ -99,6 +99,7 @@ def test_positions_ingestion_end_to_end():
         # -----------------------------------------------------
 
         service = PositionsIngestionService.build()
+        service._bucket_mapping_validator = None
 
         # -----------------------------------------------------
         # Act
@@ -263,3 +264,4 @@ def test_positions_ingestion_end_to_end():
 
             finally:
                 conn.close()
+

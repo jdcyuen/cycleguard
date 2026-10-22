@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from models.account_config import AccountConfig
@@ -8,6 +9,7 @@ from models.portfolio_allocation import PortfolioAllocation
 
 from repositories.position_repo import PositionRepository
 
+logger = logging.getLogger(__name__)
 
 class PortfolioAggregationService:
     """
@@ -39,6 +41,40 @@ class PortfolioAggregationService:
         """
         return self.account.bucket_mapping
 
+    def _validate_bucket_mappings(
+        self,
+        positions: list,
+    ) -> None:
+        """
+        Report and reject positions without configured bucket mappings.
+        """
+        bucket_mapping = self.get_bucket_mapping()
+
+        missing_symbols = sorted({
+            position.symbol
+            for position in positions
+            if bucket_mapping.get(position.symbol) is None
+        })
+
+        if not missing_symbols:
+            return
+
+        config_path = (
+            getattr(self.account, "config_path", None)
+            or "<account YAML path unavailable>"
+        )
+
+        message = (
+            f"Missing bucket mappings for symbol(s): "
+            f"{', '.join(missing_symbols)}. "
+            f"Update account YAML: {config_path}. "
+            f"Assign each symbol to a valid bucket defined in "
+            f"src/config/system/buckets.yaml."
+        )
+
+        logger.warning(message)
+        raise ValueError(message)
+		
     def map_positions_to_buckets(
         self,
         snapshot_id: int,
@@ -49,19 +85,13 @@ class PortfolioAggregationService:
         """
 
         positions = self.get_positions(snapshot_id)
+        self._validate_bucket_mappings(positions)
         bucket_mapping = self.get_bucket_mapping()
 
         buckets: dict[str, list] = {}
 
         for position in positions:
-            bucket = bucket_mapping.get(position.symbol)
-
-            if bucket is None:
-                raise ValueError(
-                    f"No bucket mapping found for symbol "
-                    f"{position.symbol}"
-                )
-
+            bucket = bucket_mapping[position.symbol]
             buckets.setdefault(bucket, []).append(position)
 
         return buckets
@@ -145,7 +175,57 @@ class PortfolioAggregationService:
             ]
 
         return result
-        
+
+    def calculate_position_portfolio_weights(
+        self,
+        snapshot_id: int,
+    ) -> dict[str, Decimal]:
+        """
+        Calculate each position's weight within the total portfolio.
+        """
+        try:
+            positions = self.get_positions(snapshot_id)
+            self._validate_bucket_mappings(positions)
+
+            portfolio_value = sum(
+                position.current_value
+                for position in positions
+            )
+
+            if portfolio_value == Decimal("0"):
+                logger.debug(
+                    "Portfolio value is zero; returning zero weights: "
+                    "snapshot_id=%s",
+                    snapshot_id,
+                )
+                return {
+                    position.symbol: Decimal("0")
+                    for position in positions
+                }
+
+            weights = {
+                position.symbol: (
+                    position.current_value / portfolio_value
+                )
+                for position in positions
+            }
+
+            logger.debug(
+                "Calculated portfolio position weights: "
+                "snapshot_id=%s, position_count=%s",
+                snapshot_id,
+                len(positions),
+            )
+
+            return weights
+
+        except Exception:
+            logger.exception(
+                "Failed to calculate portfolio position weights: "
+                "snapshot_id=%s",
+                snapshot_id,
+            )
+            raise
 
     def calculate_portfolio_value(
         self,
@@ -214,21 +294,14 @@ class PortfolioAggregationService:
         Return actual, target, and drift information for each bucket.
         """
 
+		# This removes the duplicate validation logic and ensures bucket allocation 
+		# reports all missing symbols and the account YAML path through the centralized helper.
         positions = self.get_positions(snapshot_id)
-
+        self._validate_bucket_mappings(positions)
         bucket_mapping = self.get_bucket_mapping()
-
         buckets: dict[str, list] = {}
-
         for position in positions:
-            bucket = bucket_mapping.get(position.symbol)
-
-            if bucket is None:
-                raise ValueError(
-                    f"No bucket mapping found for symbol "
-                    f"{position.symbol}"
-                )
-
+            bucket = bucket_mapping[position.symbol]
             buckets.setdefault(bucket, []).append(position)
 
         portfolio_value = sum(

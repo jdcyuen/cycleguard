@@ -484,6 +484,62 @@ class ImportHistoryRepository:
             raise ImportHistoryRepositoryError(
                 "Unable to retrieve latest import history."
             ) from exc
+			
+	
+    def get_latest_by_account(
+        self,
+        account_id: int,
+        import_type: str = "positions",
+    ) -> Optional[ImportHistory]:
+        """Return the newest import for an account and import type.
+
+        Status is intentionally not filtered. Callers must inspect it
+        so a newer RUNNING or failed import cannot be bypassed.
+        """
+        sql = """
+            SELECT
+                id,
+                account_id,
+                import_type,
+                institution,
+                filename,
+                file_hash,
+                snapshot_date,
+                import_timestamp,
+                rows_read,
+                rows_imported,
+                rows_skipped,
+                status,
+                elapsed_ms,
+                error_message
+            FROM cycleguard.import_history
+            WHERE account_id = %s
+              AND import_type = %s
+            ORDER BY import_timestamp DESC, id DESC
+            LIMIT 1
+        """
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql, (account_id, import_type))
+                row = cur.fetchone()
+
+            if row is None:
+                return None
+
+            return self._row_to_import_history(row)
+
+        except psycopg.Error as exc:
+            logger.exception(
+                "Failed retrieving latest import for account_id=%s, "
+                "import_type=%s",
+                account_id,
+                import_type,
+            )
+            raise ImportHistoryRepositoryError(
+                "Failed retrieving latest account import."
+            ) from exc
+
 
     def update(self, import_history: ImportHistory) -> ImportHistory:
         """
@@ -690,3 +746,5 @@ class ImportHistoryRepository:
                 f"Unable to delete import history record "
                 f"id={import_history_id}"
             ) from exc
+			
+	
