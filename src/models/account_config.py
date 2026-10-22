@@ -46,5 +46,8 @@ class AccountConfig:
     institution: str
     bucket_mapping: dict[str, str]
     bucket_weights: dict[str, float]
+    tolerance: float
+    security_targets: dict[str, float]
     position_limits: PositionLimits
     settings: AccountSettings
+    config_path: str | None = None

@@ -10,4 +10,7 @@ class Security:
     id: Optional[int] = None
     symbol: str = ""
     description: Optional[str] = None
+
+    # Describe what kind of security an instrument is: e.g. "ETF", "Common Stock", "Mutual Fund", "CD", "Savings Account"
     asset_type: Optional[str] = None
+    

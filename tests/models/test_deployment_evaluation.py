@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from models.deployment import DeploymentDecision
+from models.deployment_evaluation import DeploymentEvaluation
 
 
-def test_deployment_decision_can_be_created():
-    decision = DeploymentDecision(
+def test_deployment_evaluation_can_be_created():
+    decision = DeploymentEvaluation(
         action="HOLD",
         deployment_pct=Decimal("0"),
         deployment_amount=Decimal("0"),
