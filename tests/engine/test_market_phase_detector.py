@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import patch
 
 from engine.market_phase_detector import MarketPhaseDetector
+from data.providers.idata_provider import IDataProvider
 
 
 # ----------------------------------------------------------------------
@@ -46,106 +47,8 @@ def make_price_history(price_map):
     return pd.DataFrame(data)
 
 
-# ----------------------------------------------------------------------
-# Trend Signal
-# ----------------------------------------------------------------------
-
-def test_get_trend_signal():
-    detector = MarketPhaseDetector(config={})
-
-    assert detector.get_trend_signal(105, 100, 100) == "Bullish"
-    assert detector.get_trend_signal(100, 100, 100) == "Neutral"
-    assert detector.get_trend_signal(95, 100, 100) == "Bearish"
-
-
-# ----------------------------------------------------------------------
-# Breadth Signal
-# ----------------------------------------------------------------------
-
-def test_get_breadth_signal():
-    detector = MarketPhaseDetector(config={})
-
-    assert detector.get_breadth_signal(80) == "Strong"
-    assert detector.get_breadth_signal(60) == "Improving"
-    assert detector.get_breadth_signal(40) == "Weak"
-
-
-# ----------------------------------------------------------------------
-# VIX Signal
-# ----------------------------------------------------------------------
-
-def test_get_vix_signal():
-    detector = MarketPhaseDetector(config={})
-
-    assert detector.get_vix_signal(15) == "Calm"
-    assert detector.get_vix_signal(22) == "Neutral"
-    assert detector.get_vix_signal(35) == "Risk-off"
-
-
-# ----------------------------------------------------------------------
-# Leadership Signal
-# ----------------------------------------------------------------------
-
-def test_get_leadership_signal():
-    detector = MarketPhaseDetector(config={})
-
-    assert detector.get_leadership_signal(
-        101, 100,
-        102, 100,
-    ) == "Strong"
-
-    assert detector.get_leadership_signal(
-        99, 100,
-        98, 100,
-    ) == "Weak"
-
-    assert detector.get_leadership_signal(
-        101, 100,
-        99, 100,
-    ) == "Mixed"
-
-
-# ----------------------------------------------------------------------
-# Credit Signal
-# ----------------------------------------------------------------------
-
-def test_get_credit_signal():
-    detector = MarketPhaseDetector(config={})
-
-    assert detector.get_credit_signal(
-        100, 50,
-        90, 50,
-    ) == "Healthy"
-
-    assert detector.get_credit_signal(
-        90, 50,
-        100, 50,
-    ) == "Stressed"
-
-
-# ----------------------------------------------------------------------
-# Empty download
-# ----------------------------------------------------------------------
-
 @patch.object(MarketPhaseDetector, "_fetch_daily_closes")
-def test_run_empty_download(mock_download):
-    mock_download.return_value = pd.DataFrame()
-
-    detector = MarketPhaseDetector(config={})
-
-    results = detector.run()
-
-    assert results["regime"] == "TRANSITION"
-    assert results["score"] == 0
-    assert results["trend"]["status"] == "Unknown"
-
-
-# ----------------------------------------------------------------------
-# Risk-On regime
-# ----------------------------------------------------------------------
-
-@patch.object(MarketPhaseDetector, "_fetch_daily_closes")
-def test_run_risk_on(mock_download):
+def test_get_regime_data(mock_download):
 
     tickers = {
         "SPY": (249, 100, 110),
@@ -156,83 +59,61 @@ def test_run_risk_on(mock_download):
         "SHY": (249, 100, 100),
     }
 
-    sector_etfs = [
-        "XLC",
-        "XLY",
-        "XLP",
-        "XLE",
-        "XLF",
-        "XLV",
-        "XLI",
-        "XLB",
-        "XLRE",
-        "XLK",
-        "XLU",
-    ]
-
-    for etf in sector_etfs:
-        tickers[etf] = (249, 100, 110)
-
     mock_download.return_value = make_price_history(tickers)
 
     detector = MarketPhaseDetector(config={})
 
-    results = detector.run()
+    data = detector.get_regime_data()
 
-    assert results["trend"]["status"] == "bullish"
-    assert results["breadth"]["status"] == "Strong"
-    assert results["volatility"]["status"] == "calm"
-    assert results["leadership"]["status"] == "Strong"
-    assert results["credit"]["status"] == "Healthy"
+    assert "latest" in data
+    assert "dma50" in data
+    assert "dma200" in data
 
-    assert results["score"] == 6
-    assert results["regime"] == "TRANSITION"
+    assert data["latest"]["SPY"] == 110
+    assert data["dma50"]["SPY"] == pytest.approx(100.2)
+    assert data["dma200"]["SPY"] == pytest.approx(100.05)  
+    assert data["latest"]["CAPE"] == pytest.approx(40.575838) 
 
+def test_get_regime_data_handles_misaligned_ticker_dates():
+    dates = pd.date_range("2025-01-01", periods=252, freq="B")
 
-# ----------------------------------------------------------------------
-# Defensive regime
-# ----------------------------------------------------------------------
+    spy = pd.Series(range(252), index=dates, dtype=float)
+    spy.iloc[-1] = 300
 
-@patch.object(MarketPhaseDetector, "_fetch_daily_closes")
-def test_run_defensive(mock_download):
+    vix_dates = pd.date_range("2024-12-31", periods=253, freq="B")
+    vix = pd.Series(range(253), index=vix_dates, dtype=float)
 
-    tickers = {
-        "SPY": (249, 100, 90),
-        "^VIX": (249, 20, 35),
-        "QQQ": (249, 100, 90),
-        "SMH": (249, 100, 90),
-        "JNK": (249, 100, 90),
-        "SHY": (249, 100, 100),
-    }
+    closes = pd.DataFrame({"SPY": spy, "^VIX": vix})
 
-    sector_etfs = [
-        "XLC",
-        "XLY",
-        "XLP",
-        "XLE",
-        "XLF",
-        "XLV",
-        "XLI",
-        "XLB",
-        "XLRE",
-        "XLK",
-        "XLU",
-    ]
+    with patch.object(
+        MarketPhaseDetector,
+        "_fetch_daily_closes",
+        return_value=closes,
+    ):
+        detector = MarketPhaseDetector(config={})
+        data = detector.get_regime_data()
 
-    for etf in sector_etfs:
-        tickers[etf] = (249, 100, 90)
+    assert pd.notna(data["dma50"]["SPY"])
+    assert pd.notna(data["dma200"]["SPY"])
 
-    mock_download.return_value = make_price_history(tickers)
+def test_market_phase_detector_uses_injected_data_provider():
+    class MockDataProvider(IDataProvider):
+        def fetch_data(self, ticker: str, start_date: str) -> pd.DataFrame:
+            return pd.DataFrame()
 
-    detector = MarketPhaseDetector(config={})
+        def fetch_multiple_tickers(
+            self,
+            tickers: list[str],
+            period: str = "1y",
+        ) -> pd.DataFrame:
+            return make_price_history(
+                {ticker: (249, 100, 101) for ticker in tickers}
+            )
 
-    results = detector.run()
+    provider = MockDataProvider()
+    detector = MarketPhaseDetector(config={}, data_provider=provider)
 
-    assert results["trend"]["status"] == "bearish"
-    assert results["breadth"]["status"] == "Weak"
-    assert results["volatility"]["status"] == "risk-off"
-    assert results["leadership"]["status"] == "Weak"
-    assert results["credit"]["status"] == "Stressed"
+    result = detector._fetch_daily_closes(["SPY", "QQQ"])
 
-    assert results["score"] == 0
-    assert results["regime"] == "DEFENSIVE"
+    assert list(result.columns) == ["SPY", "QQQ"]
+    assert len(result) == 250

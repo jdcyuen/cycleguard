@@ -7,27 +7,10 @@ class BreadthSignal(MarketSignal):
     securities trading above their 50-day moving average.
     """
 
-    DEFAULT_PROXIES = [
-        "XLC",
-        "XLY",
-        "XLP",
-        "XLE",
-        "XLF",
-        "XLV",
-        "XLI",
-        "XLB",
-        "XLRE",
-        "XLK",
-        "XLU",
-    ]
-
     def __init__(self, config=None):
         self.config = config or {}
 
-        self.proxies = self.config.get(
-            "inputs",
-            self.DEFAULT_PROXIES.copy(),
-        )
+        self.proxies = self.config.get("inputs", [])
 
         thresholds = self.config.get("thresholds", {})
 
@@ -79,10 +62,67 @@ class BreadthSignal(MarketSignal):
         else:
             status = "Weak"
 
+        etf_evidence = {}
+
+        for proxy in self.proxies:
+            if (
+                proxy in latest
+                and proxy in dma50
+                and not latest[proxy] != latest[proxy]
+                and not dma50[proxy] != dma50[proxy]
+            ):
+                etf_evidence[proxy] = {
+                    "current": latest[proxy],
+                    "sma50": dma50[proxy],
+                    "status": (
+                        "PASS"
+                        if latest[proxy] > dma50[proxy]
+                        else "FAIL"
+                    ),
+                }
+
         return {
             "status": status,
             "value": pct_above_50,
             "passing": passing,
             "failing": failing,
             "valid_total": valid_total,
+            "evidence": {
+                "raw_inputs": {
+                    "latest": {
+                        proxy: latest[proxy]
+                        for proxy in self.proxies
+                        if proxy in latest
+                    },
+                    "dma50": {
+                        proxy: dma50[proxy]
+                        for proxy in self.proxies
+                        if proxy in dma50
+                    },
+                },
+                "calculated_values": {
+                    "pct_above_50": pct_above_50,
+                    "passing_count": len(passing),
+                    "failing_count": len(failing),
+                    "valid_total": valid_total,
+                },
+                "etfs": etf_evidence,
+                "thresholds": {
+                    "strong": self.strong_threshold,
+                    "neutral": self.neutral_threshold,
+                    "weak": self.weak_threshold,
+                },
+                "rule": (
+                    "Strong when the percentage of securities above their "
+                    "50-day SMA is above the strong threshold; "
+                    "Improving when it is at or above the weak threshold; "
+                    "otherwise Weak."
+                ),
+                "why": (
+                    f"{len(passing)} of {valid_total} securities are above "
+                    f"their 50-day SMA ({pct_above_50:.1f}%). "
+                    f"Passing: {', '.join(passing) or 'none'}. "
+                    f"Failing: {', '.join(failing) or 'none'}."
+                ),
+            },
         }

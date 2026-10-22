@@ -120,3 +120,11 @@ regime_system:
   # DEFAULT FALLBACK
   # =========================
   fallback_regime: "TRANSITION"
+
+  deployment:
+    RISK_ON: 1.00
+    TRANSITION: 0.00
+    DEFENSIVE: 0.00
+    CRISIS: 0.00
+
+    adjustments: {}

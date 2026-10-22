@@ -38,13 +38,13 @@ class TrendSignal(MarketSignal):
             dma50_value = dma50_data[self.proxy]
             dma200_value = dma200_data[self.proxy]
 
-        if current > dma200_value:
-            status = "bullish"
-        elif min(dma50_value, dma200_value) <= current <= max(
+        if min(dma50_value, dma200_value) <= current <= max(
             dma50_value,
             dma200_value,
         ):
             status = "neutral"
+        elif current > max(dma50_value, dma200_value):
+            status = "bullish"
         else:
             status = "bearish"
 
@@ -54,4 +54,31 @@ class TrendSignal(MarketSignal):
             "value": current,
             "dma50": dma50_value,
             "dma200": dma200_value,
+            "evidence": {
+                "raw_inputs": {
+                    "current": current,
+                },
+                "calculated_values": {
+                    "dma50": dma50_value,
+                    "dma200": dma200_value,
+                },
+                "comparison": {
+                    "proxy": self.proxy,
+                    "current": current,
+                    "sma50": dma50_value,
+                    "sma200": dma200_value,
+                    "status": status.upper(),
+                },
+                "rule": (
+                    "Bullish when current price is above both the 50-day and 200-day SMAs; "
+                    "neutral when price is between the 50-day and 200-day SMAs; "
+                    "otherwise bearish."
+                ),
+                "why": (
+                    f"{self.proxy} current price is {current}, "
+                    f"50-day SMA is {dma50_value}, "
+                    f"and 200-day SMA is {dma200_value}; "
+                    f"price is {status} based on its position relative to both moving averages."
+                ),
+            },
         }

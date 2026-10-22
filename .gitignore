@@ -57,3 +57,5 @@ recovery_state.json
 
 src/cycleguard.egg-info/
 logs/
+/data/
+pytest

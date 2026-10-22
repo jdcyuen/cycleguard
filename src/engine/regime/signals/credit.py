@@ -45,4 +45,37 @@ class CreditSignal(MarketSignal):
             "inputs": self.inputs,
             "ratio_current": current_ratio,
             "ratio_50": ratio_50,
+            "evidence": {
+                "raw_inputs": {
+                    "latest": {
+                        first: latest[first],
+                        second: latest[second],
+                    },
+                    "dma50": {
+                        first: dma50[first],
+                        second: dma50[second],
+                    },
+                },
+                "calculated_values": {
+                    "ratio_current": current_ratio,
+                    "ratio_50": ratio_50,
+                    "status": status,
+                },
+                "comparison": {
+                    "first": first,
+                    "second": second,
+                    "current_ratio": current_ratio,
+                    "sma50_ratio": ratio_50,
+                    "status": status.upper(),
+                },
+                "rule": (
+                    "Healthy when the current first-to-second ratio is above "
+                    "the 50-day SMA ratio; otherwise Stressed."
+                ),
+                "why": (
+                    f"{first}/{second} current ratio is {current_ratio:.4f}, "
+                    f"versus the 50-day ratio of {ratio_50:.4f}; "
+                    f"result is {status}."
+                ),
+            },
         }

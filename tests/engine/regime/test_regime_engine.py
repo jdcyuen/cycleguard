@@ -119,3 +119,31 @@ def test_regime_engine_evaluates_all_configured_signals():
     assert "credit" in result["signals"]
     assert "cape" in result["signals"]
     assert "regime" in result
+
+def test_regime_engine_preserves_signal_evidence():
+    config = {
+        "signals": {
+            "trend": {},
+        },
+        "regimes": {},
+        "fallback_regime": "TRANSITION",
+    }
+
+    engine = RegimeEngine(config)
+
+    result = engine.evaluate(
+        {
+            "current": 105,
+            "dma50": 100,
+            "dma200": 100,
+        }
+    )
+
+    trend = result["signals"]["trend"]
+
+    assert "evidence" in trend
+    assert trend["evidence"]["raw_inputs"]["current"] == 105
+    assert trend["evidence"]["calculated_values"]["dma50"] == 100
+    assert trend["evidence"]["calculated_values"]["dma200"] == 100
+    assert "rule" in trend["evidence"]
+    assert "why" in trend["evidence"]

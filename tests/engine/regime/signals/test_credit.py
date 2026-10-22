@@ -88,3 +88,36 @@ def test_credit_signal_missing_input():
     )
 
     assert result["status"] == "Unknown"
+
+def test_credit_signal_returns_explainable_evidence():
+    signal = CreditSignal(
+        {
+            "inputs": ["JNK", "SHY"],
+        }
+    )
+
+    result = signal.evaluate(
+        {
+            "latest": {
+                "JNK": 105,
+                "SHY": 100,
+            },
+            "dma50": {
+                "JNK": 100,
+                "SHY": 100,
+            },
+        }
+    )
+
+    assert "evidence" in result
+
+    evidence = result["evidence"]
+
+    assert evidence["raw_inputs"]["latest"]["JNK"] == 105
+    assert evidence["raw_inputs"]["latest"]["SHY"] == 100
+    assert evidence["raw_inputs"]["dma50"]["JNK"] == 100
+    assert evidence["raw_inputs"]["dma50"]["SHY"] == 100
+
+    assert "calculated_values" in evidence
+    assert "rule" in evidence
+    assert "why" in evidence

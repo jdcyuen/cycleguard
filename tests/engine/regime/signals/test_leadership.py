@@ -146,3 +146,39 @@ def test_leadership_signal_ignores_missing_inputs():
     assert result["status"] == "Mixed"
     assert result["above_50"] == 1
     assert result["total"] == 2
+
+def test_leadership_signal_returns_explainable_evidence():
+    signal = LeadershipSignal(
+        {
+            "inputs": ["QQQ", "SMH"],
+        }
+    )
+
+    result = signal.evaluate(
+        {
+            "latest": {
+                "QQQ": 110,
+                "SMH": 95,
+            },
+            "dma50": {
+                "QQQ": 100,
+                "SMH": 100,
+            },
+        }
+    )
+
+    assert "evidence" in result
+
+    evidence = result["evidence"]
+
+    assert evidence["raw_inputs"]["latest"]["QQQ"] == 110
+    assert evidence["raw_inputs"]["latest"]["SMH"] == 95
+    assert evidence["raw_inputs"]["dma50"]["QQQ"] == 100
+    assert evidence["raw_inputs"]["dma50"]["SMH"] == 100
+
+    assert evidence["calculated_values"]["above_50"] == 1
+    assert evidence["calculated_values"]["total"] == 2
+    assert evidence["calculated_values"]["status"] == "Mixed"
+
+    assert "rule" in evidence
+    assert "why" in evidence

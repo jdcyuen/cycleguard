@@ -22,7 +22,27 @@ class VolatilitySignal(MarketSignal):
         return "volatility"
 
     def evaluate(self, data: dict) -> dict:
-        current_vix = data["value"]
+        latest = data.get("latest", {})
+
+        if latest:
+            if not self.config.get("inputs"):
+                return {
+                    "status": "unknown",
+                    "value": None,
+                }
+
+            vix_proxy = self.config["inputs"][0]
+
+            if vix_proxy not in latest:
+                return {
+                    "status": "unknown",
+                    "value": None,
+                }
+
+            current_vix = latest[vix_proxy]
+
+        else:
+            current_vix = data["value"]
 
         if current_vix < self.calm_threshold:
             status = "calm"
@@ -34,4 +54,27 @@ class VolatilitySignal(MarketSignal):
         return {
             "status": status,
             "value": current_vix,
+            "evidence": {
+                "raw_inputs": {
+                    "value": current_vix,
+                },
+                "calculated_values": {
+                    "status": status,
+                },
+                "thresholds": {
+                    "calm": self.calm_threshold,
+                    "elevated": self.risk_off_threshold,
+                },
+                "rule": (
+                    "< 18 Calm Low market stress; "
+                    "> 25 Risk-Off High market stress; "
+                    "18 - 25 neutral Elevated but not extreme."
+                ),
+                "why": (
+                    f"VIX is {current_vix}. "
+                    f"Calm threshold is {self.calm_threshold}; "
+                    f"elevated threshold is {self.risk_off_threshold}; "
+                    f"result is {status}."
+                ),
+            },
         }

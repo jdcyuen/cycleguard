@@ -48,4 +48,29 @@ class CapeSignal(MarketSignal):
             "status": status,
             "input": input_name,
             "value": value,
+            "evidence": {
+                "raw_inputs": {
+                    "value": value,
+                },
+                "calculated_values": {
+                    "status": status,
+                },
+                "thresholds": {
+                    "expensive": expensive,
+                    "neutral": neutral,
+                    "cheap": cheap,
+                },
+                "rule": (
+                    f"Expensive when CAPE is >= {expensive}; "
+                    f"neutral when CAPE is >= {neutral}; "
+                    f"attractive when CAPE is >= {cheap}; "
+                    "otherwise cheap."
+                ),
+                "why": (
+                    f"CAPE is {value}. "
+                    f"Thresholds are expensive >= {expensive}, "
+                    f"neutral >= {neutral}, and attractive >= {cheap}; "
+                    f"result is {status}."
+                ),
+            },
         }

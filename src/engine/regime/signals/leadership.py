@@ -51,4 +51,30 @@ class LeadershipSignal(MarketSignal):
             "inputs": valid_inputs,
             "above_50": above_50,
             "total": len(valid_inputs),
+            "evidence": {
+                "raw_inputs": {
+                    "latest": {
+                        symbol: latest[symbol]
+                        for symbol in valid_inputs
+                    },
+                    "dma50": {
+                        symbol: dma50[symbol]
+                        for symbol in valid_inputs
+                    },
+                },
+                "calculated_values": {
+                    "above_50": above_50,
+                    "total": len(valid_inputs),
+                    "status": status,
+                },
+                "rule": (
+                    "Strong when all valid leadership inputs are above "
+                    "their 50-day SMA; Weak when none are above; "
+                    "otherwise Mixed."
+                ),
+                "why": (
+                    f"{above_50} of {len(valid_inputs)} leadership "
+                    f"inputs are above their 50-day SMA."
+                ),
+            },
         }

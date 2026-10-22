@@ -127,3 +127,37 @@ def test_cape_signal_unknown_when_data_missing():
     )
 
     assert result["status"] == "unknown"
+
+def test_cape_signal_returns_explainable_evidence():
+    signal = CapeSignal(
+        {
+            "inputs": ["CAPE"],
+            "thresholds": {
+                "expensive": 30,
+                "neutral": 25,
+                "cheap": 20,
+            },
+        }
+    )
+
+    result = signal.evaluate(
+        {
+            "latest": {
+                "CAPE": 35,
+            }
+        }
+    )
+
+    assert "evidence" in result
+
+    evidence = result["evidence"]
+
+    assert evidence["raw_inputs"]["value"] == 35
+    assert evidence["calculated_values"]["status"] == "expensive"
+
+    assert evidence["thresholds"]["expensive"] == 30
+    assert evidence["thresholds"]["neutral"] == 25
+    assert evidence["thresholds"]["cheap"] == 20
+
+    assert "rule" in evidence
+    assert "why" in evidence
