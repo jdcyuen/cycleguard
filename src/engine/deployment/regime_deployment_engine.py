@@ -1,7 +1,10 @@
 from decimal import Decimal
 
 from engine.deployment.base_deployment_engine import BaseDeploymentEngine
-from models.deployment import DeploymentDecision
+from models.deployment_evaluation import DeploymentEvaluation
+from engine.deployment.regime_based_sizing_strategy import (
+    RegimeBasedSizingStrategy,
+)
 
 
 class RegimeDeploymentEngine(BaseDeploymentEngine):
@@ -10,11 +13,19 @@ class RegimeDeploymentEngine(BaseDeploymentEngine):
 
     This engine does not detect the regime and does not calculate
     available capital. It consumes those results and produces a
-    DeploymentDecision.
+    DeploymentEvaluation.
     """
 
-    def __init__(self, deployment_policy=None):
+    def __init__(
+        self, 
+        deployment_policy=None,
+        sizing_strategy=None,
+    ):
         self.deployment_policy = deployment_policy or {}
+        self.sizing_strategy = (
+            sizing_strategy
+            or RegimeBasedSizingStrategy(self.deployment_policy)
+        )
 
         for regime, deployment_pct in self.deployment_policy.items():
             if deployment_pct > Decimal("1"):
@@ -27,18 +38,11 @@ class RegimeDeploymentEngine(BaseDeploymentEngine):
                     "Deployment percentage cannot be negative"
                 )
 
-    def _get_deployment_pct(self, regime: str) -> Decimal:
-        """Return the deployment percentage for a market regime."""
-        return self.deployment_policy.get(
-            regime,
-            Decimal("0"),
-        )
-
     def evaluate(
         self,
         regime_result: dict,
         available_capital: Decimal,
-    ) -> DeploymentDecision:
+    ) -> DeploymentEvaluation:
         """
         Convert a market regime and available capital into a
         deployment decision.
@@ -60,19 +64,23 @@ class RegimeDeploymentEngine(BaseDeploymentEngine):
             )
 
         regime = regime_result["regime"]
-        deployment_pct = self._get_deployment_pct(regime)
+        deployment_pct = self.sizing_strategy.calculate(
+            regime_result,
+            available_capital,
+        )
 
         deployment_amount = (
             available_capital * deployment_pct
         )
 
         if deployment_pct == Decimal("0"):
-            action = "HOLD" if regime != "RISK_ON" else "DEPLOY"
+            action = "HOLD"
         else:
             action = "DEPLOY"
 
-        return DeploymentDecision(
+        return DeploymentEvaluation(
             action=action,
             deployment_amount=deployment_amount,
             deployment_pct=deployment_pct,
+			source="regime",
         )

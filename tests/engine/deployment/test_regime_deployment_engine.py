@@ -1,10 +1,11 @@
 import pytest
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from engine.deployment.regime_deployment_engine import RegimeDeploymentEngine
-from models.deployment import DeploymentDecision
+from models.deployment_evaluation import DeploymentEvaluation
 
-def test_deployment_engine_returns_deployment_decision():
+def test_deployment_engine_returns_deployment_evaluation():
 
     engine = RegimeDeploymentEngine(
         {
@@ -22,7 +23,7 @@ def test_deployment_engine_returns_deployment_decision():
         Decimal("10000"),
     )
 
-    assert isinstance(decision, DeploymentDecision)
+    assert isinstance(decision, DeploymentEvaluation)
     assert decision.action == "HOLD"
     assert decision.deployment_amount == Decimal("0")
 
@@ -47,6 +48,33 @@ def test_deployment_engine_deploys_when_regime_is_risk_on():
     assert decision.action == "DEPLOY"
     assert decision.deployment_amount == Decimal("10000")
     assert decision.deployment_pct == Decimal("1.0")
+
+def test_deployment_engine_receives_regime_signal_results():
+    engine = RegimeDeploymentEngine(
+        {
+            "RISK_ON": Decimal("0.50"),
+        }
+    )
+
+    regime_result = {
+        "signals": {
+            "trend": {"status": "bullish"},
+            "breadth": {"status": "strong"},
+            "volatility": {"status": "calm"},
+            "leadership": {"status": "Strong"},
+            "credit": {"status": "Healthy"},
+            "cape": {"status": "neutral"},
+        },
+        "regime": "RISK_ON",
+    }
+
+    decision = engine.evaluate(
+        regime_result,
+        Decimal("10000"),
+    )
+
+    assert decision.action == "DEPLOY"
+    assert decision.deployment_pct == Decimal("0.50")
 
 
 def test_deployment_engine_holds_when_regime_is_risk_off():
@@ -173,7 +201,7 @@ def test_deployment_engine_allows_zero_percent_deployment():
         Decimal("10000"),
     )
 
-    assert decision.action == "DEPLOY"
+    assert decision.action == "HOLD"
     assert decision.deployment_pct == Decimal("0")
     assert decision.deployment_amount == Decimal("0")
 
@@ -237,41 +265,6 @@ def test_deployment_engine_accepts_regime_deployment_policy():
 
     assert engine.deployment_policy == deployment_policy
 
-def test_deployment_engine_gets_deployment_pct_for_regime():
-    deployment_policy = {
-        "RISK_ON": Decimal("1.00"),
-        "TRANSITION": Decimal("0.50"),
-        "RISK_OFF": Decimal("0.00"),
-    }
-
-    engine = RegimeDeploymentEngine(deployment_policy)
-
-    assert engine._get_deployment_pct("RISK_ON") == Decimal("1.00")
-    assert engine._get_deployment_pct("TRANSITION") == Decimal("0.50")
-    assert engine._get_deployment_pct("RISK_OFF") == Decimal("0.00")
-
-def test_deployment_engine_defaults_to_zero_for_unknown_regime():
-    engine = RegimeDeploymentEngine(
-        {
-            "RISK_ON": Decimal("1.00"),
-            "TRANSITION": Decimal("0.50"),
-            "RISK_OFF": Decimal("0.00"),
-        }
-    )
-
-    assert engine._get_deployment_pct("UNKNOWN") == Decimal("0")
-
-def test_deployment_engine_defaults_to_zero_for_unknown_regime():
-    engine = RegimeDeploymentEngine(
-        {
-            "RISK_ON": Decimal("1.00"),
-            "TRANSITION": Decimal("0.50"),
-            "RISK_OFF": Decimal("0.00"),
-        }
-    )
-
-    assert engine._get_deployment_pct("UNKNOWN") == Decimal("0")
-
 def test_deployment_engine_partially_deploys_in_transition():
     engine = RegimeDeploymentEngine(
         {
@@ -317,3 +310,50 @@ def test_deployment_engine_holds_for_unknown_regime():
     assert decision.action == "HOLD"
     assert decision.deployment_pct == Decimal("0")
     assert decision.deployment_amount == Decimal("0")
+
+def test_regime_deployment_engine_is_base_deployment_engine():
+    from engine.deployment.base_deployment_engine import BaseDeploymentEngine
+
+    engine = RegimeDeploymentEngine()
+
+    assert isinstance(engine, BaseDeploymentEngine)
+
+def test_regime_deployment_engine_initializes_base_deployment_policy():
+    policy = {
+        "RISK_ON": Decimal("0.05"),
+        "TRANSITION": Decimal("0.02"),
+    }
+
+    engine = RegimeDeploymentEngine(policy)
+
+    assert engine.deployment_policy == policy
+
+def test_regime_deployment_engine_uses_injected_sizing_strategy():
+    strategy = MagicMock()
+    strategy.calculate.return_value = Decimal("0.25")
+
+    engine = RegimeDeploymentEngine(
+        deployment_policy={
+            "RISK_ON": Decimal("0.50"),
+        },
+        sizing_strategy=strategy,
+    )
+
+    regime_result = {
+        "regime": "RISK_ON",
+        "signals": {},
+    }
+
+    result = engine.evaluate(
+        regime_result,
+        Decimal("10000"),
+    )
+
+    strategy.calculate.assert_called_once_with(
+        regime_result,
+        Decimal("10000"),
+    )
+
+    assert result.deployment_pct == Decimal("0.25")
+    assert result.deployment_amount == Decimal("2500")
+    assert result.action == "DEPLOY"

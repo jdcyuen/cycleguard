@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from models.deployment import DeploymentDecision
+from models.deployment_evaluation import DeploymentEvaluation
 from engine.deployment.base_deployment_engine import BaseDeploymentEngine
 
 
@@ -12,18 +12,11 @@ class CrashDeploymentEngine(BaseDeploymentEngine):
     CycleGuard crash deployment engine.
     """
 
-    def _get_deployment_pct(self, regime: str) -> Decimal:
-        """Return the configured deployment percentage for a regime."""
-        return self.deployment_policy.get(
-            regime,
-            Decimal("0"),
-        )
-
     def evaluate(
         self,
         drawdown: float,
         available_capital: Decimal,
-    ) -> DeploymentDecision:
+    ) -> DeploymentEvaluation:
 
         """
         Evaluate a crash deployment decision based on drawdown.
@@ -44,10 +37,11 @@ class CrashDeploymentEngine(BaseDeploymentEngine):
                 break
         
         if level is None:
-            return DeploymentDecision(
+            return DeploymentEvaluation(
                 action="HOLD",
                 deployment_pct=Decimal("0"),
                 deployment_amount=Decimal("0"),
+				source="crash",
             )
 
         deployment_pct = Decimal(
@@ -56,8 +50,9 @@ class CrashDeploymentEngine(BaseDeploymentEngine):
 
         deployment_amount = available_capital * deployment_pct
 
-        return DeploymentDecision(
+        return DeploymentEvaluation(
             action="DEPLOY",
             deployment_pct=deployment_pct,
             deployment_amount=deployment_amount,
+			source="crash",
         )

@@ -82,3 +82,31 @@ class TestCrashDeploymentEngine:
         assert result.action == "DEPLOY"
         assert result.deployment_pct == Decimal("0.09")
         assert result.deployment_amount == Decimal("9000")
+
+    def test_crash_deployment_engine_uses_base_evaluate_signature(self):
+        from engine.deployment.base_deployment_engine import BaseDeploymentEngine
+
+        engine = CrashDeploymentEngine()
+
+        assert isinstance(engine, BaseDeploymentEngine)
+
+    def test_crash_deployment_engine_does_not_require_regime_deployment_lookup(self):
+        engine = self.engine
+
+        result = engine.evaluate(
+            drawdown=-0.20,
+            available_capital=Decimal("100000"),
+        )
+
+        assert result.deployment_pct == Decimal("0.05")
+
+    def test_crash_deployment_engine_does_not_require_regime_deployment_lookup(self):
+        result = self.engine.evaluate(
+            drawdown=-0.20,
+            available_capital=Decimal("100000"),
+        )
+
+        assert result.deployment_pct == Decimal("0.05")
+
+    def test_crash_deployment_engine_has_no_regime_deployment_lookup(self):
+        assert "_get_deployment_pct" not in CrashDeploymentEngine.__dict__
