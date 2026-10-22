@@ -53,9 +53,12 @@ def main():
         progress=True
     )
 
-    # Handle MultiIndex columns (older/newer yfinance versions)
+    # Handle MultiIndex columns
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
+
+    # Remove incomplete rows
+    df = df.dropna(subset=["Close"]).copy()
 
     close = df["Close"]
 
@@ -81,10 +84,33 @@ def main():
 
     df["RSI_14"] = 100 - (100 / (1 + rs))
 
-    df["Volume_20D_Avg"] = 
+    # MACD (12, 26, 9)
+    ema_12 = close.ewm(span=12, adjust=False).mean()
+    ema_26 = close.ewm(span=26, adjust=False).mean()
+
+    df["MACD"] = ema_12 - ema_26
+    df["MACD_Signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    df["MACD_Histogram"] = df["MACD"] - df["MACD_Signal"]
+
+    df["MACD_Above_Signal"] = (
+        df["MACD"] > df["MACD_Signal"]
+    )
+
+    df["MACD_Above_Zero"] = (
+        df["MACD"] > 0
+    )
+
+    df["MACD_Histogram_Rising"] = (
+        df["MACD_Histogram"] > df["MACD_Histogram"].shift(1)
+    )
+
+    df["Volume_20D_Avg"] = df["Volume"].rolling(20).mean()
     
     
     df["Volume_Ratio"] = df["Volume"] / df["Volume_20D_Avg"]
+
+    #print("\nLast 3 rows:")
+    #print(df[["Close", "Volume"]].tail(3))
 
     latest = df.iloc[-1]
 
@@ -102,6 +128,12 @@ def main():
             "Pct_vs_50EMA",
             "Pct_vs_200MA",
             "RSI_14",
+            "MACD",
+            "MACD_Signal",
+            "MACD_Histogram",
+            "MACD_Above_Signal",
+            "MACD_Above_Zero",
+            "MACD_Histogram_Rising",
             "Volume_Ratio",
         ]
     ])
