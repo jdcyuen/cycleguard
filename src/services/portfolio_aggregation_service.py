@@ -294,8 +294,8 @@ class PortfolioAggregationService:
         Return actual, target, and drift information for each bucket.
         """
 
-		# This removes the duplicate validation logic and ensures bucket allocation 
-		# reports all missing symbols and the account YAML path through the centralized helper.
+        # This removes the duplicate validation logic and ensures bucket allocation 
+        # reports all missing symbols and the account YAML path through the centralized helper.
         positions = self.get_positions(snapshot_id)
         self._validate_bucket_mappings(positions)
         bucket_mapping = self.get_bucket_mapping()
@@ -305,11 +305,17 @@ class PortfolioAggregationService:
             buckets.setdefault(bucket, []).append(position)
 
         portfolio_value = sum(
-            position.current_value
-            for position in positions
+            (
+                Decimal(str(position.current_value))
+                for position in positions
+            ),
+            Decimal("0"),
         )
 
-        target_weights = self.get_target_weights()
+        target_weights = {
+            bucket: Decimal(str(weight))
+            for bucket, weight in self.get_target_weights().items()
+        }
 
         if portfolio_value == 0:
             actual_weights = {
@@ -319,8 +325,11 @@ class PortfolioAggregationService:
         else:
             actual_weights = {
                 bucket: sum(
-                    position.current_value
-                    for position in bucket_positions
+                    (
+                        Decimal(str(position.current_value))
+                        for position in bucket_positions
+                    ),
+                    Decimal("0"),
                 ) / portfolio_value
                 for bucket, bucket_positions in buckets.items()
             }
@@ -331,8 +340,11 @@ class PortfolioAggregationService:
             bucket: BucketAllocation(
                 name=bucket,
                 market_value=sum(
-                    position.current_value
-                    for position in buckets.get(bucket, [])
+                    (
+                        Decimal(str(position.current_value))
+                        for position in buckets.get(bucket, [])
+                    ),
+                    Decimal("0"),
                 ),
                 actual_weight=actual_weights.get(
                     bucket,

@@ -28,6 +28,7 @@ def account():
         bucket_mapping={},
         bucket_weights={},
         tolerance=0.05,
+		bucket_tolerance=0.02,
         security_targets={},
         position_limits=PositionLimits(
             max_position_pct=0.10,
@@ -780,6 +781,7 @@ def test_evaluate_holds_when_dynamic_deployment_is_disabled(
         bucket_mapping={},
         bucket_weights={},
         tolerance=0.05,
+		bucket_tolerance=0.02,
         security_targets={},
         position_limits=PositionLimits(
             max_position_pct=0.10,
@@ -853,6 +855,7 @@ def test_crash_deployment_overrides_disabled_dynamic_deployment(
         bucket_mapping={},
         bucket_weights={},
         tolerance=0.05,
+		bucket_tolerance=0.02,
         security_targets={},
         position_limits=PositionLimits(
             max_position_pct=0.10,

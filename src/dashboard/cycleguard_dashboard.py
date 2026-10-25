@@ -14,9 +14,13 @@ root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
 
+from src.core.logger import setup_logging
+
+setup_logging()
+
 import streamlit as st
 
-st.set_page_config(page_title="CycleGuard Dashboard", page_icon="📉", layout="wide")
+st.set_page_config(page_title="CycleGuard Dashboard", page_icon="ðŸ“‰", layout="wide")
 
 import json
 
@@ -24,6 +28,7 @@ from src.dashboard.components.sync_fidelity import render_sync_fidelity
 from src.dashboard.components.action_panel import render_action_panel
 from src.dashboard.components.trade_preview import render_trade_preview
 from src.dashboard.components.portfolio_view import render_portfolio_view
+from src.dashboard.components.drift_detection import render_drift_detection
 
 from src.engine.crash_manager import CrashManager
 from src.engine.recovery_manager import RecoveryManager
@@ -353,10 +358,18 @@ with st.container(border=True):
         st.json(phase_data)
 
 
-# =========================
 # PORTFOLIO OVERVIEW
-# =========================
 render_portfolio_view(portfolio)
+
+
+# =========================
+# DRIFT DETECTION
+# =========================
+render_drift_detection(
+    db_conn,
+    account_repository,
+    snapshot_repository,
+)
 
 
 # =========================
