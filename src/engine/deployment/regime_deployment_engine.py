@@ -83,14 +83,20 @@ class RegimeDeploymentEngine(BaseDeploymentEngine):
                         f"regime '{regime}': {value!r}"
                     ) from exc
 
-                if (
-                    not deployment_pct.is_finite()
-                    or deployment_pct < Decimal("0")
-                    or deployment_pct > Decimal("1")
-                ):
+                if not deployment_pct.is_finite():
                     raise ValueError(
                         f"Deployment percentage for regime "
-                        f"'{regime}' must be between 0 and 1"
+                        f"'{regime}' must be finite"
+                    )
+
+                if deployment_pct > Decimal("1"):
+                    raise ValueError(
+                        "Deployment percentage cannot exceed 100%"
+                    )
+
+                if deployment_pct < Decimal("0"):
+                    raise ValueError(
+                        "Deployment percentage cannot be negative"
                     )
 
             self.deployment_policy = deployment_policy
