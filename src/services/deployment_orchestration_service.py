@@ -10,6 +10,7 @@ from services.portfolio_aggregation_service import (
 from engine.allocation.allocation_engine import AllocationEngine
 from repositories.snapshot_repo import SnapshotRepository
 from repositories.account_repo import AccountRepository
+from engine.deployment.cash_deployment_policy import CashDeploymentPolicy
 
 from datetime import date
 
@@ -32,6 +33,7 @@ class DeploymentOrchestrationService:
         allocation_engine: AllocationEngine,
         account_repository: AccountRepository | None = None,
         snapshot_repository: SnapshotRepository | None = None,
+        cash_deployment_policy: CashDeploymentPolicy | None = None,
     ):
         self.portfolio_service = portfolio_service
         self.regime_engine = regime_engine
@@ -42,6 +44,12 @@ class DeploymentOrchestrationService:
         self.allocation_engine = allocation_engine
         self.account_repository = account_repository
         self.snapshot_repository = snapshot_repository
+        self.cash_deployment_policy = (
+            cash_deployment_policy
+            if cash_deployment_policy is not None
+            else CashDeploymentPolicy()
+        )
+
 
     # DeploymentOrchestrationService.evaluate() gathers available capital, obtains 
     # both the normal regime-based and crash-based deployment decisions, then applies 
@@ -214,29 +222,65 @@ class DeploymentOrchestrationService:
             )
         )
         
-        # 7. Crash deployment has priority over regime deployment
+                # 7. Select the winning deployment decision.
+        # Crash deployment always has priority.
         if crash_decision.action == "DEPLOY":
-            return crash_decision
+            selected_decision = crash_decision
 
-
-        # 8. Check if dynamic deployment is enabled
-        # Dynamic deployment in CycleGuard means: 
-        # CycleGuard can automatically determine when market conditions are favorable enough to recommend 
-        # moving available cash/defensive assets into investments, rather than waiting for a fixed 
-        # calendar-based rebalance.
-        # Crash deployment always gets priority.
-        #     ● enable_dynamic_deployment = False suppresses normal regime deployment.
-        #     ● enable_dynamic_deployment = True allows the existing regime deployment logic.
-        if not self.account.settings.enable_dynamic_deployment:
+        # 8. Suppress normal regime deployment when disabled.
+        elif not self.account.settings.enable_dynamic_deployment:
             return DeploymentEvaluation(
                 action="HOLD",
                 deployment_pct=Decimal("0"),
                 deployment_amount=Decimal("0"),
-				source="regime",
+                source="regime",
             )
 
-        # 9. Otherwise use the regime decision
-        return regime_decision
+        else:
+            selected_decision = regime_decision
+
+        # 9. Apply the cash deployment policy to proposed deployments.
+        if selected_decision.action != "DEPLOY":
+            return selected_decision
+
+        portfolio_value = self.portfolio_service.get_portfolio_value(
+            snapshot_id
+        )
+
+        approved_amount = self.cash_deployment_policy.approve(
+            proposed_amount=selected_decision.deployment_amount,
+            available_defensive_capital=available_capital,
+            portfolio_value=portfolio_value,
+        )
+
+        # Preserve the original decision when the policy does not
+        # change the proposed amount.
+        if approved_amount == selected_decision.deployment_amount:
+            return selected_decision
+
+        # Do not return a DEPLOY decision if no capital is approved.
+        if approved_amount <= Decimal("0"):
+            return DeploymentEvaluation(
+                action="HOLD",
+                deployment_pct=Decimal("0"),
+                deployment_amount=Decimal("0"),
+                source=selected_decision.source,
+            )
+
+        # The percentage is relative to the available defensive surplus,
+        # consistent with the deployment engines.
+        approved_pct = (
+            approved_amount / available_capital
+            if available_capital > Decimal("0")
+            else Decimal("0")
+        )
+
+        return DeploymentEvaluation(
+            action="DEPLOY",
+            deployment_pct=approved_pct,
+            deployment_amount=approved_amount,
+            source=selected_decision.source,
+        )
 
     def allocate_deployment(
         self,
