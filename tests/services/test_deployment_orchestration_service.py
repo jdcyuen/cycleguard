@@ -85,7 +85,8 @@ def test_evaluate_returns_deployment_evaluation(
             drift_value=Decimal("100000"),
         )
     }
-
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
+		
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
         "signals": {},
@@ -141,6 +142,7 @@ def test_evaluate_gets_available_capital_from_portfolio_service(
             drift_value=Decimal("75000"),
         )
     }
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -193,6 +195,8 @@ def test_evaluate_uses_defensive_bucket_surplus_as_available_capital(
             drift_value=Decimal("100000"),
         )
     }
+
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -372,6 +376,8 @@ def test_evaluate_passes_defensive_surplus_to_deployment_engine(
             drift_value=Decimal("75000"),
         )
     }
+	
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -432,6 +438,8 @@ def test_evaluate_passes_defensive_surplus_for_partial_regime_deployment(
             drift_value=Decimal("100000"),
         )
     }
+	
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -486,12 +494,13 @@ def test_evaluate_passes_market_data_to_regime_engine(
     allocation_engine = MagicMock()
 
     portfolio_service.get_bucket_allocation.return_value = {
-    "defensive": MagicMock(
-        market_value=Decimal("175000"),
-        target_weight=Decimal("0.10"),
-        drift_value=Decimal("75000"),
-    )
-}
+        "defensive": MagicMock(
+			market_value=Decimal("175000"),
+			target_weight=Decimal("0.10"),
+			drift_value=Decimal("75000"),
+		)
+	}
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     market_data = {
         "sp500": 6500,
@@ -557,6 +566,7 @@ def test_evaluate_passes_regime_and_capital_to_regime_deployment_engine(
             drift_value=available_capital,
         )
     }
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
     regime_engine.evaluate.return_value = regime_result
 
     expected_decision = DeploymentEvaluation(
@@ -635,12 +645,13 @@ def test_crash_deployment_takes_priority_over_regime_deployment(
     available_capital = Decimal("100000")
 
     portfolio_service.get_bucket_allocation.return_value = {
-    "defensive": MagicMock(
-        market_value=available_capital,
-        target_weight=Decimal("0"),
-        drift_value=available_capital,
-    )
-}
+        "defensive": MagicMock(
+			market_value=available_capital,
+			target_weight=Decimal("0"),
+			drift_value=available_capital,
+		)
+	}
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -876,6 +887,8 @@ def test_crash_deployment_overrides_disabled_dynamic_deployment(
             drift_value=Decimal("100000"),
         )
     }
+	
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
@@ -935,6 +948,8 @@ def test_evaluate_passes_crash_drawdown_and_capital_to_crash_engine(
             drift_value=available_capital,
         )
     }
+	
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
 
     regime_engine.evaluate.return_value = {
         "regime": "RISK_ON",
