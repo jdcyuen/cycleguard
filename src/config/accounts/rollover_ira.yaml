@@ -148,9 +148,35 @@ tolerance: 0.05
 # Tells CycleGuard the desired portfolio-level allocation for specific securities.
 # CycleGuard's desired allocation for FTEC is 5% of the entire rollover IRA portfolio.
 security_targets:
+  FDRXX: 0.10
+  SGOV: 0.05
+  FXNAX: 0.07
+  VUSB: 0.03
+  BINC: 0.03
+  ICVT: 0.02
+  IBIE: 0.02
+  IBIC: 0.02
+  IBIF: 0.02
+  IBIG: 0.02
+  IBID: 0.02
+  FZROX: 0.15
   FTEC: 0.05
   SOXX: 0.04 
   SPMO: 0.03
+  SCHD: 0.03
+  GPIQ: 0.01
+  JEPQ: 0.01
+  FYEE: 0.01
+  RSPA: 0.01
+  JEPI: 0.01
+  GOOG: 0.02
+  SNDK: 0.02
+  NVDA: 0.02
+  MU: 0.01
+  FZILX: 0.05
+  VYMI:  0.03
+  IEMG: 0.04
+  DBMF: 0.06
 
 
 # =========================
