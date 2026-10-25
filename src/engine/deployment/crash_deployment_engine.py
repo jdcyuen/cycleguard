@@ -6,6 +6,12 @@ from engine.deployment.base_deployment_engine import BaseDeploymentEngine
 
 # CrashDeploymentEngine takes the drawdown calculated by CrashManager and 
 # applies CycleGuard's crash-deployment policy.
+#	1. Reads configured crash drawdown levels.
+#	2. Selects a matching level based on the drawdown.
+#	3. Calculates the proposed deployment as available_capital × deploy_pct.
+#	4. Returns a DeploymentEvaluation with source="crash".
+#	5. Returns HOLD when no configured level matches.
+
 
 class CrashDeploymentEngine(BaseDeploymentEngine):
     """
