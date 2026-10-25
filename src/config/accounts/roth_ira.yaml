@@ -56,6 +56,8 @@ bucket_mapping:
 # imported into PostgreSQL.
 #
 # The bucket weights should total 100% (1.00).
+
+
 #
 # CycleGuard uses these targets to:
 #   - calculate the desired allocation for each bucket
@@ -93,6 +95,7 @@ bucket_weights:
   foreign_equity: 0.00
   alternatives: 0.00
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:

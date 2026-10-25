@@ -1,0 +1,25 @@
+risk_profiles:
+  very_aggressive:
+    equity: 0.76
+    fixed_income: 0.19
+    alternatives: 0.05
+
+  aggressive:
+    equity: 0.665
+    fixed_income: 0.285
+    alternatives: 0.05
+
+  moderate:
+    equity: 0.57
+    fixed_income: 0.38
+    alternatives: 0.05
+
+  balanced:
+    equity: 0.475
+    fixed_income: 0.475
+    alternatives: 0.05
+
+  conservative:
+    equity: 0.38
+    fixed_income: 0.57
+    alternatives: 0.05

@@ -131,6 +131,18 @@ class AccountConfigLoader:
         )
 
         tolerance = config["tolerance"]
+        bucket_tolerance = config["bucket_tolerance"]
+
+        if (
+            not isinstance(bucket_tolerance, (int, float))
+            or isinstance(bucket_tolerance, bool)
+            or not math.isfinite(bucket_tolerance)
+            or not 0.0 <= bucket_tolerance <= 1.0
+        ):
+            raise ValueError(
+                f"Bucket tolerance for {file.name} "
+                "must be finite and between 0.0 and 1.0"
+            )
         
         security_targets = config.get(
             "security_targets",
@@ -214,6 +226,7 @@ class AccountConfigLoader:
             bucket_mapping=bucket_mapping,
             bucket_weights=bucket_weights,
             tolerance=tolerance,
+            bucket_tolerance=bucket_tolerance,
             security_targets=security_targets,
             position_limits=position_limits,
             settings=settings,

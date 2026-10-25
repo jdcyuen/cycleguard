@@ -46,11 +46,10 @@ bucket_mapping:
   BINC: fixed_income
   VUSB: fixed_income
   ICVT: fixed_income
-  VGLT: fixed_income
 
   # -------- TIPS Ladder --------
 
-  IBIC: tips_ladder
+  46438G505: tips_ladder
   IBID: tips_ladder
   IBIE: tips_ladder
   IBIF: tips_ladder
@@ -61,7 +60,9 @@ bucket_mapping:
   SCHD: equity_income
   JEPQ: equity_income
   JEPI: equity_income
-  VYMI: equity_income
+  FYEE: equity_income
+  GPIQ: equity_income
+  RSPA: equity_income
 
   # -------- Core Equity --------
 
@@ -69,32 +70,29 @@ bucket_mapping:
 
   # -------- Equity Growth --------
 
-  SCHG: equity_growth
   FTEC: equity_growth
+  SOXX: equity_growth
+  SPMO: equity_growth
 
   # -------- High Beta --------
 
-  SMH: high_beta
   NVDA: high_beta
   MU: high_beta
-  WDC: high_beta
-  CLS: high_beta
-  FBTC: high_beta
+  SNDK: high_beta
 
   # -------- Individual Stocks --------
 
-  AAPL: equity_growth
   GOOG: equity_growth
 
   # -------- Foreign Equity --------
 
   FZILX: foreign_equity
   IEMG: foreign_equity
+  VYMI: foreign_equity
 
   # -------- Alternatives --------
 
   DBMF: alternatives
-  IAUM: alternatives
 
 
 # =========================
@@ -137,6 +135,8 @@ bucket_weights:
   high_beta: 0.03
   foreign_equity: 0.08
   alternatives: 0.05
+  
+bucket_tolerance: 0.02  
 
 # tolerance:
 #   The acceptable drift percentage for any security before an action
@@ -182,7 +182,6 @@ position_limits:
   overrides:
 
     FZROX: 0.20
-    SMH: 0.15
     SCHD: 0.15
     SGOV: 0.25
     FXNAX: 0.25

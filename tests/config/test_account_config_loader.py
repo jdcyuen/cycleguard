@@ -28,6 +28,7 @@ bucket_weights:
   foreign_equity: 0.03
   alternatives: 0.02
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:
@@ -121,7 +122,8 @@ def test_load_file_parses_yaml(config_dir):
             "foreign_equity": 0.03,
             "alternatives": 0.02,
         },
-        tolerance = 0.05,
+        tolerance=0.05,
+        bucket_tolerance=0.02,
         security_targets={
             "FTEC": 0.07,
         },
@@ -162,6 +164,7 @@ bucket_weights:
   defensive: 0.50
   fixed_income: 0.30
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:
@@ -193,6 +196,7 @@ account:
 position_limits:
   max_position_pct: 1.50
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:
@@ -229,6 +233,7 @@ position_limits:
   overrides:
     FZROX: 1.50
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:
@@ -272,6 +277,7 @@ bucket_weights:
   foreign_equity: 0.03
   alternatives: 0.02
 
+bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:

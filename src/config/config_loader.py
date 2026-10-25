@@ -115,11 +115,12 @@ class ConfigLoader:
                     account_type=account_data["account_type"],
                     risk_profile=account_data["risk_profile"],
                     account_number=account_data["account_number"],
-                    institution=account_data["institution"],
+                    institution=account_data["institution"],					
                     bucket_mapping=data.get("bucket_mapping", {}),
                     bucket_weights=data.get("bucket_weights", {}),
-                    security_targets=data.get("security_targets", {}),
                     tolerance=data["tolerance"],
+                    bucket_tolerance=data["bucket_tolerance"],
+                    security_targets=data.get("security_targets", {}),					
                     position_limits=PositionLimits(
                         max_position_pct=data.get(
                             "position_limits", {}
