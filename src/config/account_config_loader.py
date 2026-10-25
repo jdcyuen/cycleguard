@@ -4,6 +4,10 @@ import yaml
 import math
 
 from core.logger import get_logger
+from config.bucket_target_validator import (
+    BucketTargetValidationError,
+    validate_bucket_security_targets,
+)
 
 from models.account_config import (
     AccountConfig,
