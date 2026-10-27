@@ -6,6 +6,7 @@ from engine.allocation.allocation_engine import AllocationEngine
 from engine.allocation.current_weight_proportional_strategy import (
     CurrentWeightProportionalStrategy,
 )
+from models.account_config import PositionLimits
 
 
 def test_classifies_explicit_and_dynamic_securities():
@@ -359,3 +360,77 @@ def test_allocates_only_available_underweight_capacity():
 
     assert sum(result.values(), Decimal("0")) == Decimal("15000")
 
+def test_position_limit_caps_deployment_at_account_default():
+    engine = AllocationEngine(
+        dynamic_allocation_strategy=CurrentWeightProportionalStrategy(),
+    )
+
+    result = engine.allocate_deployment(
+        deployment_amount=Decimal("50000"),
+        actual_targets={
+            "FTEC": Decimal("0.08"),
+        },
+        desired_targets={
+            "FTEC": Decimal("0.15"),
+        },
+        portfolio_value=Decimal("1000000"),
+        eligible_securities=["FTEC"],
+        position_limits=PositionLimits(
+            max_position_pct=0.10,
+            overrides={},
+        ),
+    )
+
+    # FTEC is at 8%; the 10% cap permits only another $20,000.
+    assert result == {
+        "FTEC": Decimal("20000"),
+    }
+
+def test_position_limit_symbol_override_takes_precedence():
+    engine = AllocationEngine(
+        dynamic_allocation_strategy=CurrentWeightProportionalStrategy(),
+    )
+
+    result = engine.allocate_deployment(
+        deployment_amount=Decimal("100000"),
+        actual_targets={
+            "FTEC": Decimal("0.08"),
+        },
+        desired_targets={
+            "FTEC": Decimal("0.15"),
+        },
+        portfolio_value=Decimal("1000000"),
+        eligible_securities=["FTEC"],
+        position_limits=PositionLimits(
+            max_position_pct=0.10,
+            overrides={"FTEC": 0.20},
+        ),
+    )
+
+    # The 20% FTEC override permits its full $70,000 target shortfall.
+    assert result == {
+        "FTEC": Decimal("70000"),
+    }
+
+def test_position_at_cap_receives_no_additional_deployment():
+    engine = AllocationEngine(
+        dynamic_allocation_strategy=CurrentWeightProportionalStrategy(),
+    )
+
+    result = engine.allocate_deployment(
+        deployment_amount=Decimal("50000"),
+        actual_targets={
+            "FTEC": Decimal("0.10"),
+        },
+        desired_targets={
+            "FTEC": Decimal("0.15"),
+        },
+        portfolio_value=Decimal("1000000"),
+        eligible_securities=["FTEC"],
+        position_limits=PositionLimits(
+            max_position_pct=0.10,
+            overrides={},
+        ),
+    )
+
+    assert result == {}
