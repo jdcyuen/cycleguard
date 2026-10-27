@@ -350,12 +350,28 @@ class DeploymentOrchestrationService:
                 len(eligible_securities),
             )
 
+            # Pass the account's configured position limits to the engine.
+            # Symbol-specific overrides take precedence over the account
+            # default and constrain how much new capital each position can
+            # receive.
+            position_limits = self.account.position_limits
+
+            logger.info(
+                "Applying account position limits to deployment: "
+                "account=%s, default_max_position_pct=%s, "
+                "override_count=%s",
+                self.account.name,
+                position_limits.max_position_pct,
+                len(position_limits.overrides),
+            )
+
             allocations = self.allocation_engine.allocate_deployment(
                 deployment_amount=deployment_amount,
                 actual_targets=actual_targets,
                 desired_targets=desired_targets,
                 portfolio_value=portfolio_value,
                 eligible_securities=eligible_securities,
+                position_limits=position_limits,
             )
 
             logger.info(
