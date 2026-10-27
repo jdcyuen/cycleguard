@@ -2,6 +2,7 @@
 
 import sys
 import os
+from decimal import Decimal
 from pathlib import Path
 
 from engine.regime.regime_engine import RegimeEngine
@@ -49,6 +50,7 @@ from services.portfolio_aggregation_service import (
 from services.deployment_orchestration_service import (
     DeploymentOrchestrationService,
 )
+from engine.deployment.cash_deployment_policy import CashDeploymentPolicy
 from engine.deployment.regime_deployment_engine import (
     RegimeDeploymentEngine,
 )
@@ -156,6 +158,16 @@ portfolio_service = PortfolioAggregationService(
 
 deployment_config = regime_config.get("deployment", {})
 
+crash_execution_rules = config.get(
+    "crash_deployment", {}
+).get("execution_rules", {})
+
+cash_deployment_policy = CashDeploymentPolicy(
+    max_deployment_per_event=Decimal(
+        str(crash_execution_rules.get("max_deployment_per_event", 0.15))
+    ),
+)
+
 deployment_policy = {
     regime: value
     for regime, value in deployment_config.items()
@@ -184,6 +196,7 @@ deployment_orchestration_service = DeploymentOrchestrationService(
     allocation_engine=allocation_engine,
     account_repository=account_repository,
     snapshot_repository=snapshot_repository,
+    cash_deployment_policy=cash_deployment_policy,
 )
 
 phase_data = {
@@ -331,7 +344,7 @@ with st.container(border=True):
             f"""
         ### Regime Signal Details
        **1. 📈 Trend ({trend.get("evidence", {}).get("comparison", {}).get("proxy", "SPY")}):** {trend.get("evidence", {}).get("why", "No explanation available.")}.<br>
-        Live Reading: SPY=\${trend.get("value", 0):.2f} | 50DMA=\${trend.get("dma50", 0):.2f} | 200DMA=\${trend.get("dma200", 0):.2f}
+        Live Reading: SPY=${trend.get("value", 0):.2f} | 50DMA=${trend.get("dma50", 0):.2f} | 200DMA=${trend.get("dma200", 0):.2f}
         
         **2. 📊 Breadth (Sectors):** {breadth.get("evidence", {}).get("why", "No explanation available.")}<br>
         Live Reading: {breadth_live}
