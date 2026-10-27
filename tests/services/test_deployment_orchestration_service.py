@@ -1,5 +1,6 @@
 
 import pytest
+from engine.deployment.cash_deployment_policy import CashDeploymentPolicy
 from decimal import Decimal
 from unittest.mock import MagicMock
 from datetime import date
@@ -121,7 +122,70 @@ def test_evaluate_returns_deployment_evaluation(
 
     assert result is expected_decision
 
+def test_evaluate_caps_deployment_at_configured_event_limit(
+    account,
+    account_repository,
+    snapshot_repository,
+):
+    portfolio_service = MagicMock()
+    regime_engine = MagicMock()
+    regime_deployment_engine = MagicMock()
+    crash_manager = MagicMock()
+    crash_deployment_engine = MagicMock()
+    allocation_engine = MagicMock()
 
+    portfolio_service.get_bucket_allocation.return_value = {
+        "defensive": MagicMock(
+            market_value=Decimal("300000"),
+            target_weight=Decimal("0"),
+            drift_value=Decimal("300000"),
+        )
+    }
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
+
+    regime_engine.evaluate.return_value = {
+        "regime": "RISK_ON",
+        "signals": {},
+    }
+
+    regime_deployment_engine.evaluate.return_value = DeploymentEvaluation(
+        action="DEPLOY",
+        deployment_pct=Decimal("1.0"),
+        deployment_amount=Decimal("300000"),
+    )
+
+    crash_manager.run.return_value = {"drawdown": Decimal("0")}
+    crash_deployment_engine.evaluate.return_value = DeploymentEvaluation(
+        action="HOLD",
+        deployment_pct=Decimal("0"),
+        deployment_amount=Decimal("0"),
+    )
+
+    policy = CashDeploymentPolicy(
+        max_deployment_per_event=Decimal("0.15"),
+    )
+
+    service = DeploymentOrchestrationService(
+        portfolio_service=portfolio_service,
+        regime_engine=regime_engine,
+        crash_manager=crash_manager,
+        regime_deployment_engine=regime_deployment_engine,
+        crash_deployment_engine=crash_deployment_engine,
+        account=account,
+        allocation_engine=allocation_engine,
+        account_repository=account_repository,
+        snapshot_repository=snapshot_repository,
+        cash_deployment_policy=policy,
+    )
+
+    result = service.evaluate(
+        snapshot_id=123,
+        market_data={"test": "data"},
+    )
+
+    assert result.action == "DEPLOY"
+    assert result.deployment_amount == Decimal("150000")
+    assert result.deployment_pct == Decimal("0.5")
 
 def test_evaluate_gets_available_capital_from_portfolio_service(
     account,
@@ -1305,6 +1369,62 @@ def test_evaluate_blocks_deployment_when_snapshot_lookup_fails(
     regime_engine.evaluate.assert_not_called()
     crash_manager.run.assert_not_called()
 
+def test_evaluate_caps_deployment_at_configured_event_limit(
+    account,
+    account_repository,
+    snapshot_repository,
+):
+    portfolio_service = MagicMock()
+    regime_engine = MagicMock()
+    regime_deployment_engine = MagicMock()
+    crash_manager = MagicMock()
+    crash_deployment_engine = MagicMock()
+    allocation_engine = MagicMock()
 
+    portfolio_service.get_bucket_allocation.return_value = {
+        "defensive": MagicMock(
+            market_value=Decimal("300000"),
+            target_weight=Decimal("0"),
+            drift_value=Decimal("300000"),
+        )
+    }
+    portfolio_service.get_portfolio_value.return_value = Decimal("1000000")
+
+    regime_engine.evaluate.return_value = {
+        "regime": "RISK_ON",
+        "signals": {},
+    }
+
+    regime_deployment_engine.evaluate.return_value = DeploymentEvaluation(
+        action="DEPLOY",
+        deployment_pct=Decimal("1.0"),
+        deployment_amount=Decimal("300000"),
+    )
+
+    policy = CashDeploymentPolicy(
+        max_deployment_per_event=Decimal("0.15"),
+    )
+
+    service = DeploymentOrchestrationService(
+        portfolio_service=portfolio_service,
+        regime_engine=regime_engine,
+        crash_manager=crash_manager,
+        regime_deployment_engine=regime_deployment_engine,
+        crash_deployment_engine=crash_deployment_engine,
+        account=account,
+        allocation_engine=allocation_engine,
+        account_repository=account_repository,
+        snapshot_repository=snapshot_repository,
+        cash_deployment_policy=policy,
+    )
+
+    result = service.evaluate(
+        snapshot_id=123,
+        market_data={"test": "data"},
+    )
+
+    assert result.action == "DEPLOY"
+    assert result.deployment_amount == Decimal("150000")
+    assert result.deployment_pct == Decimal("0.5")
 
 
