@@ -1137,6 +1137,7 @@ def test_allocate_deployment_passes_portfolio_data_to_allocation_engine(
         },
         portfolio_value=portfolio_value,
         eligible_securities=["FTEC", "SOXX"],
+        position_limits=account.position_limits,
     )
 
 
