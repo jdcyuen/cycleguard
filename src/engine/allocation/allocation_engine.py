@@ -215,7 +215,7 @@ class AllocationEngine:
             sum(dynamic_targets.values(), Decimal("0")),
         )
 
-        return dynamic_targets    
+        return dynamic_targets
 
 
     def calculate_security_differences(
@@ -266,7 +266,7 @@ class AllocationEngine:
             len(differences),
         )
 
-        return differences  
+        return differences
 
     def determine_allocation_status(
         self,
@@ -331,7 +331,7 @@ class AllocationEngine:
             upper_bound,
         )
 
-        return "HOLD"  
+        return "HOLD"
 
     def calculate_security_action_amount(
         self,
@@ -427,33 +427,167 @@ class AllocationEngine:
 
         return Decimal("0")
 
+
+
     def _calculate_deployment_needs(
         self,
         actual_targets: dict[str, Decimal],
         desired_targets: dict[str, Decimal],
         portfolio_value: Decimal,
         eligible_securities: list[str],
+        position_limits=None,
     ) -> dict[str, Decimal]:
-        """Calculate dollar underweight needs for eligible securities."""
+        """
+        Calculate permitted deployment needs for eligible securities.
 
+        A security must be underweight and eligible for deployment.
+        Its initial need is the dollar amount required to reach its
+        desired target weight.
+
+        When position limits are supplied, cap that need at the
+        remaining dollar capacity allowed by the security's position
+        limit. A symbol-specific override takes precedence over the
+        account's default position limit.
+        """
+        logger.info(
+            "Calculating deployment needs: portfolio_value=%s, "
+            "eligible_security_count=%s, position_limits_enabled=%s",
+            portfolio_value,
+            len(eligible_securities),
+            position_limits is not None,
+        )
+
+        # Calculate desired weight minus actual weight for each security.
+        # Only positive differences represent underweight positions.
         differences = self.calculate_security_differences(
             actual_targets=actual_targets,
             desired_targets=desired_targets,
         )
 
-        needs = {
-            symbol: portfolio_value * difference
-            for symbol, difference in differences.items()
-            if symbol in eligible_securities
-            and difference > Decimal("0")
-        }
+        needs = {}
 
-        logger.debug(
-            "Calculated deployment needs: %s",
+        for symbol, difference in differences.items():
+            # Exclude securities that the orchestration service has not
+            # approved as eligible for this deployment.
+            if symbol not in eligible_securities:
+                logger.debug(
+                    "Deployment need skipped: symbol=%s, reason=ineligible",
+                    symbol,
+                )
+                continue
+
+            # Do not allocate new capital to positions already at or
+            # above their desired target.
+            if difference <= Decimal("0"):
+                logger.debug(
+                    "Deployment need skipped: symbol=%s, "
+                    "reason=not_underweight, weight_difference=%s",
+                    symbol,
+                    difference,
+                )
+                continue
+
+            # Convert the underweight percentage into dollars.
+            # Example: a 2% shortfall in a $1,000,000 portfolio is $20,000.
+            initial_need = portfolio_value * difference
+            permitted_need = initial_need
+
+            logger.debug(
+                "Initial deployment need calculated: symbol=%s, "
+                "actual_weight=%s, desired_weight=%s, "
+                "weight_difference=%s, initial_need=%s",
+                symbol,
+                actual_targets.get(symbol, Decimal("0")),
+                desired_targets.get(symbol, Decimal("0")),
+                difference,
+                initial_need,
+            )
+
+            if position_limits is not None:
+                # A symbol-specific override takes precedence over the
+                # account-wide default maximum position percentage.
+                has_override = symbol in position_limits.overrides
+                limit_pct = Decimal(
+                    str(
+                        position_limits.overrides.get(
+                            symbol,
+                            position_limits.max_position_pct,
+                        )
+                    )
+                )
+
+                current_weight = actual_targets.get(
+                    symbol,
+                    Decimal("0"),
+                )
+
+                # Calculate how much more this position can receive before
+                # reaching its configured maximum portfolio weight.
+                remaining_capacity = max(
+                    Decimal("0"),
+                    portfolio_value * (limit_pct - current_weight),
+                )
+
+                # Never propose more than either the target shortfall or
+                # the position's remaining permitted capacity.
+                permitted_need = min(
+                    initial_need,
+                    remaining_capacity,
+                )
+
+                logger.debug(
+                    "Position limit evaluated: symbol=%s, "
+                    "limit_source=%s, limit_pct=%s, current_weight=%s, "
+                    "remaining_capacity=%s, initial_need=%s, "
+                    "permitted_need=%s",
+                    symbol,
+                    "override" if has_override else "default",
+                    limit_pct,
+                    current_weight,
+                    remaining_capacity,
+                    initial_need,
+                    permitted_need,
+                )
+
+                # INFO makes it easy to find cases where a configured
+                # position limit constrains a proposed deployment.
+                if permitted_need < initial_need:
+                    logger.info(
+                        "Position limit reduced deployment need: "
+                        "symbol=%s, initial_need=%s, permitted_need=%s, "
+                        "reduction=%s, limit_pct=%s, current_weight=%s",
+                        symbol,
+                        initial_need,
+                        permitted_need,
+                        initial_need - permitted_need,
+                        limit_pct,
+                        current_weight,
+                    )
+
+            if permitted_need > Decimal("0"):
+                needs[symbol] = permitted_need
+            else:
+                logger.info(
+                    "No deployment permitted for security: symbol=%s, "
+                    "initial_need=%s, reason=no_remaining_capacity_or_need",
+                    symbol,
+                    initial_need,
+                )
+
+        # Report the final needs that the proportional allocator may use.
+        total_need = sum(needs.values(), Decimal("0"))
+
+        logger.info(
+            "Deployment needs calculated: eligible_needs=%s, "
+            "security_count=%s, total_permitted_need=%s",
             needs,
+            len(needs),
+            total_need,
         )
 
         return needs
+
+
 
     @staticmethod
     def _calculate_proportional_allocations(
@@ -509,6 +643,7 @@ class AllocationEngine:
         desired_targets: dict[str, Decimal],
         portfolio_value: Decimal,
         eligible_securities: list[str],
+        position_limits=None,
     ) -> dict[str, Decimal]:
         """
         Distribute approved deployment capital across eligible underweight securities.
@@ -567,11 +702,21 @@ class AllocationEngine:
                 )
                 return {}
 
+            # Apply account position limits before distributing deployment
+            # capital, so the proportional allocator cannot exceed the
+            # permitted dollar need calculated for each security.
+            logger.debug(
+                "Passing position limits to deployment-needs calculation: "
+                "limits_enabled=%s",
+                position_limits is not None,
+            )
+
             needs = self._calculate_deployment_needs(
                 actual_targets=actual_targets,
                 desired_targets=desired_targets,
                 portfolio_value=portfolio_value,
                 eligible_securities=eligible_securities,
+                position_limits=position_limits,
             )
 
             if not needs:
