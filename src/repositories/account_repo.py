@@ -1,6 +1,6 @@
 from typing import Optional
 
-import psycopg
+import psycopg2
 
 from models.account import Account
 from core.logger import get_logger
@@ -58,11 +58,57 @@ class AccountRepository:
                     institution=row[3],
                 )
 
-        except psycopg.Error as exc:
+        except psycopg2.Error as exc:
             logger.exception(f"Failed to lookup account id={account_id}.")
             raise AccountRepositoryError(
                 f"Failed to lookup account id={account_id}"
             ) from exc
+			
+    def get_by_account_number(
+        self,
+        account_number: str,
+    ) -> Optional[Account]:
+
+        logger.info(
+            "Looking up account by normalized account number."
+        )
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, account_number, name, institution
+                    FROM cycleguard.accounts
+                    WHERE UPPER(
+                        REGEXP_REPLACE(account_number, '\\s', '', 'g')
+                    ) = UPPER(
+                        REGEXP_REPLACE(%s, '\\s', '', 'g')
+                    )
+                    """,
+                    (account_number,),
+                )
+
+                row = cur.fetchone()
+
+                if row is None:
+                    logger.info("Account number not found.")
+                    return None
+
+                return Account(
+                    id=row[0],
+                    account_number=row[1],
+                    name=row[2],
+                    institution=row[3],
+                )
+
+        except psycopg2.Error as exc:
+            logger.exception(
+                "Failed to lookup account by account number."
+            )
+            raise AccountRepositoryError(
+                "Failed to lookup account by account number."
+            ) from exc
+	
 
     def get_by_name(
         self,
@@ -105,7 +151,7 @@ class AccountRepository:
                     institution=row[3],
                 )
 
-        except psycopg.Error as exc:
+        except psycopg2.Error as exc:
             logger.exception(f"Failed to lookup account '{name}'.")
 
             raise AccountRepositoryError(
@@ -145,7 +191,7 @@ class AccountRepository:
                     for row in accounts
                 ]
 
-        except psycopg.Error as exc:
+        except psycopg2.Error as exc:
             logger.exception(f"Failed to list accounts.")
             raise AccountRepositoryError(
                 "Failed to list accounts"
@@ -194,7 +240,7 @@ class AccountRepository:
                     institution=row[3],
                 )
 
-        except psycopg.IntegrityError as exc:
+        except psycopg2.IntegrityError as exc:
 
             self.conn.rollback()
             logger.exception(f"Account '{account.name}' already exists.")
@@ -203,7 +249,7 @@ class AccountRepository:
                 f"Account '{account.name}' already exists."
             ) from exc
 
-        except psycopg.Error as exc:
+        except psycopg2.Error as exc:
 
             self.conn.rollback()
             logger.exception(f"Failed to create account '{ account.name}'.")

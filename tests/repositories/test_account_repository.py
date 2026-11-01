@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-import psycopg
+import psycopg2
 import pytest
 
 from repositories.account_repo import (
@@ -49,14 +49,74 @@ def test_get_by_id_returns_none_when_missing(repository, mock_conn):
 
 def test_get_by_id_database_error(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
-    cursor.execute.side_effect = psycopg.Error("database unavailable")
+    cursor.execute.side_effect = psycopg2.Error("database unavailable")
 
     with pytest.raises(
         AccountRepositoryError,
         match="Failed to lookup account id=123",
     ):
         repository.get_by_id(123)
+		
+def test_get_by_account_number_returns_account(repository, mock_conn):
+    cursor = mock_conn.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (
+        123,
+        "Z32228042",
+        "Joint WROS TOD",
+        "Fidelity",
+    )
 
+    result = repository.get_by_account_number("Z32228042")
+
+    assert isinstance(result, Account)
+    assert result.id == 123
+    assert result.account_number == "Z32228042"
+    assert result.name == "Joint WROS TOD"
+
+    sql, params = cursor.execute.call_args.args
+    assert "REGEXP_REPLACE" in sql
+    assert params == ("Z32228042",)
+
+
+def test_get_by_account_number_normalizes_input(repository, mock_conn):
+    cursor = mock_conn.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (
+        123,
+        "Z32228042",
+        "Joint WROS TOD",
+        "Fidelity",
+    )
+
+    result = repository.get_by_account_number("z322 28042")
+
+    assert result is not None
+    assert result.account_number == "Z32228042"
+
+    _, params = cursor.execute.call_args.args
+    assert params == ("z322 28042",)
+
+
+def test_get_by_account_number_returns_none_when_missing(
+    repository,
+    mock_conn,
+):
+    cursor = mock_conn.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = None
+
+    result = repository.get_by_account_number("MISSING123")
+
+    assert result is None
+
+
+def test_get_by_account_number_database_error(repository, mock_conn):
+    cursor = mock_conn.cursor.return_value.__enter__.return_value
+    cursor.execute.side_effect = psycopg2.Error("database unavailable")
+
+    with pytest.raises(
+        AccountRepositoryError,
+        match="Failed to lookup account by account number",
+    ):
+        repository.get_by_account_number("Z32228042")				
 
 def test_get_by_name_returns_account(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
@@ -84,7 +144,7 @@ def test_get_by_name_returns_none_when_missing(repository, mock_conn):
 
 def test_get_by_name_database_error(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
-    cursor.execute.side_effect = psycopg.Error("database unavailable")
+    cursor.execute.side_effect = psycopg2.Error("database unavailable")
 
     with pytest.raises(
         AccountRepositoryError,
@@ -115,7 +175,7 @@ def test_list_accounts(repository, mock_conn):
 
 def test_list_accounts_database_error(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
-    cursor.execute.side_effect = psycopg.Error("database unavailable")
+    cursor.execute.side_effect = psycopg2.Error("database unavailable")
 
     with pytest.raises(
         AccountRepositoryError,
@@ -167,7 +227,7 @@ def test_create_account(repository, mock_conn):
 
 def test_create_account_integrity_error(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
-    cursor.execute.side_effect = psycopg.IntegrityError("duplicate account")
+    cursor.execute.side_effect = psycopg2.IntegrityError("duplicate account")
 
     with pytest.raises(
         AccountRepositoryError,
@@ -187,7 +247,7 @@ def test_create_account_integrity_error(repository, mock_conn):
 
 def test_create_account_database_error(repository, mock_conn):
     cursor = mock_conn.cursor.return_value.__enter__.return_value
-    cursor.execute.side_effect = psycopg.Error("database unavailable")
+    cursor.execute.side_effect = psycopg2.Error("database unavailable")
 
     with pytest.raises(
         AccountRepositoryError,

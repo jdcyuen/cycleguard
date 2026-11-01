@@ -10,24 +10,22 @@ snapshot already stored in the CycleGuard database.
 
 Responsibilities
 ----------------
-1. Resolve database accounts to YAML account configurations by account number.
+1. Resolve database accounts to YAML account configurations through the
+   shared DriftDetectionOrchestrationService.
 2. Allow the user to select an account and refresh its drift analysis.
-3. Retrieve the latest stored snapshot without importing a CSV or creating
-   a new snapshot.
-4. Evaluate position and bucket drift through DriftDetectionService.
-5. Display results in AG Grid, with position and bucket rows clearly distinct.
-6. Warn about missing snapshots and snapshots older than one calendar day.
+3. Evaluate the latest stored database snapshot without importing a CSV
+   or creating a new snapshot.
+4. Display position and bucket drift results in AG Grid.
+5. Warn about missing snapshots and snapshots older than one calendar day.
 
 Architecture
 ------------
 - This module owns Streamlit presentation and user interaction.
-- AccountConfigLoader resolves YAML configurations.
-- AccountRepository and SnapshotRepository provide database account/snapshot
-  access.
-- PortfolioAggregationService supplies portfolio and bucket calculations.
-- DriftDetectionService evaluates drift and delegates bucket trim proposals
-  to BucketTrimProposalService.
-- Business calculations and proposal rules remain outside this UI component.
+- DriftDetectionOrchestrationService coordinates account matching, snapshot
+  retrieval, portfolio aggregation, and drift evaluation.
+- AccountRepository and SnapshotRepository provide database access to the
+  orchestration service.
+- Business calculations and proposal rules remain in the service layer.
 
 Inputs
 ------
@@ -63,21 +61,29 @@ configuration in YAML. Avoid duplicating calculations performed by services.
 
 from __future__ import annotations
 
-from src.core.logger import get_logger
+from core.logger import get_logger
 from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
-
-from config.account_config_loader import AccountConfigLoader
 from repositories.account_repo import AccountRepository
 from repositories.snapshot_repo import SnapshotRepository
-from repositories.position_repo import PositionRepository
-from services.drift_detection_service import DriftDetectionService
-from services.portfolio_aggregation_service import PortfolioAggregationService
-
+from services.drift_detection_orchestration_service import (
+    DriftDetectionOrchestrationService,
+)
+from services.account_reconciliation_service import (
+    AccountReconciliationService,
+    AccountReconciliationServiceError,
+    normalize_account_number,
+)
+from services.account_registration_service import (
+    AccountRegistrationService,
+    AccountRegistrationError,
+    AccountRegistrationValidationError,
+    AccountRegistrationConflictError,
+)
 
 logger = get_logger(__name__)
 
@@ -86,10 +92,8 @@ GRID_HEIGHT = 520
 
 
 def _normalize_account_number(value: Any) -> str:
-    """Normalize account numbers for YAML-to-database matching."""
-    if value is None:
-        return ""
-    return "".join(str(value).split()).strip()
+    """Use the shared account-number normalization rule."""
+    return normalize_account_number(value)
 
 
 def _get_account_number(account: Any) -> str:
@@ -366,86 +370,126 @@ def _build_grid(rows: list[dict[str, Any]], account_id: Any) -> None:
         fit_columns_on_grid_load=False,
         key=f"drift_detection_grid_{account_id}",
     )
+	
+def _render_pending_account_registration(
+    pending_accounts: list[Any],
+    account_repository: AccountRepository,
+) -> None:
+    """Prompt once to register all pending YAML accounts."""
 
+    success_message = st.session_state.pop(
+        "account_registration_success",
+        None,
+    )
+    if success_message:
+        st.success(success_message)
 
-def _load_account_configurations() -> list[Any]:
-    """Load YAML configurations and report configuration failures."""
-    try:
-        configurations = AccountConfigLoader().load()
-    except Exception:
-        logger.exception("Unable to load account YAML configurations")
-        raise
+    if st.session_state.pop(
+        "suppress_account_registration_dialog_once",
+        False,
+    ):
+        return
 
-    if not configurations:
-        logger.warning("No account YAML configurations were loaded")
+    if not pending_accounts:
+        return
 
-    return configurations
-
-
-def _match_accounts_to_configurations(
-    database_accounts: list[Any],
-    configurations: list[Any],
-) -> list[tuple[Any, Any]]:
-    """Match database accounts to YAML configurations by account number."""
-    configs_by_number = {
-        _normalize_account_number(getattr(config, "account_number", None)): config
-        for config in configurations
-        if _normalize_account_number(
-            getattr(config, "account_number", None)
+    @st.dialog("Unregistered Accounts")
+    def confirm_registration() -> None:
+        st.write(
+            "The following accounts have YAML configurations "
+            "but are not registered in CycleGuard:"
         )
-    }
 
-    matches: list[tuple[Any, Any]] = []
-
-    for database_account in database_accounts:
-        account_number = _get_account_number(database_account)
-
-        if not account_number:
-            logger.warning(
-                "Database account id=%s has no account number",
-                getattr(database_account, "id", None),
+        for account_config in pending_accounts:
+            display_name = (
+                getattr(account_config, "display_name", None)
+                or "Unnamed Account"
             )
-            continue
-
-        configuration = configs_by_number.get(account_number)
-
-        if configuration is None:
-            logger.warning(
-                "No YAML configuration matches database account id=%s",
-                getattr(database_account, "id", None),
+            account_number = normalize_account_number(
+                getattr(account_config, "account_number", None)
             )
-            continue
+            st.write(f"- **{display_name}** (`{account_number}`)")
 
-        matches.append((database_account, configuration))
+        st.write(
+            f"Would you like to register all "
+            f"{len(pending_accounts)} account(s)?"
+        )
 
-    return matches
+        col_yes, col_no = st.columns(2)
 
+        with col_yes:
+            if st.button(
+                "Yes, register all",
+                type="primary",
+                use_container_width=True,
+                key="confirm_register_all_accounts",
+            ):
+                registration_service = AccountRegistrationService(
+                    account_repository
+                )
 
-def _evaluate_snapshot_drift(
-    db_connection: Any,
-    account_config: Any,
-    snapshot_id: int,
-) -> list[dict[str, Any]]:
-    """Build services and evaluate drift for an existing snapshot."""
-    position_repository = PositionRepository(db_connection)
-    portfolio_service = PortfolioAggregationService(
-        position_repository,
-        account_config,
-    )
-    drift_service = DriftDetectionService(
-        portfolio_service,
-        account_config,
-    )
+                successful = []
+                failed = []
 
-    logger.info(
-        "Evaluating drift for account=%s snapshot_id=%s",
-        getattr(account_config, "name", "unknown"),
-        snapshot_id,
-    )
+                for account_config in pending_accounts:
+                    display_name = (
+                        getattr(account_config, "display_name", None)
+                        or "Unnamed Account"
+                    )
 
-    return drift_service.evaluate(snapshot_id)
+                    try:
+                        registration_service.register(account_config)
+                        successful.append(display_name)
 
+                    except AccountRegistrationError as exc:
+                        logger.warning(
+                            "Account registration rejected for %s: %s",
+                            display_name,
+                            exc,
+                        )
+                        failed.append(f"{display_name}: {exc}")
 
+                    except Exception:
+                        logger.exception(
+                            "Unexpected registration failure for %s",
+                            display_name,
+                        )
+                        failed.append(
+                            f"{display_name}: Unexpected error. "
+                            "Check application logs."
+                        )
+
+                messages = []
+
+                if successful:
+                    messages.append(
+                        "Successfully registered: "
+                        + ", ".join(successful)
+                    )
+
+                if failed:
+                    messages.append(
+                        "Registration failures: "
+                        + "; ".join(failed)
+                    )
+
+                st.session_state["account_registration_success"] = (
+                    " | ".join(messages)
+                )
+                st.rerun()
+
+        with col_no:
+            if st.button(
+                "No",
+                use_container_width=True,
+                key="cancel_register_all_accounts",
+            ):
+                st.session_state[
+                    "suppress_account_registration_dialog_once"
+                ] = True
+                st.rerun()
+
+    confirm_registration()
 
 def render_drift_detection(
     db_connection: Any,
@@ -466,12 +510,30 @@ def render_drift_detection(
         )
 
         try:
-            configurations = _load_account_configurations()
-            database_accounts = account_repository.list_accounts()
-            matches = _match_accounts_to_configurations(
-                database_accounts,
-                configurations,
+            reconciliation_service = AccountReconciliationService(
+                account_repository
             )
+            reconciliation = reconciliation_service.reconcile()
+
+            orchestration_service = DriftDetectionOrchestrationService(
+                db_connection,
+                account_repository,
+                snapshot_repository,
+            )
+
+            matches = [
+                (match.database_account, match.account_config)
+                for match in reconciliation.active_accounts
+            ]
+
+        except AccountReconciliationServiceError as exc:
+            logger.exception(
+                "Account reconciliation failed in Drift Detection"
+            )
+            st.error(
+                f"Account reconciliation failed: {exc}"
+            )
+            return
         except Exception:
             logger.exception(
                 "Unable to initialize the Drift Detection panel"
@@ -480,8 +542,32 @@ def render_drift_detection(
                 "Drift Detection could not load account information. "
                 "Check the application logs for details."
             )
-            return
+            return			
 
+        if reconciliation.historical_accounts:
+            st.caption(
+                f"{len(reconciliation.historical_accounts)} historical/inactive "
+                "database account(s) have no matching YAML configuration."
+            )
+
+        if reconciliation.duplicate_accounts:
+            st.error(
+                f"{len(reconciliation.duplicate_accounts)} duplicate account "
+                "group(s) detected. These accounts are excluded from Drift Detection."
+            )
+            for duplicate in reconciliation.duplicate_accounts:
+                st.warning(
+                    f"Duplicate account number: "
+                    f"{duplicate.normalized_account_number} "
+                    f"(source: {duplicate.source}, "
+                    f"records: {len(duplicate.records)})"
+                )
+
+        _render_pending_account_registration(
+            reconciliation.pending_registration,
+            account_repository,
+        )
+		
         if not matches:
             st.warning(
                 "No database accounts match an account_number in the YAML "
@@ -510,11 +596,18 @@ def render_drift_detection(
 
             labels[label] = (database_account, account_config)
 
+        dropdown_width = max(
+            200,
+            max(len(label) for label in labels) * 8 + 48,
+        )
+
         selected_label = st.selectbox(
             "Account",
             options=list(labels.keys()),
             key="drift_detection_account_selector",
+            width=dropdown_width,
         )
+        
         database_account, account_config = labels[selected_label]
         account_id = getattr(database_account, "id", None)
 
@@ -534,17 +627,36 @@ def render_drift_detection(
             )
 
         try:
-            snapshot = snapshot_repository.get_latest_by_account(account_id)
+            with st.spinner("Evaluating portfolio drift..."):
+                result = orchestration_service.evaluate_account(
+                    database_account,
+                    account_config,
+                )
+        except ValueError as exc:
+            logger.warning(
+                "Drift evaluation validation failed for account_id=%s: %s",
+                account_id,
+                exc,
+                exc_info=True,
+            )
+            st.error(
+                "Drift evaluation could not complete because portfolio "
+                "validation failed. Review account YAML bucket mappings, "
+                "targets, and the application logs."
+            )
+            return
         except Exception:
             logger.exception(
-                "Unable to retrieve latest snapshot for account_id=%s",
+                "Unexpected drift evaluation failure for account_id=%s",
                 account_id,
             )
             st.error(
-                "Unable to retrieve the latest snapshot. "
+                "Drift evaluation failed unexpectedly. "
                 "Check the application logs for details."
             )
             return
+
+        snapshot = result.snapshot
 
         if snapshot is None:
             logger.info(
@@ -558,19 +670,7 @@ def render_drift_detection(
             )
             return
 
-        snapshot_id = getattr(snapshot, "id", None)
         snapshot_date = _get_snapshot_date(snapshot)
-
-        if snapshot_id is None:
-            logger.error(
-                "Latest snapshot for account_id=%s has no snapshot id",
-                account_id,
-            )
-            st.error(
-                "The latest snapshot record is missing its identifier. "
-                "Check the database and application logs."
-            )
-            return
 
         if snapshot_date is None:
             st.warning(
@@ -597,40 +697,7 @@ def render_drift_detection(
                     "refreshing drift does not import newer data."
                 )
 
-        try:
-            with st.spinner("Evaluating portfolio drift..."):
-                rows = _evaluate_snapshot_drift(
-                    db_connection,
-                    account_config,
-                    snapshot_id,
-                )
-        except ValueError as exc:
-            logger.warning(
-                "Drift evaluation validation failed for account_id=%s "
-                "snapshot_id=%s: %s",
-                account_id,
-                snapshot_id,
-                exc,
-                exc_info=True,
-            )
-            st.error(
-                "Drift evaluation could not complete because portfolio "
-                "validation failed. Review account YAML bucket mappings, "
-                "targets, and the application logs."
-            )
-            return
-        except Exception:
-            logger.exception(
-                "Unexpected drift evaluation failure for account_id=%s "
-                "snapshot_id=%s",
-                account_id,
-                snapshot_id,
-            )
-            st.error(
-                "Drift evaluation failed unexpectedly. "
-                "Check the application logs for details."
-            )
-            return
+        rows = result.rows
 
         if not rows:
             st.info("The latest snapshot contains no rows to evaluate.")
@@ -692,6 +759,7 @@ def render_drift_detection(
                 "Position rows do not duplicate bucket trim amounts."
             )
 
+        snapshot_id = getattr(snapshot, "id", None)
         logger.info(
             "Drift Detection rendered for account_id=%s snapshot_id=%s "
             "positions=%s buckets=%s",
