@@ -40,8 +40,11 @@ bucket_mapping:
   FTEC: equity_growth
   SOXX: equity_growth
   XBI: equity_growth
+  SPMO: equity_growth
   MU: high_beta
   SNDK: high_beta
+  MRNA: high_beta
+  TEAM: high_beta
 
 
 # =========================
@@ -85,23 +88,30 @@ bucket_mapping:
 
 bucket_weights:
 
-  defensive: 0.05
+  defensive: 0.13
   fixed_income: 0.00
   tips_ladder: 0.00
-  core_equity: 0.35
+  core_equity: 0.25
   equity_income: 0.00
-  equity_growth: 0.25
-  high_beta: 0.35
+  equity_growth: 0.40
+  high_beta: 0.22
   foreign_equity: 0.00
   alternatives: 0.00
 
 bucket_tolerance: 0.02
-tolerance: 0.05
+tolerance: 0.10
 
 security_targets:
-  FTEC: 0.05
-  SOXX: 0.04 
-  SPMO: 0.03
+  FZROX: 0.25
+  FTEC: 0.15
+  SOXX: 0.12
+  SPMO: 0.08
+  MU: 0.07
+  SNDK: 0.07
+  TEAM: 0.05
+  MRNA: 0.03
+  XBI: 0.05
+  FDRXX: 0.13
 
 # =========================
 # POSITION LIMITS
@@ -164,16 +174,16 @@ position_limits:
   max_position_pct: 0.20
 
   overrides:
-
-    FZROX: 0.40
-
-    SCHG: 0.30
-
-    SMH: 0.30
-
-    SNDK: 0.15
-
-    SGOV: 0.25
+    FZROX: 0.35
+    FTEC: 0.25
+    SOXX: 0.20
+    SPMO: 0.15
+    MU: 0.12
+    SNDK: 0.12
+    TEAM: 0.10
+    MRNA: 0.07
+    XBI: 0.10
+    FDRXX: 0.20
 
 
 # =========================

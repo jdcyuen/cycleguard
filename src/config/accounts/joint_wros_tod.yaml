@@ -39,39 +39,45 @@ bucket_mapping:
 
   # -------- Defensive / Cash --------
 
-  # SGOV: defensive
+  SPAXX: defensive
+
 
   # -------- Fixed Income --------
 
-  # Add approved fixed-income securities here.
+
 
   # -------- TIPS Ladder --------
 
-  # Add approved TIPS ladder securities here.
-
-  # -------- Core Equity --------
-
-  # Add approved core-equity securities here.
 
   # -------- Equity Income --------
 
-  # Add approved equity-income securities here.
+  SCHD: equity_income
+
+
+  # -------- Core Equity --------
+
+  FZROX: core_equity
 
   # -------- Equity Growth --------
 
-  # Add approved equity-growth securities here.
+
 
   # -------- High Beta --------
 
-  # Add approved high-beta securities here.
+
+
+  # -------- Individual Stocks --------
+
+
 
   # -------- Foreign Equity --------
 
-  # Add approved foreign-equity securities here.
+
 
   # -------- Alternatives --------
 
-  # Add approved alternative securities here.
+
+
 
 
 # =========================
@@ -101,23 +107,23 @@ bucket_mapping:
 
 bucket_weights:
 
-  defensive: 0.05
-  fixed_income: 0.25
-  tips_ladder: 0.05
-  core_equity: 0.25
-  equity_income: 0.15
-  equity_growth: 0.10
-  high_beta: 0.05
-  foreign_equity: 0.07
-  alternatives: 0.03
+  defensive: 0.30
+  fixed_income: 0.00
+  tips_ladder: 0.00
+  core_equity: 0.50
+  equity_income: 0.20
+  equity_growth: 0.00
+  high_beta: 0.00
+  foreign_equity: 0.00
+  alternatives: 0.00
 
 bucket_tolerance: 0.02
 tolerance: 0.05
 
 security_targets:
-  FTEC: 0.05
-  SOXX: 0.04 
-  SPMO: 0.03
+  FZROX: 0.50
+  SCHD: 0.20
+  SPAXX: 0.30
 
 # =========================
 # POSITION LIMITS
@@ -147,13 +153,13 @@ position_limits:
 
   overrides:
 
-    SCHD: 0.15
+    SCHD: 0.50
 
-    JEPI: 0.10
+    FZROX: 0.50
 
-    JEPQ: 0.10
+    SPAXX: 0.30
 
-    SGOV: 0.20
+
 
 
 # =========================
