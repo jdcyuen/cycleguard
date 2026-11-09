@@ -1,10 +1,12 @@
 # tests/config/test_account_config_loader.py
 
 from pathlib import Path
-
+import logging
 import pytest
 
+import config.account_config_loader as account_config_loader_module
 from config.account_config_loader import AccountConfigLoader
+from config.bucket_target_validator import BucketTargetValidationError
 from models.account_config import AccountConfig, PositionLimits, AccountSettings
 
 
@@ -27,6 +29,9 @@ bucket_weights:
   high_beta: 0.03
   foreign_equity: 0.03
   alternatives: 0.02
+
+bucket_mapping:
+  FTEC: equity_growth
 
 bucket_tolerance: 0.02
 tolerance: 0.05
@@ -110,8 +115,10 @@ def test_load_file_parses_yaml(config_dir):
         risk_profile="conservative",
         account_number="123456",
         institution="Fidelity",
-         bucket_mapping={},
-         bucket_weights={
+        bucket_mapping={
+            "FTEC": "equity_growth",
+        },
+        bucket_weights={
             "defensive": 0.15,
             "fixed_income": 0.30,
             "tips_ladder": 0.10,
@@ -313,3 +320,73 @@ settings:
     assert account.settings.rebalance_frequency == "monthly"
     assert account.settings.allow_fractional_shares is True
     assert account.tolerance == 0.05
+
+def test_bucket_target_validation_error_logs_warning_and_continues(
+    config_dir,
+    monkeypatch,
+    caplog,
+):
+    def raise_validation_error(**kwargs):
+        raise BucketTargetValidationError(
+            "Test bucket target validation issue"
+        )
+
+    monkeypatch.setattr(
+        account_config_loader_module,
+        "validate_bucket_security_targets",
+        raise_validation_error,
+    )
+
+    loader = AccountConfigLoader(config_dir)
+
+    logger = logging.getLogger("app.config.account_config_loader")
+    logger.addHandler(caplog.handler)
+
+    try:
+        with caplog.at_level(
+            "WARNING",
+            logger="app.config.account_config_loader",
+        ):
+            account = loader.get("rollover_ira")
+    finally:
+        logger.removeHandler(caplog.handler)
+
+    assert account is not None
+    assert account.name == "rollover_ira"
+    assert "Test bucket target validation issue" in caplog.text
+    assert "Loading continues" in caplog.text
+
+def test_unexpected_validation_error_is_logged_and_propagated(
+    config_dir,
+    monkeypatch,
+    caplog,
+):
+    def raise_unexpected_error(**kwargs):
+        raise RuntimeError("Unexpected validation failure")
+
+    monkeypatch.setattr(
+        account_config_loader_module,
+        "validate_bucket_security_targets",
+        raise_unexpected_error,
+    )
+
+    loader = AccountConfigLoader(config_dir)
+
+    logger = logging.getLogger("app.config.account_config_loader")
+    logger.addHandler(caplog.handler)
+
+    try:
+        with caplog.at_level(
+            "ERROR",
+            logger="app.config.account_config_loader",
+        ):
+            with pytest.raises(
+                RuntimeError,
+                match="Unexpected validation failure",
+            ):
+                loader.get("rollover_ira")
+    finally:
+        logger.removeHandler(caplog.handler)
+
+    assert "Failed to load account configuration" in caplog.text
+    assert "Unexpected validation failure" in caplog.text

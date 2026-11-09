@@ -35,7 +35,7 @@ Data Sources
 ------------
 - Account views: PortfolioAccountView models.
 - Holdings: PortfolioHolding models.
-- Allocations: PortfolioAllocation models.
+- Allocations: PortfolioBucketAllocation models.
 - Completeness indicators: determined by the orchestration service.
 
 Maintenance Notes
@@ -60,7 +60,9 @@ from dataclasses import dataclass, field
 
 from models.portfolio_view.portfolio_account_view import PortfolioAccountView
 from models.portfolio_view.portfolio_holding import PortfolioHolding
-from models.portfolio_view.portfolio_allocation import PortfolioAllocation
+from models.portfolio_view.portfolio_bucket_allocation import (
+    PortfolioBucketAllocation,
+)
 
 
 @dataclass(slots=True)
@@ -112,10 +114,10 @@ class PortfolioViewResult:
     holdings: list[PortfolioHolding] = field(default_factory=list)
     """List of securities included in the selected portfolio view."""
 
-    actual_allocations: list[PortfolioAllocation] = field(default_factory=list)
+    actual_allocations: list[PortfolioBucketAllocation] = field(default_factory=list)
     """List of actual bucket allocations."""
 
-    target_allocations: list[PortfolioAllocation] = field(default_factory=list)
+    target_allocations: list[PortfolioBucketAllocation] = field(default_factory=list)
     """List of configured target bucket allocations."""
 
     missing_snapshot_accounts: list[str] = field(default_factory=list)

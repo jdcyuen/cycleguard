@@ -5,9 +5,15 @@ from unittest.mock import MagicMock
 import pytest
 
 from models.position import Position
+from models.account_config import (
+    AccountConfig,
+    AccountSettings,
+    PositionLimits,
+)
 from models.portfolio_view import (
     PortfolioAccountView,
     PortfolioHolding,
+    PortfolioTargetHolding,
 )
 from services.portfolio_view_orchestration_service import (
     PortfolioViewOrchestrationService,
@@ -262,3 +268,296 @@ class TestActualAllocationCalculation:
                 holdings=[],
                 bucket_names=[],
             )
+
+class TestTargetAllocationCalculation:
+    """Tests for configured target bucket and security allocations."""
+
+    @pytest.fixture
+    def account_config(self):
+        return AccountConfig(
+            name="rollover_ira",
+            display_name="Rollover IRA",
+            account_type="ira",
+            risk_profile="conservative",
+            account_number="123456",
+            institution="Fidelity",
+            bucket_mapping={
+                "FZROX": "core_equity",
+                "FTEC": "equity_growth",
+                "SOXX": "equity_growth",
+            },
+            bucket_weights={
+                "defensive": 0.15,
+                "fixed_income": 0.30,
+                "tips_ladder": 0.10,
+                "core_equity": 0.20,
+                "equity_income": 0.10,
+                "equity_growth": 0.07,
+                "high_beta": 0.03,
+                "foreign_equity": 0.03,
+                "alternatives": 0.02,
+            },
+            tolerance=0.05,
+            bucket_tolerance=0.02,
+            security_targets={
+                "FZROX": 0.20,
+                "FTEC": 0.05,
+                "SOXX": 0.01,
+            },
+            position_limits=PositionLimits(
+                max_position_pct=0.25,
+                overrides={},
+            ),
+            settings=AccountSettings(
+                rebalance_frequency="quarterly",
+                allow_fractional_shares=True,
+                enable_recovery_trims=True,
+                enable_dynamic_deployment=True,
+            ),
+        )
+
+    def test_creates_all_configured_buckets(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        assert len(allocations) == 9
+
+        assert [allocation.bucket for allocation in allocations] == [
+            "defensive",
+            "fixed_income",
+            "tips_ladder",
+            "core_equity",
+            "equity_income",
+            "equity_growth",
+            "high_beta",
+            "foreign_equity",
+            "alternatives",
+        ]
+
+    def test_converts_bucket_weights_to_percentage_points(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        core = next(
+            allocation
+            for allocation in allocations
+            if allocation.bucket == "core_equity"
+        )
+
+        assert core.percentage == Decimal("20.00")
+
+    def test_assigns_target_securities_to_configured_buckets(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        growth = next(
+            allocation
+            for allocation in allocations
+            if allocation.bucket == "equity_growth"
+        )
+
+        assert len(growth.target_holdings) == 2
+
+        targets = {
+            holding.symbol: holding
+            for holding in growth.target_holdings
+        }
+
+        assert targets["FTEC"].bucket == "equity_growth"
+        assert targets["FTEC"].target_percentage == Decimal("5.00")
+
+        assert targets["SOXX"].bucket == "equity_growth"
+        assert targets["SOXX"].target_percentage == Decimal("1.00")
+
+    def test_preserves_bucket_weight_independently_of_security_targets(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        growth = next(
+            allocation
+            for allocation in allocations
+            if allocation.bucket == "equity_growth"
+        )
+
+        # The bucket target comes from bucket_weights, not a
+        # recalculation based on the sum of security targets.
+        assert growth.percentage == Decimal("7.00")
+
+        assert sum(
+            (
+                holding.target_percentage
+                for holding in growth.target_holdings
+            ),
+            Decimal("0"),
+        ) == Decimal("6.00")
+
+    def test_includes_buckets_without_target_securities(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        defensive = next(
+            allocation
+            for allocation in allocations
+            if allocation.bucket == "defensive"
+        )
+
+        assert defensive.percentage == Decimal("15.00")
+        assert defensive.target_holdings == []
+
+    def test_target_holdings_are_independent_of_actual_holdings(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        all_targets = [
+            holding
+            for allocation in allocations
+            for holding in allocation.target_holdings
+        ]
+
+        assert len(all_targets) == 3
+        assert all(
+            isinstance(holding, PortfolioTargetHolding)
+            for holding in all_targets
+        )
+
+class TestBuildAccountView:
+    """Tests for account view orchestration."""
+
+    def test_calculates_targets_when_snapshot_is_missing(
+        self, service, account_view, monkeypatch
+    ):
+        account_view.database_account.id = 1
+
+        service.list_accounts = MagicMock(
+            return_value=[account_view]
+        )
+
+        service.snapshot_repository = MagicMock()
+        service.snapshot_repository.get_latest_by_account.return_value = (
+            None
+        )
+
+        bucket_names = ["core_equity", "fixed_income"]
+
+        service._load_valid_bucket_names = MagicMock(
+            return_value=bucket_names
+        )
+
+        expected_targets = [
+            MagicMock(bucket="core_equity"),
+            MagicMock(bucket="fixed_income"),
+        ]
+
+        calculate_targets = MagicMock(
+            return_value=expected_targets
+        )
+
+        monkeypatch.setattr(
+            service,
+            "_calculate_target_allocations",
+            calculate_targets,
+        )
+
+        result = service.build_account_view(account_id=1)
+
+        calculate_targets.assert_called_once_with(
+            account_config=account_view.account_config,
+            bucket_names=bucket_names,
+        )
+
+        assert result.target_allocations == expected_targets
+        assert result.snapshot is None
+        assert result.actual_allocations == []
+        assert "No portfolio snapshot" in result.message
+
+    def test_calculates_targets_and_actuals_when_snapshot_exists(
+        self, service, account_view, monkeypatch
+    ):
+        account_view.database_account.id = 1
+
+        service.list_accounts = MagicMock(
+            return_value=[account_view]
+        )
+
+        snapshot = MagicMock()
+        snapshot.id = 123
+
+        service.snapshot_repository = MagicMock()
+        service.snapshot_repository.get_latest_by_account.return_value = (
+            snapshot
+        )
+
+        bucket_names = ["core_equity", "fixed_income"]
+
+        service._load_valid_bucket_names = MagicMock(
+            return_value=bucket_names
+        )
+
+        holdings = [MagicMock()]
+        expected_targets = [MagicMock()]
+        expected_actuals = [MagicMock()]
+
+        monkeypatch.setattr(
+            service,
+            "_add_bucket_mappings_to_positions",
+            MagicMock(return_value=holdings),
+        )
+
+        monkeypatch.setattr(
+            service,
+            "_calculate_target_allocations",
+            MagicMock(return_value=expected_targets),
+        )
+
+        monkeypatch.setattr(
+            service,
+            "_calculate_actual_allocations",
+            MagicMock(return_value=expected_actuals),
+        )
+
+        monkeypatch.setattr(
+            service,
+            "_validate_position_percentages",
+            MagicMock(),
+        )
+
+        result = service.build_account_view(account_id=1)
+
+        assert result.snapshot is snapshot
+        assert result.holdings == holdings
+        assert result.target_allocations == expected_targets
+        assert result.actual_allocations == expected_actuals
+
+        service._calculate_target_allocations.assert_called_once_with(
+            account_config=account_view.account_config,
+            bucket_names=bucket_names,
+        )
+
+        service._calculate_actual_allocations.assert_called_once_with(
+            holdings=holdings,
+            bucket_names=bucket_names,
+        )

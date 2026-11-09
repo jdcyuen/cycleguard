@@ -1,15 +1,14 @@
-
 """
-Module: portfolio_allocation
+Module: portfolio_bucket_allocation
 
 Purpose
 -------
-Defines the PortfolioAllocation model used to represent an aggregate
-CycleGuard bucket allocation.
+Define the PortfolioBucketAllocation model used to represent an
+aggregate CycleGuard bucket allocation.
 
 Architecture
 ------------
-PortfolioAllocation belongs to the Portfolio View model package.
+PortfolioBucketAllocation belongs to the Portfolio View model package.
 It groups individual PortfolioHolding objects into a bucket-level
 allocation for actual and target portfolio analysis.
 
@@ -18,7 +17,7 @@ Responsibilities
 - Identify the canonical CycleGuard allocation bucket.
 - Store the bucket's aggregate allocation percentage.
 - Store its aggregate market value when representing actual allocation.
-- Associate the holdings contributing to the bucket.
+- Associate the actual holdings contributing to the bucket.
 - Support both actual and target allocation representations.
 
 Design Principles
@@ -54,10 +53,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from models.portfolio_view.portfolio_holding import PortfolioHolding
-
+from models.portfolio_view.portfolio_target_holding import (
+    PortfolioTargetHolding,
+)
 
 @dataclass(slots=True)
-class PortfolioAllocation:
+class PortfolioBucketAllocation:
     """
     Represent the aggregate allocation of one CycleGuard bucket.
 
@@ -75,6 +76,10 @@ class PortfolioAllocation:
 
         holdings:
             PortfolioHolding instances contributing to this bucket.
+			
+		target_holdings:
+            PortfolioTargetHolding instances representing configured
+            security targets assigned to this bucket.
     """
 
     bucket: str
@@ -87,4 +92,9 @@ class PortfolioAllocation:
     """Aggregate actual market value in USD; None when not applicable."""
 
     holdings: list[PortfolioHolding] = field(default_factory=list)
-    """List of securities associated with this bucket; defaults to an empty list."""
+    """List of actual securities associated with this bucket."""
+	
+    target_holdings: list[PortfolioTargetHolding] = field(
+        default_factory=list
+    )
+    """List of configured security targets associated with this bucket."""

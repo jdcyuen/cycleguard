@@ -210,8 +210,9 @@ from config.account_config_loader import AccountConfigLoader
 from core.logger import get_logger
 from models.portfolio_view import (
     PortfolioAccountView,
-    PortfolioAllocation,
+    PortfolioBucketAllocation,
     PortfolioHolding,
+	PortfolioTargetHolding,
     PortfolioViewResult,
 )
 from repositories.account_repo import AccountRepository
@@ -265,7 +266,7 @@ class PortfolioViewOrchestrationService:
         logger.info(
             "PortfolioViewOrchestrationService initialized."
         )
-		
+
     def list_accounts(self) -> list[PortfolioAccountView]:
         """
         Return all active, reconciled accounts available to Portfolio View.
@@ -374,6 +375,17 @@ class PortfolioViewOrchestrationService:
                     "reconciled account."
                 )
 
+            # Load canonical buckets for both target and actual allocations.
+            bucket_names = self._load_valid_bucket_names()
+
+			# Calculate configured targets independently of snapshot availability.
+            account_view.target_allocations = (
+				self._calculate_target_allocations(
+					account_config=account_view.account_config,
+					bucket_names=bucket_names,
+				)
+)
+
             snapshot = self.snapshot_repository.get_latest_by_account(
                 account_id
             )
@@ -402,9 +414,6 @@ class PortfolioViewOrchestrationService:
                         account_config=account_view.account_config,
                     )
                 )
-				
-                # Load the permitted bucket identifiers.
-                bucket_names = self._load_valid_bucket_names()
 
                 # Calculate actual allocations using snapshot positions.
                 account_view.actual_allocations = (
@@ -436,7 +445,7 @@ class PortfolioViewOrchestrationService:
                 account_id,
             )
             raise
-			
+
     def _add_bucket_mappings_to_positions(
         self,
         snapshot_id: int,
@@ -527,12 +536,85 @@ class PortfolioViewOrchestrationService:
                 snapshot_id,
             )
             raise
-			
+
+    def _calculate_target_allocations(
+		self,
+		account_config: AccountConfig,
+		bucket_names: list[str],
+	) -> list[PortfolioBucketAllocation]:
+        """
+		Build target bucket and security allocations from account configuration.
+
+		Target allocations are independent of actual portfolio holdings.
+		Account configuration stores allocation weights as decimal fractions;
+		this method converts them to percentage points for Portfolio View.
+
+		Args:
+			account_config: Account configuration containing bucket weights,
+				security targets, and symbol-to-bucket mappings.
+			bucket_names: Canonical bucket names.
+
+		Returns:
+			A list of target allocations, including buckets without
+			individual security targets.
+
+		Raises:
+			ValueError: If a target security has no valid canonical bucket
+				mapping.
+		"""
+        if account_config is None:
+            raise ValueError("Account configuration is required.")
+
+        if not bucket_names:
+            raise ValueError("Canonical bucket names are required.")
+
+        bucket_allocations = {}
+
+        for bucket in bucket_names:
+            weight = account_config.bucket_weights.get(bucket, 0)
+
+            bucket_allocations[bucket] = PortfolioBucketAllocation(
+				bucket=bucket,
+				market_value=Decimal("0"),
+				percentage=Decimal(str(weight)) * Decimal("100"),
+				holdings=[],
+				target_holdings=[],
+			)
+
+        for symbol, target_weight in account_config.security_targets.items():
+            bucket = account_config.bucket_mapping.get(symbol)
+
+            if bucket is None:
+                raise ValueError(
+					f"Target security '{symbol}' has no bucket mapping."
+				)
+
+            if bucket not in bucket_allocations:
+                raise ValueError(
+					f"Target security '{symbol}' maps to unknown "
+					f"canonical bucket '{bucket}'."
+				)
+
+            target_holding = PortfolioTargetHolding(
+				symbol=symbol,
+				bucket=bucket,
+				target_percentage=(
+					Decimal(str(target_weight)) * Decimal("100")
+				),
+				account_name=account_config.display_name,
+			)
+
+            bucket_allocations[bucket].target_holdings.append(
+				target_holding
+			)
+
+        return list(bucket_allocations.values())
+
     def _calculate_actual_allocations(
         self,
         holdings: list[PortfolioHolding],
         bucket_names: list[str],
-    ) -> list[PortfolioAllocation]:
+    ) -> list[PortfolioBucketAllocation]:
         """
         Calculate actual portfolio allocations by canonical bucket.
 
@@ -547,7 +629,7 @@ class PortfolioViewOrchestrationService:
 
         Returns
         -------
-        list[PortfolioAllocation]
+        list[PortfolioBucketAllocation]
             Actual bucket allocations, including empty buckets and
             UNMAPPED when applicable.
 
@@ -595,7 +677,7 @@ class PortfolioViewOrchestrationService:
                 )
 
                 allocations.append(
-                    PortfolioAllocation(
+                    PortfolioBucketAllocation(
                         bucket=bucket,
                         percentage=percentage,
                         market_value=market_value,
@@ -611,7 +693,7 @@ class PortfolioViewOrchestrationService:
 
             if unmapped_holdings:
                 allocations.append(
-                    PortfolioAllocation(
+                    PortfolioBucketAllocation(
                         bucket="UNMAPPED",
                         percentage=sum(
                             (
@@ -644,7 +726,7 @@ class PortfolioViewOrchestrationService:
                 "Failed calculating actual portfolio allocations."
             )
             raise
-			
+
     def _validate_position_percentages(
         self,
         holdings: list[PortfolioHolding],
@@ -688,7 +770,7 @@ class PortfolioViewOrchestrationService:
             "Validating position percentages for account %s.",
             account_view.account_config.name,
         )
-		
+
         if not holdings:
             warning = (
                 "Position percentage reconciliation is incomplete. "
@@ -772,7 +854,7 @@ class PortfolioViewOrchestrationService:
                 account_view.account_config.name,
             )
             raise
-			
+
     def _load_valid_bucket_names(self) -> list[str]:
         """
         Load valid bucket identifiers from system configuration.

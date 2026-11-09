@@ -5,7 +5,7 @@ from models.account_config import AccountConfig
 from models.bucket_allocation import BucketAllocation
 from models.portfolio_bucket import PortfolioBucket
 from models.position_allocation import PositionAllocation
-from models.portfolio_allocation import PortfolioAllocation
+from models.portfolio_allocation_summary import PortfolioAllocationSummary
 
 from repositories.position_repo import PositionRepository
 
@@ -381,7 +381,7 @@ class PortfolioAggregationService:
     def get_portfolio_allocation(
         self,
         snapshot_id: int,
-    ) -> PortfolioAllocation:
+    ) -> PortfolioAllocationSummary:
         """
         Return the complete aggregated portfolio allocation.
         """
@@ -393,7 +393,7 @@ class PortfolioAggregationService:
             snapshot_id
         )
 
-        return PortfolioAllocation(
+        return PortfolioAllocationSummary(
             portfolio_value=portfolio_value,
             buckets=buckets,
         )

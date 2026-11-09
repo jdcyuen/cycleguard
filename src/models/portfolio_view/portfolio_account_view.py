@@ -38,7 +38,7 @@ Data Sources
 - Account configuration: AccountConfig model.
 - Snapshot: Snapshot model.
 - Holdings: PortfolioHolding models.
-- Allocations: PortfolioAllocation models.
+- Allocations: PortfolioBucketAllocation models.
 
 Maintenance Notes
 -----------------
@@ -58,7 +58,9 @@ from models.account import Account
 from models.account_config import AccountConfig
 from models.snapshot import Snapshot
 from models.portfolio_view.portfolio_holding import PortfolioHolding
-from models.portfolio_view.portfolio_allocation import PortfolioAllocation
+from models.portfolio_view.portfolio_bucket_allocation import (
+    PortfolioBucketAllocation,
+)
 
 
 @dataclass(slots=True)
@@ -104,10 +106,10 @@ class PortfolioAccountView:
     holdings: list[PortfolioHolding] = field(default_factory=list)
     """List of securities associated with the account."""
 
-    actual_allocations: list[PortfolioAllocation] = field(default_factory=list)
+    actual_allocations: list[PortfolioBucketAllocation] = field(default_factory=list)
     """List of actual bucket allocations for the account."""
 
-    target_allocations: list[PortfolioAllocation] = field(default_factory=list)
+    target_allocations: list[PortfolioBucketAllocation] = field(default_factory=list)
     """List of configured target bucket allocations for the account."""
 
     validation_warnings: list[str] = field(default_factory=list)
