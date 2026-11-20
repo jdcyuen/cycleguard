@@ -51,3 +51,26 @@ class YFinanceDataProvider(IDataProvider):
         result = pd.DataFrame(df["Close"])
         result.columns = [tickers[0]]
         return result
+
+    def fetch_52_week_range(self, ticker: str) -> dict:
+        """
+        Fetch the 52-week low and high for a security.
+
+        Returns
+        -------
+        dict
+            Contains year_low and year_high.
+        """
+
+        try:
+            fast_info = yf.Ticker(ticker).fast_info
+
+            return {
+				"year_low": fast_info.get("yearLow"),
+				"year_high": fast_info.get("yearHigh"),
+			}
+
+        except Exception as exc:
+            raise DataProviderError(
+                f"Failed to fetch 52-week range for ticker: {ticker}"
+            ) from exc

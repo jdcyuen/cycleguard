@@ -47,6 +47,9 @@ from repositories.position_repo import PositionRepository
 from services.portfolio_aggregation_service import (
     PortfolioAggregationService,
 )
+from services.portfolio_view_orchestration_service import (
+    PortfolioViewOrchestrationService,
+)
 from services.deployment_orchestration_service import (
     DeploymentOrchestrationService,
 )
@@ -63,7 +66,7 @@ from engine.allocation.current_weight_proportional_strategy import (
 )
 from database.connection import DBConnection
 from config.account_config_loader import AccountConfigLoader
-
+from data.providers.yfinance_data_provider import YFinanceDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +153,16 @@ if account is None:
 account_repository = AccountRepository(db_conn)
 snapshot_repository = SnapshotRepository(db_conn)
 position_repository = PositionRepository(db_conn)
+
+data_provider = YFinanceDataProvider()
+
+portfolio_view_service = PortfolioViewOrchestrationService(
+    db_connection=db_connection,
+    account_repository=account_repository,
+    snapshot_repository=snapshot_repository,
+    position_repository=position_repository,
+    data_provider=data_provider,
+)
 
 portfolio_service = PortfolioAggregationService(
     position_repository,
@@ -372,7 +385,10 @@ with st.container(border=True):
 
 
 # PORTFOLIO OVERVIEW
-render_portfolio_view(portfolio)
+render_portfolio_view(
+    portfolio,
+    portfolio_view_service=portfolio_view_service,
+)
 
 
 # =========================

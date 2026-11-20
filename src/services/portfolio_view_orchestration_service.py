@@ -222,6 +222,7 @@ from services.account_reconciliation_service import (
     AccountReconciliationService,
 )
 from models.account_config import AccountConfig
+from data.providers.yfinance_data_provider import YFinanceDataProvider
 
 
 logger = get_logger(__name__)
@@ -237,6 +238,7 @@ class PortfolioViewOrchestrationService:
         snapshot_repository: SnapshotRepository,
         position_repository: PositionRepository,
         config_loader: AccountConfigLoader | None = None,
+        data_provider: YFinanceDataProvider | None = None,
     ) -> None:
         """Initialize the service with injected dependencies."""
 
@@ -261,6 +263,12 @@ class PortfolioViewOrchestrationService:
             config_loader
             if config_loader is not None
             else AccountConfigLoader()
+        )
+
+        self.data_provider = (
+            data_provider
+            if data_provider is not None
+            else YFinanceDataProvider()
         )
 
         logger.info(
@@ -378,6 +386,19 @@ class PortfolioViewOrchestrationService:
             # Load canonical buckets for both target and actual allocations.
             bucket_names = self._load_valid_bucket_names()
 
+            unmapped_target_symbols = [
+                symbol
+                for symbol in account_view.account_config.security_targets
+                if symbol not in account_view.account_config.bucket_mapping
+            ]
+
+            for symbol in unmapped_target_symbols:
+                warning = (
+                    f"Target security '{symbol}' has no bucket mapping; "
+                    "it is excluded from target bucket allocations."
+                )
+                account_view.validation_warnings.append(warning)
+
 			# Calculate configured targets independently of snapshot availability.
             account_view.target_allocations = (
 				self._calculate_target_allocations(
@@ -443,6 +464,230 @@ class PortfolioViewOrchestrationService:
             logger.exception(
                 "Failed to build Portfolio View for account ID %d.",
                 account_id,
+            )
+            raise
+
+    def build_all_accounts_view(self) -> PortfolioViewResult:
+        """
+        Build a consolidated Portfolio View across all active accounts.
+
+        Each account retains its own holdings and target allocations.
+        Consolidated actual allocations are calculated using combined
+        market values rather than account-level percentages.
+
+        Returns
+        -------
+        PortfolioViewResult
+            Consolidated portfolio information, including account
+            views, holdings, allocations, and completeness indicators.
+
+        Raises
+        ------
+        Exception
+            Propagates unexpected reconciliation, repository,
+            configuration, or calculation failures.
+        """
+
+        logger.info("Building consolidated Portfolio View for all accounts.")
+
+        try:
+            available_accounts = self.list_accounts()
+
+            if not available_accounts:
+                return PortfolioViewResult(
+                    selected_account_id=None,
+                    message="No active accounts are available for Portfolio View.",
+                )
+
+            account_views = []
+            all_holdings = []
+            all_target_allocations = []
+            missing_snapshot_accounts = []
+            validation_warnings = []
+
+            for account in available_accounts:
+                account_id = account.database_account.id
+
+                account_view = self.build_account_view(account_id)
+                account_views.append(account_view)
+
+                all_holdings.extend(account_view.holdings)
+                all_target_allocations.extend(
+                    account_view.target_allocations
+                )
+
+                if account_view.snapshot is None:
+                    missing_snapshot_accounts.append(
+                        account_view.account_config.display_name
+                    )
+
+                validation_warnings.extend(
+                    account_view.validation_warnings
+                )
+
+            bucket_names = self._load_valid_bucket_names()
+
+            actual_allocations = (
+                self._calculate_consolidated_actual_allocations(
+                    holdings=all_holdings,
+                    bucket_names=bucket_names,
+                )
+            )
+
+            actual_complete = not missing_snapshot_accounts
+
+            result = PortfolioViewResult(
+                selected_account_id=None,
+                accounts=account_views,
+                holdings=all_holdings,
+                actual_allocations=actual_allocations,
+                target_allocations=all_target_allocations,
+                missing_snapshot_accounts=missing_snapshot_accounts,
+                validation_warnings=validation_warnings,
+                actual_allocation_complete=actual_complete,
+                target_allocation_complete=True,
+            )
+
+            logger.info(
+                "Built consolidated Portfolio View for %d accounts. "
+                "Holdings: %d; missing snapshots: %d.",
+                len(account_views),
+                len(all_holdings),
+                len(missing_snapshot_accounts),
+            )
+
+            return result
+
+        except Exception:
+            logger.exception(
+                "Failed to build consolidated Portfolio View."
+            )
+            raise
+
+    def _calculate_consolidated_actual_allocations(
+        self,
+        holdings: list[PortfolioHolding],
+        bucket_names: list[str],
+    ) -> list[PortfolioBucketAllocation]:
+        """
+        Calculate consolidated actual allocations using market values.
+
+        Bucket percentages are calculated against the combined market
+        value of all available holdings, not by adding account-level
+        percentages.
+
+        Parameters
+        ----------
+        holdings : list[PortfolioHolding]
+            Holdings from all accounts with available snapshots.
+
+        bucket_names : list[str]
+            Canonical CycleGuard bucket identifiers.
+
+        Returns
+        -------
+        list[PortfolioBucketAllocation]
+            Consolidated actual bucket allocations.
+
+        Raises
+        ------
+        ValueError
+            If bucket_names is invalid.
+        """
+
+        if not isinstance(bucket_names, list) or not bucket_names:
+            raise ValueError("bucket_names must be a non-empty list.")
+
+        if not isinstance(holdings, list):
+            raise ValueError("holdings must be a list.")
+
+        logger.info(
+            "Calculating consolidated allocations for %d holdings.",
+            len(holdings),
+        )
+
+        try:
+            total_market_value = sum(
+                (
+                    holding.position.current_value
+                    for holding in holdings
+                ),
+                Decimal("0"),
+            )
+
+            allocations = []
+
+            for bucket in bucket_names:
+                bucket_holdings = [
+                    holding
+                    for holding in holdings
+                    if holding.bucket == bucket
+                ]
+
+                market_value = sum(
+                    (
+                        holding.position.current_value
+                        for holding in bucket_holdings
+                    ),
+                    Decimal("0"),
+                )
+
+                percentage = (
+                    market_value / total_market_value * Decimal("100")
+                    if total_market_value > 0
+                    else Decimal("0")
+                )
+
+                allocations.append(
+                    PortfolioBucketAllocation(
+                        bucket=bucket,
+                        percentage=percentage,
+                        market_value=market_value,
+                        holdings=bucket_holdings,
+                    )
+                )
+
+            unmapped_holdings = [
+                holding
+                for holding in holdings
+                if holding.bucket == "UNMAPPED"
+            ]
+
+            if unmapped_holdings:
+                unmapped_market_value = sum(
+                    (
+                        holding.position.current_value
+                        for holding in unmapped_holdings
+                    ),
+                    Decimal("0"),
+                )
+
+                unmapped_percentage = (
+                    unmapped_market_value / total_market_value
+                    * Decimal("100")
+                    if total_market_value > 0
+                    else Decimal("0")
+                )
+
+                allocations.append(
+                    PortfolioBucketAllocation(
+                        bucket="UNMAPPED",
+                        percentage=unmapped_percentage,
+                        market_value=unmapped_market_value,
+                        holdings=unmapped_holdings,
+                    )
+                )
+
+            logger.info(
+                "Calculated %d consolidated bucket allocations.",
+                len(allocations),
+            )
+
+            return allocations
+
+        except Exception:
+            logger.exception(
+                "Failed calculating consolidated portfolio allocations."
             )
             raise
 
@@ -574,20 +819,26 @@ class PortfolioViewOrchestrationService:
             weight = account_config.bucket_weights.get(bucket, 0)
 
             bucket_allocations[bucket] = PortfolioBucketAllocation(
-				bucket=bucket,
-				market_value=Decimal("0"),
-				percentage=Decimal(str(weight)) * Decimal("100"),
-				holdings=[],
-				target_holdings=[],
-			)
+                bucket=bucket,
+                market_value=Decimal("0"),
+                percentage=Decimal(str(weight)) * Decimal("100"),
+                holdings=[],
+                target_holdings=[],
+                account_name=account_config.display_name,
+            )
 
         for symbol, target_weight in account_config.security_targets.items():
             bucket = account_config.bucket_mapping.get(symbol)
 
             if bucket is None:
-                raise ValueError(
-					f"Target security '{symbol}' has no bucket mapping."
-				)
+                logger.warning(
+                    "Target security '%s' has no bucket mapping "
+                    "for account '%s'. Excluding it from target "
+                    "bucket allocations.",
+                    symbol,
+                    account_config.display_name,
+                )
+                continue
 
             if bucket not in bucket_allocations:
                 raise ValueError(
@@ -854,6 +1105,61 @@ class PortfolioViewOrchestrationService:
                 account_view.account_config.name,
             )
             raise
+
+    def fetch_52_week_ranges(
+        self,
+        symbols: list[str],
+    ) -> dict[str, dict[str, float | None]]:
+        """
+        Fetch 52-week low and high values for unique securities.
+
+        Each symbol is queried once per call. Individual data
+        retrieval failures do not prevent the Portfolio View
+        from loading.
+        """
+
+        ranges: dict[str, dict[str, float | None]] = {}
+
+        unique_symbols = sorted(
+            {
+                str(symbol).strip().upper()
+                for symbol in symbols
+                if symbol and str(symbol).strip()
+            }
+        )
+
+        for symbol in unique_symbols:
+            try:
+                result = self.data_provider.fetch_52_week_range(
+                    symbol
+                )
+
+                ranges[symbol] = {
+                    "year_low": (
+                        float(result["year_low"])
+                        if result.get("year_low") is not None
+                        else None
+                    ),
+                    "year_high": (
+                        float(result["year_high"])
+                        if result.get("year_high") is not None
+                        else None
+                    ),
+                }
+
+            except Exception:
+                logger.warning(
+                    "Unable to retrieve 52-week range for %s.",
+                    symbol,
+                    exc_info=True,
+                )
+
+                ranges[symbol] = {
+                    "year_low": None,
+                    "year_high": None,
+                }
+
+        return ranges
 
     def _load_valid_bucket_names(self) -> list[str]:
         """

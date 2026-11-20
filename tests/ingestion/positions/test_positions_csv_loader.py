@@ -146,8 +146,8 @@ def test_numeric_cleanup(
     csv_file = tmp_path / "positions.csv"
 
     csv_file.write_text(
-        """Symbol,Account Number,Quantity,Current Value,Total Gain Loss Percent
-AAPL,12345,"1,000","$12,345.67","+15.25%"
+        """Symbol,Account Number,Quantity,Last Price,Current Value,Total Gain Loss Percent
+AAPL,12345,"1,000","$123.45","$12,345.67","+15.25%"
 """
     )
 
@@ -156,6 +156,7 @@ AAPL,12345,"1,000","$12,345.67","+15.25%"
     row = rows[0]
 
     assert row["quantity"] == Decimal("1000")
+    assert row["last_price"] == Decimal("123.45")
     assert row["current_value"] == Decimal("12345.67")
     assert row["total_gain_loss_percent"] == Decimal("15.25")
 

@@ -269,6 +269,151 @@ class TestActualAllocationCalculation:
                 bucket_names=[],
             )
 
+class TestConsolidatedActualAllocationCalculation:
+    """Tests for market-value-weighted consolidated allocations."""
+
+    def test_calculates_percentages_from_combined_market_values(
+        self, service
+    ):
+        holdings = [
+            make_holding(
+                "FZROX",
+                Decimal("80"),
+                "core_equity",
+                Decimal("80000"),
+            ),
+            make_holding(
+                "FZROX",
+                Decimal("20"),
+                "core_equity",
+                Decimal("20000"),
+            ),
+            make_holding(
+                "FXNAX",
+                Decimal("100"),
+                "fixed_income",
+                Decimal("100000"),
+            ),
+        ]
+
+        allocations = (
+            service._calculate_consolidated_actual_allocations(
+                holdings=holdings,
+                bucket_names=["core_equity", "fixed_income"],
+            )
+        )
+
+        assert len(allocations) == 2
+
+        core = allocations[0]
+        assert core.bucket == "core_equity"
+        assert core.market_value == Decimal("100000")
+        assert core.percentage == Decimal("50")
+        assert len(core.holdings) == 2
+
+        fixed_income = allocations[1]
+        assert fixed_income.bucket == "fixed_income"
+        assert fixed_income.market_value == Decimal("100000")
+        assert fixed_income.percentage == Decimal("50")
+
+    def test_preserves_duplicate_tickers_from_different_accounts(
+        self, service
+    ):
+        first = make_holding(
+            "FZROX",
+            Decimal("100"),
+            "core_equity",
+            Decimal("75000"),
+        )
+        first.account_name = "Rollover IRA"
+
+        second = make_holding(
+            "FZROX",
+            Decimal("100"),
+            "core_equity",
+            Decimal("25000"),
+        )
+        second.account_name = "Roth IRA"
+
+        allocations = (
+            service._calculate_consolidated_actual_allocations(
+                holdings=[first, second],
+                bucket_names=["core_equity"],
+            )
+        )
+
+        core = allocations[0]
+
+        assert len(core.holdings) == 2
+        assert core.holdings[0].account_name == "Rollover IRA"
+        assert core.holdings[1].account_name == "Roth IRA"
+        assert core.market_value == Decimal("100000")
+        assert core.percentage == Decimal("100")
+
+    def test_includes_unmapped_holdings_in_consolidated_percentage(
+        self, service
+    ):
+        holdings = [
+            make_holding(
+                "FZROX",
+                Decimal("90"),
+                "core_equity",
+                Decimal("90000"),
+            ),
+            make_holding(
+                "UNKNOWN",
+                Decimal("10"),
+                "UNMAPPED",
+                Decimal("10000"),
+            ),
+        ]
+
+        allocations = (
+            service._calculate_consolidated_actual_allocations(
+                holdings=holdings,
+                bucket_names=["core_equity"],
+            )
+        )
+
+        assert len(allocations) == 2
+
+        unmapped = allocations[1]
+        assert unmapped.bucket == "UNMAPPED"
+        assert unmapped.market_value == Decimal("10000")
+        assert unmapped.percentage == Decimal("10")
+
+    def test_zero_market_value_produces_zero_percentages(
+        self, service
+    ):
+        allocations = (
+            service._calculate_consolidated_actual_allocations(
+                holdings=[
+                    make_holding(
+                        "FZROX",
+                        Decimal("100"),
+                        "core_equity",
+                        Decimal("0"),
+                    )
+                ],
+                bucket_names=["core_equity", "fixed_income"],
+            )
+        )
+
+        assert all(
+            allocation.percentage == Decimal("0")
+            for allocation in allocations
+        )
+
+    def test_rejects_empty_bucket_names(self, service):
+        with pytest.raises(
+            ValueError,
+            match="bucket_names must be a non-empty list",
+        ):
+            service._calculate_consolidated_actual_allocations(
+                holdings=[],
+                bucket_names=[],
+            )
+
 class TestTargetAllocationCalculation:
     """Tests for configured target bucket and security allocations."""
 
@@ -337,6 +482,19 @@ class TestTargetAllocationCalculation:
             "foreign_equity",
             "alternatives",
         ]
+
+    def test_assigns_account_name_to_each_bucket(
+        self, service, account_config
+    ):
+        allocations = service._calculate_target_allocations(
+            account_config=account_config,
+            bucket_names=list(account_config.bucket_weights),
+        )
+
+        assert all(
+            allocation.account_name == "Rollover IRA"
+            for allocation in allocations
+        )
 
     def test_converts_bucket_weights_to_percentage_points(
         self, service, account_config
@@ -443,6 +601,194 @@ class TestTargetAllocationCalculation:
             isinstance(holding, PortfolioTargetHolding)
             for holding in all_targets
         )
+
+class TestBuildAllAccountsView:
+    """Tests for consolidated all-accounts view orchestration."""
+
+    def test_combines_holdings_and_allocations_across_accounts(
+        self, service
+    ):
+        first_database_account = MagicMock()
+        first_database_account.id = 1
+
+        second_database_account = MagicMock()
+        second_database_account.id = 2
+
+        first_config = MagicMock()
+        first_config.display_name = "Rollover IRA"
+
+        second_config = MagicMock()
+        second_config.display_name = "Roth IRA"
+
+        first_holding = make_holding(
+            "FZROX",
+            Decimal("100"),
+            "core_equity",
+            Decimal("75000"),
+        )
+        first_holding.account_name = "Rollover IRA"
+
+        second_holding = make_holding(
+            "FZROX",
+            Decimal("100"),
+            "core_equity",
+            Decimal("25000"),
+        )
+        second_holding.account_name = "Roth IRA"
+
+        fixed_income_holding = make_holding(
+            "FXNAX",
+            Decimal("100"),
+            "fixed_income",
+            Decimal("100000"),
+        )
+        fixed_income_holding.account_name = "Roth IRA"
+
+        first_view = PortfolioAccountView(
+            database_account=first_database_account,
+            account_config=first_config,
+            snapshot=MagicMock(),
+            holdings=[first_holding],
+            target_allocations=[MagicMock()],
+        )
+
+        second_view = PortfolioAccountView(
+            database_account=second_database_account,
+            account_config=second_config,
+            snapshot=MagicMock(),
+            holdings=[
+                second_holding,
+                fixed_income_holding,
+            ],
+            target_allocations=[MagicMock()],
+        )
+
+        service.list_accounts = MagicMock(
+            return_value=[first_view, second_view]
+        )
+        service.build_account_view = MagicMock(
+            side_effect=[first_view, second_view]
+        )
+        service._load_valid_bucket_names = MagicMock(
+            return_value=["core_equity", "fixed_income"]
+        )
+
+        result = service.build_all_accounts_view()
+
+        assert result.selected_account_id is None
+        assert len(result.accounts) == 2
+        assert len(result.holdings) == 3
+
+        # The same ticker in two accounts must remain two holdings.
+        fzrox_holdings = [
+            holding
+            for holding in result.holdings
+            if holding.position.symbol == "FZROX"
+        ]
+
+        assert len(fzrox_holdings) == 2
+        assert {
+            holding.account_name
+            for holding in fzrox_holdings
+        } == {"Rollover IRA", "Roth IRA"}
+
+        assert len(result.actual_allocations) == 2
+
+        core = result.actual_allocations[0]
+        assert core.bucket == "core_equity"
+        assert core.market_value == Decimal("100000")
+        assert core.percentage == Decimal("50")
+
+        fixed_income = result.actual_allocations[1]
+        assert fixed_income.bucket == "fixed_income"
+        assert fixed_income.market_value == Decimal("100000")
+        assert fixed_income.percentage == Decimal("50")
+
+        assert len(result.target_allocations) == 2
+        assert result.actual_allocation_complete is True
+        assert result.target_allocation_complete is True
+        assert result.missing_snapshot_accounts == []
+
+        service.build_account_view.assert_any_call(1)
+        service.build_account_view.assert_any_call(2)
+
+    def test_tracks_accounts_with_missing_snapshots(
+        self, service
+    ):
+        first_database_account = MagicMock()
+        first_database_account.id = 1
+
+        second_database_account = MagicMock()
+        second_database_account.id = 2
+
+        first_config = MagicMock()
+        first_config.display_name = "Rollover IRA"
+
+        second_config = MagicMock()
+        second_config.display_name = "Roth IRA"
+
+        available_holding = make_holding(
+            "FZROX",
+            Decimal("100"),
+            "core_equity",
+            Decimal("100000"),
+        )
+        available_holding.account_name = "Roth IRA"
+
+        missing_snapshot_view = PortfolioAccountView(
+            database_account=first_database_account,
+            account_config=first_config,
+            snapshot=None,
+            target_allocations=[MagicMock()],
+            message="No portfolio snapshot is available.",
+        )
+
+        available_snapshot_view = PortfolioAccountView(
+            database_account=second_database_account,
+            account_config=second_config,
+            snapshot=MagicMock(),
+            holdings=[available_holding],
+            target_allocations=[MagicMock()],
+        )
+
+        service.list_accounts = MagicMock(
+            return_value=[
+                missing_snapshot_view,
+                available_snapshot_view,
+            ]
+        )
+        service.build_account_view = MagicMock(
+            side_effect=[
+                missing_snapshot_view,
+                available_snapshot_view,
+            ]
+        )
+        service._load_valid_bucket_names = MagicMock(
+            return_value=["core_equity", "fixed_income"]
+        )
+
+        result = service.build_all_accounts_view()
+
+        assert len(result.accounts) == 2
+        assert len(result.holdings) == 1
+
+        assert result.missing_snapshot_accounts == [
+            "Rollover IRA"
+        ]
+
+        assert result.actual_allocation_complete is False
+        assert result.target_allocation_complete is True
+
+        assert len(result.target_allocations) == 2
+
+        core = next(
+            allocation
+            for allocation in result.actual_allocations
+            if allocation.bucket == "core_equity"
+        )
+
+        assert core.market_value == Decimal("100000")
+        assert core.percentage == Decimal("100")
 
 class TestBuildAccountView:
     """Tests for account view orchestration."""

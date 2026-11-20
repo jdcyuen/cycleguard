@@ -103,6 +103,7 @@ class PositionsCSVLoader(BaseCsvLoader[pd.DataFrame]):
         valid_rows = []
         numeric_cols = [
             "quantity",
+			"last_price",
             "average_cost_basis",
             "cost_basis_total",
             "current_value",

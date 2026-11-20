@@ -174,6 +174,7 @@ def test_insert_position_success(
         2,      # account_id
         3,      # security_id
         100,    # quantity
+        None,   # last_price
         50.0,   # avg_cost
         None,   # cost_basis_total
         None,   # current_value
@@ -258,6 +259,7 @@ def test_get_by_snapshot_success(repository, mock_conn):
             3,          # security_id
             4,          # snapshot_id
             100,        # quantity
+            None,       # last_price
             50.0,       # avg_cost
             5000.0,     # cost_basis_total
             5500.0,     # current_value
@@ -443,6 +445,7 @@ def test_get_by_snapshot_with_security_success(
             3,          # security_id
             4,          # snapshot_id
             100,        # quantity
+            None,       # last_price
             50.0,       # avg_cost
             5000.0,     # cost_basis_total
             5500.0,     # current_value

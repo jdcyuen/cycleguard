@@ -148,8 +148,8 @@ class PositionsIngestionService(BaseIngestionService):
             security_id=security_id,
             snapshot_id=snapshot_id,
             import_history_id=import_history_id,
-
             quantity=row.quantity,
+            last_price=getattr(row, "last_price", None),
             ave_cost=row.average_cost_basis,
             cost_basis_total=row.cost_basis_total,
             current_value=row.current_value,

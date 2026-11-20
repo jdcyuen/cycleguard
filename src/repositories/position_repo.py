@@ -13,16 +13,16 @@ class PositionRepository:
 
     def insert( self, position: Position, ) -> None:
 
-        """ 
-        Insert a Position into the database. 
-        """ 
-        logger.info( "Inserting position " 
-                    "security_id=%s " 
-                    "snapshot_id=%s", 
-                    position.security_id, 
-                    position.snapshot_id, 
-        ) 
-        
+        """
+        Insert a Position into the database.
+        """
+        logger.info( "Inserting position "
+                    "security_id=%s "
+                    "snapshot_id=%s",
+                    position.security_id,
+                    position.snapshot_id,
+        )
+
         logger.debug( "Position: %s", position, )
 
         try:
@@ -35,6 +35,7 @@ class PositionRepository:
                         account_id,
                         security_id,
                         quantity,
+						last_price,
                         avg_cost,
                         cost_basis_total,
                         current_value,
@@ -44,21 +45,22 @@ class PositionRepository:
                         total_gain,
                         total_gain_pct
                     )
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         position.import_history_id,
-                        position.snapshot_id, 
-                        position.account_id, 
-                        position.security_id, 
-                        position.quantity, 
-                        position.ave_cost, 
-                        position.cost_basis_total, 
-                        position.current_value, 
-                        position.percent_of_account, 
-                        position.daily_gain, 
-                        position.daily_gain_pct, 
-                        position.total_gain, 
+                        position.snapshot_id,
+                        position.account_id,
+                        position.security_id,
+                        position.quantity,
+						position.last_price,
+                        position.ave_cost,
+                        position.cost_basis_total,
+                        position.current_value,
+                        position.percent_of_account,
+                        position.daily_gain,
+                        position.daily_gain_pct,
+                        position.total_gain,
                         position.total_gain_pct,
                     ),
                 )
@@ -87,69 +89,70 @@ class PositionRepository:
                 f"for security_id={position.security_id}"
             ) from exc
 
-    def get_by_snapshot( self, snapshot_id: int, ) -> list[Position]: 
-        
-        """ 
-        Returns all positions for a snapshot. 
-        """ 
-        
-        logger.info( "Retrieving positions " "for snapshot_id=%s", snapshot_id, ) 
-        
-        try: 
-            with self.conn.cursor() as cur: 
-                cur.execute( 
-                    """ 
-                    SELECT id, account_id, security_id, snapshot_id, quantity, avg_cost, cost_basis_total, current_value, percent_of_account, daily_gain, daily_gain_pct, total_gain, total_gain_pct 
-                    FROM cycleguard.positions 
-                    WHERE snapshot_id = %s ORDER BY security_id """, (snapshot_id,), 
-                ) 
-                
-                rows = cur.fetchall() 
-                return [ 
-                    Position( 
-                        id=row[0], 
-                        account_id=row[1], 
-                        security_id=row[2], 
-                        snapshot_id=row[3], 
-                        quantity=row[4], 
-                        ave_cost=row[5], 
-                        cost_basis_total=row[6], 
-                        current_value=row[7], 
-                        percent_of_account=row[8], 
-                        daily_gain=row[9], 
-                        daily_gain_pct=row[10], 
-                        total_gain=row[11], 
-                        total_gain_pct=row[12], 
-                    ) for row in rows ] 
-        except psycopg.Error as exc: 
-            logger.exception( "Failed retrieving positions." ) 
-            raise PositionRepositoryError( "Failed retrieving positions." ) from exc  
+    def get_by_snapshot( self, snapshot_id: int, ) -> list[Position]:
 
-    def delete_by_snapshot( self, snapshot_id: int, ) -> int: 
-        """ 
-        Deletes all positions for a snapshot. Returns: Number of rows deleted. 
-        """ 
+        """
+        Returns all positions for a snapshot.
+        """
+
+        logger.info( "Retrieving positions " "for snapshot_id=%s", snapshot_id, )
+
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, account_id, security_id, snapshot_id, quantity, last_price, avg_cost, cost_basis_total, current_value, percent_of_account, daily_gain, daily_gain_pct, total_gain, total_gain_pct
+                    FROM cycleguard.positions
+                    WHERE snapshot_id = %s ORDER BY security_id """, (snapshot_id,),
+                )
+
+                rows = cur.fetchall()
+                return [
+                    Position(
+                        id=row[0],
+                        account_id=row[1],
+                        security_id=row[2],
+                        snapshot_id=row[3],
+                        quantity=row[4],
+                        last_price=row[5],
+                        ave_cost=row[6],
+                        cost_basis_total=row[7],
+                        current_value=row[8],
+                        percent_of_account=row[9],
+                        daily_gain=row[10],
+                        daily_gain_pct=row[11],
+                        total_gain=row[12],
+                        total_gain_pct=row[13],
+                    ) for row in rows ]
+        except psycopg.Error as exc:
+            logger.exception( "Failed retrieving positions." )
+            raise PositionRepositoryError( "Failed retrieving positions." ) from exc
+
+    def delete_by_snapshot( self, snapshot_id: int, ) -> int:
+        """
+        Deletes all positions for a snapshot. Returns: Number of rows deleted.
+        """
         logger.info( "Deleting positions " "for snapshot_id=%s", snapshot_id, )
 
-        try: 
-            with self.conn.cursor() as cur: 
-                cur.execute( 
-                    """ 
-                    DELETE FROM cycleguard.positions 
-                    WHERE snapshot_id = %s 
-                    """, 
-                    (snapshot_id,), 
-                ) 
-                rows_deleted = cur.rowcount 
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM cycleguard.positions
+                    WHERE snapshot_id = %s
+                    """,
+                    (snapshot_id,),
+                )
+                rows_deleted = cur.rowcount
 
-            self.conn.commit() 
-            
-            logger.info( "Deleted %d positions.", rows_deleted, ) 
-            return rows_deleted 
+            self.conn.commit()
 
-        except psycopg.Error as exc: 
-            self.conn.rollback() 
-            logger.exception( "Failed deleting positions." ) 
+            logger.info( "Deleted %d positions.", rows_deleted, )
+            return rows_deleted
+
+        except psycopg.Error as exc:
+            self.conn.rollback()
+            logger.exception( "Failed deleting positions." )
             raise PositionRepositoryError( "Failed deleting positions." ) from exc
 
     def delete_by_import_history_id(
@@ -293,6 +296,7 @@ class PositionRepository:
                         p.security_id,
                         p.snapshot_id,
                         p.quantity,
+						p.last_price,
                         p.avg_cost,
                         p.cost_basis_total,
                         p.current_value,
@@ -320,15 +324,16 @@ class PositionRepository:
                         security_id=row[2],
                         snapshot_id=row[3],
                         quantity=row[4],
-                        ave_cost=row[5],
-                        cost_basis_total=row[6],
-                        current_value=row[7],
-                        percent_of_account=row[8],
-                        daily_gain=row[9],
-                        daily_gain_pct=row[10],
-                        total_gain=row[11],
-                        total_gain_pct=row[12],
-                        symbol=row[13],
+                        last_price=row[5],
+                        ave_cost=row[6],
+                        cost_basis_total=row[7],
+                        current_value=row[8],
+                        percent_of_account=row[9],
+                        daily_gain=row[10],
+                        daily_gain_pct=row[11],
+                        total_gain=row[12],
+                        total_gain_pct=row[13],
+                        symbol=row[14],
                     )
                     for row in rows
                 ]

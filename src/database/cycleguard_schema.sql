@@ -69,6 +69,81 @@ ALTER SEQUENCE cycleguard.accounts_id_seq OWNED BY cycleguard.accounts.id;
 
 
 --
+-- Name: deployment_decision; Type: TABLE; Schema: cycleguard; Owner: cycleguard_user
+--
+
+CREATE TABLE cycleguard.deployment_decision (
+    id integer NOT NULL,
+    account_id integer NOT NULL,
+    recommended_amount numeric(20,2) NOT NULL,
+    reason text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE cycleguard.deployment_decision OWNER TO cycleguard_user;
+
+--
+-- Name: deployment_decision_id_seq; Type: SEQUENCE; Schema: cycleguard; Owner: cycleguard_user
+--
+
+CREATE SEQUENCE cycleguard.deployment_decision_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE cycleguard.deployment_decision_id_seq OWNER TO cycleguard_user;
+
+--
+-- Name: deployment_decision_id_seq; Type: SEQUENCE OWNED BY; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER SEQUENCE cycleguard.deployment_decision_id_seq OWNED BY cycleguard.deployment_decision.id;
+
+
+--
+-- Name: deployment_decision_snapshot; Type: TABLE; Schema: cycleguard; Owner: cycleguard_user
+--
+
+CREATE TABLE cycleguard.deployment_decision_snapshot (
+    deployment_decision_snapshot_id integer NOT NULL,
+    deployment_decision_id integer NOT NULL,
+    snapshot_date date NOT NULL,
+    recommended_amount numeric(20,2) NOT NULL,
+    actual_amount_deployed numeric(20,2) NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE cycleguard.deployment_decision_snapshot OWNER TO cycleguard_user;
+
+--
+-- Name: deployment_decision_snapshot_deployment_decision_snapshot_i_seq; Type: SEQUENCE; Schema: cycleguard; Owner: cycleguard_user
+--
+
+CREATE SEQUENCE cycleguard.deployment_decision_snapshot_deployment_decision_snapshot_i_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE cycleguard.deployment_decision_snapshot_deployment_decision_snapshot_i_seq OWNER TO cycleguard_user;
+
+--
+-- Name: deployment_decision_snapshot_deployment_decision_snapshot_i_seq; Type: SEQUENCE OWNED BY; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER SEQUENCE cycleguard.deployment_decision_snapshot_deployment_decision_snapshot_i_seq OWNED BY cycleguard.deployment_decision_snapshot.deployment_decision_snapshot_id;
+
+
+--
 -- Name: import_history; Type: TABLE; Schema: cycleguard; Owner: cycleguard_user
 --
 
@@ -133,7 +208,8 @@ CREATE TABLE cycleguard.positions (
     total_gain numeric(20,2),
     total_gain_pct numeric(10,4),
     created_at timestamp without time zone DEFAULT now(),
-    import_history_id integer
+    import_history_id integer,
+    last_price numeric(18,4)
 );
 
 
@@ -291,6 +367,20 @@ ALTER TABLE ONLY cycleguard.accounts ALTER COLUMN id SET DEFAULT nextval('cycleg
 
 
 --
+-- Name: deployment_decision id; Type: DEFAULT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision ALTER COLUMN id SET DEFAULT nextval('cycleguard.deployment_decision_id_seq'::regclass);
+
+
+--
+-- Name: deployment_decision_snapshot deployment_decision_snapshot_id; Type: DEFAULT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision_snapshot ALTER COLUMN deployment_decision_snapshot_id SET DEFAULT nextval('cycleguard.deployment_decision_snapshot_deployment_decision_snapshot_i_seq'::regclass);
+
+
+--
 -- Name: import_history id; Type: DEFAULT; Schema: cycleguard; Owner: cycleguard_user
 --
 
@@ -331,6 +421,22 @@ ALTER TABLE ONLY cycleguard.transactions ALTER COLUMN id SET DEFAULT nextval('cy
 
 ALTER TABLE ONLY cycleguard.accounts
     ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: deployment_decision deployment_decision_pkey; Type: CONSTRAINT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision
+    ADD CONSTRAINT deployment_decision_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: deployment_decision_snapshot deployment_decision_snapshot_pkey; Type: CONSTRAINT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision_snapshot
+    ADD CONSTRAINT deployment_decision_snapshot_pkey PRIMARY KEY (deployment_decision_snapshot_id);
 
 
 --
@@ -403,6 +509,29 @@ ALTER TABLE ONLY cycleguard.snapshots
 
 ALTER TABLE ONLY cycleguard.transactions
     ADD CONSTRAINT uq_transaction UNIQUE (account_id, run_date, security_id, amount, action, trade_type);
+
+
+--
+-- Name: accounts_account_number_normalized_uidx; Type: INDEX; Schema: cycleguard; Owner: cycleguard_user
+--
+
+CREATE UNIQUE INDEX accounts_account_number_normalized_uidx ON cycleguard.accounts USING btree (upper(regexp_replace((account_number)::text, '\s'::text, ''::text, 'g'::text)));
+
+
+--
+-- Name: deployment_decision deployment_decision_account_id_fkey; Type: FK CONSTRAINT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision
+    ADD CONSTRAINT deployment_decision_account_id_fkey FOREIGN KEY (account_id) REFERENCES cycleguard.accounts(id);
+
+
+--
+-- Name: deployment_decision_snapshot deployment_decision_snapshot_deployment_decision_id_fkey; Type: FK CONSTRAINT; Schema: cycleguard; Owner: cycleguard_user
+--
+
+ALTER TABLE ONLY cycleguard.deployment_decision_snapshot
+    ADD CONSTRAINT deployment_decision_snapshot_deployment_decision_id_fkey FOREIGN KEY (deployment_decision_id) REFERENCES cycleguard.deployment_decision(id);
 
 
 --

@@ -18,6 +18,7 @@ class Position:
 
     symbol: str = ""
     quantity: Decimal = Decimal("0")
+    last_price: Optional[Decimal] = None
     ave_cost: Decimal = Decimal("0")
     cost_basis_total: Optional[Decimal] = None
 

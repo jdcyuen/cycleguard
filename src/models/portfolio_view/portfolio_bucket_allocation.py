@@ -76,25 +76,34 @@ class PortfolioBucketAllocation:
 
         holdings:
             PortfolioHolding instances contributing to this bucket.
-			
+
 		target_holdings:
             PortfolioTargetHolding instances representing configured
             security targets assigned to this bucket.
+
+		account_name:
+            Display name of the account associated with this allocation.
+            None for consolidated actual allocations.
     """
+
+
 
     bucket: str
     """Canonical CycleGuard bucket identifier."""
 
     percentage: Decimal
-    """Aggregate bucket allocation expressed in percentage points."""
+    """Aggregate allocation percentage expressed in percentage points."""
 
     market_value: Decimal | None = None
     """Aggregate actual market value in USD; None when not applicable."""
 
     holdings: list[PortfolioHolding] = field(default_factory=list)
     """List of actual securities associated with this bucket."""
-	
+
     target_holdings: list[PortfolioTargetHolding] = field(
         default_factory=list
     )
     """List of configured security targets associated with this bucket."""
+
+    account_name: str | None = None
+    """Account associated with this allocation; None for consolidated actuals."""
