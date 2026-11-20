@@ -57,6 +57,9 @@ def make_account(account_number, name="test_account", account_id=1):
         ("ab-123", "AB-123"),
         ("AB-123", "AB-123"),
         (" Ab - 123 ", "AB-123"),
+        ("12\t345", "12345"),
+        ("12\n345", "12345"),
+        (" 12\t\n 345 ", "12345"),
         (None, ""),
         ("   ", ""),
     ],
@@ -156,37 +159,37 @@ def test_reconcile_detects_duplicate_yaml_numbers(
     assert result.active_accounts == []
     assert result.pending_registration == []
     assert result.duplicate_accounts
-    assert result.duplicate_accounts[0].source == "YAML"
     assert result.duplicate_accounts[0].normalized_account_number == "12345"
     assert result.has_duplicates is True
 
 
-def test_reconcile_detects_duplicate_database_numbers(
+def test_reconcile_classifies_database_accounts_without_yaml(
     service, account_repo, loader
 ):
     loader.load.return_value = []
     account_repo.list_accounts.return_value = [
         make_account("12345", account_id=1),
-        make_account("12 345", account_id=2),
     ]
 
     result = service.reconcile()
 
-    assert result.historical_accounts == []
-    assert result.duplicate_accounts
-    assert result.duplicate_accounts[0].source == "database"
-    assert result.duplicate_accounts[0].normalized_account_number == "12345"
+    assert result.active_accounts == []
+    assert result.pending_registration == []
+    assert len(result.historical_accounts) == 1
+    assert result.historical_accounts[0].account_number == "12345"
+    assert result.duplicate_accounts == []
+    assert result.has_duplicates is False
 
 
-def test_duplicate_in_either_source_blocks_matching_in_both_sources(
+def test_yaml_duplicate_numbers_block_matching(
     service, account_repo, loader
 ):
     loader.load.return_value = [
         make_config("12345"),
+        make_config("12 345", "account_two"),
     ]
     account_repo.list_accounts.return_value = [
-        make_account("12345", account_id=1),
-        make_account("12 345", account_id=2),
+        make_account("12345"),
     ]
 
     result = service.reconcile()

@@ -2,6 +2,11 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
+from models.account import Account
+from models.account_match import AccountMatch
+from models.account_reconciliation_result import (
+    AccountReconciliationResult,
+)
 
 from ingestion.common.cli_ingestion_helper import (
     resolve_snapshot_date,
@@ -135,126 +140,213 @@ def test_confirm_add_account_strip(mock_input):
 # ============================================================
 # resolve_account
 # ============================================================
-
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
-def test_resolve_account_existing_account(mock_validation):
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
+def test_resolve_account_existing_account(mock_reconciliation):
     repo = MagicMock()
 
-    validation = mock_validation.return_value
-    validation.exists.return_value = True
+    account = Account(
+        id=1,
+        account_number="123456",
+        name="IRA",
+        institution="Fidelity",
+    )
+
+    account_match = AccountMatch(
+        database_account=account,
+        account_config=MagicMock(),
+    )
+
+    reconciliation = AccountReconciliationResult(
+        active_accounts=[account_match],
+    )
+
+    mock_reconciliation.return_value.reconcile.return_value = (
+        reconciliation
+    )
 
     result = resolve_account("IRA", repo)
 
     assert result == "IRA"
 
-    validation.exists.assert_called_once_with("IRA")
-    validation.add_account.assert_not_called()
+    mock_reconciliation.return_value.reconcile.assert_called_once()
 
 
 @patch("ingestion.common.cli_ingestion_helper.confirm_add_account", return_value=True)
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountRegistrationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
 def test_resolve_account_add_new(
-    mock_validation,
+    mock_reconciliation,
+    mock_registration,
     mock_confirm,
 ):
     repo = MagicMock()
+    pending_config = MagicMock()
+    pending_config.display_name = "IRA"
 
-    validation = mock_validation.return_value
-    validation.exists.return_value = False
+    account = Account(
+        id=1,
+        account_number="123456",
+        name="IRA",
+        institution="Fidelity",
+    )
+
+    active_match = AccountMatch(
+        database_account=account,
+        account_config=MagicMock(),
+    )
+
+    pending_result = AccountReconciliationResult(
+        pending_registration=[pending_config],
+    )
+    active_result = AccountReconciliationResult(
+        active_accounts=[active_match],
+    )
+
+    mock_reconciliation.return_value.reconcile.side_effect = [
+        pending_result,
+        active_result,
+    ]
 
     result = resolve_account("IRA", repo)
 
     assert result == "IRA"
-
-    validation.add_account.assert_called_once_with("IRA")
+    mock_confirm.assert_called_once_with("IRA")
+    mock_registration.return_value.register.assert_called_once_with(
+        pending_config
+    )
 
 
 @patch("ingestion.common.cli_ingestion_helper.confirm_add_account", return_value=False)
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountRegistrationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
 def test_resolve_account_decline_add(
-    mock_validation,
+    mock_reconciliation,
+    mock_registration,
     mock_confirm,
 ):
     repo = MagicMock()
+    pending_config = MagicMock()
+    pending_config.display_name = "IRA"
 
-    validation = mock_validation.return_value
-    validation.exists.return_value = False
+    mock_reconciliation.return_value.reconcile.return_value = (
+        AccountReconciliationResult(
+            pending_registration=[pending_config],
+        )
+    )
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit, match="Import cancelled."):
         resolve_account("IRA", repo)
 
+    mock_confirm.assert_called_once_with("IRA")
+    mock_registration.return_value.register.assert_not_called()
 
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
-def test_resolve_account_no_accounts(mock_validation):
+
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
+def test_resolve_account_no_accounts(mock_reconciliation):
     repo = MagicMock()
-    repo.list_accounts.return_value = []
+
+    mock_reconciliation.return_value.reconcile.return_value = (
+        AccountReconciliationResult()
+    )
 
     with pytest.raises(ValueError):
         resolve_account(None, repo)
 
 
 @patch("builtins.input", return_value="2")
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
 def test_resolve_account_select_existing(
-    mock_validation,
+    mock_reconciliation,
     mock_input,
 ):
     repo = MagicMock()
 
-    acct1 = MagicMock()
-    acct1.name = "IRA"
+    account1 = Account(
+        id=1,
+        account_number="123456",
+        name="IRA",
+        institution="Fidelity",
+    )
+    account2 = Account(
+        id=2,
+        account_number="789012",
+        name="Brokerage",
+        institution="Schwab",
+    )
 
-    acct2 = MagicMock()
-    acct2.name = "Brokerage"
-
-    repo.list_accounts.return_value = [acct1, acct2]
+    mock_reconciliation.return_value.reconcile.return_value = (
+        AccountReconciliationResult(
+            active_accounts=[
+                AccountMatch(account1, MagicMock()),
+                AccountMatch(account2, MagicMock()),
+            ],
+        )
+    )
 
     result = resolve_account(None, repo)
 
     assert result == "Brokerage"
+    mock_input.assert_called_once()
 
 
 @patch("builtins.input", side_effect=["abc", "1"])
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
 def test_resolve_account_invalid_then_valid(
-    mock_validation,
+    mock_reconciliation,
     mock_input,
     capsys,
 ):
     repo = MagicMock()
 
-    acct = MagicMock()
-    acct.name = "IRA"
+    account = Account(
+        id=1,
+        account_number="123456",
+        name="IRA",
+        institution="Fidelity",
+    )
 
-    repo.list_accounts.return_value = [acct]
+    mock_reconciliation.return_value.reconcile.return_value = (
+        AccountReconciliationResult(
+            active_accounts=[
+                AccountMatch(account, MagicMock()),
+            ],
+        )
+    )
 
     result = resolve_account(None, repo)
 
     assert result == "IRA"
 
     captured = capsys.readouterr()
-
     assert "Please enter a valid number." in captured.out
 
-
 @patch("builtins.input", side_effect=["5", "1"])
-@patch("ingestion.common.cli_ingestion_helper.AccountValidationService")
+@patch("ingestion.common.cli_ingestion_helper.AccountReconciliationService")
 def test_resolve_account_out_of_range_then_valid(
-    mock_validation,
+    mock_reconciliation,
     mock_input,
     capsys,
 ):
     repo = MagicMock()
 
-    acct = MagicMock()
-    acct.name = "IRA"
+    account = Account(
+        id=1,
+        account_number="123456",
+        name="IRA",
+        institution="Fidelity",
+    )
 
-    repo.list_accounts.return_value = [acct]
+    mock_reconciliation.return_value.reconcile.return_value = (
+        AccountReconciliationResult(
+            active_accounts=[
+                AccountMatch(account, MagicMock()),
+            ],
+        )
+    )
 
     result = resolve_account(None, repo)
 
     assert result == "IRA"
 
     captured = capsys.readouterr()
-
-    assert "Selection out of range" in captured.out
+    assert "Selection out of range." in captured.out

@@ -1,8 +1,15 @@
-from services.account_validation_service import (
-    AccountValidationService,
+from services.account_reconciliation_service import (
+    AccountReconciliationService,
 )
 
+from services.account_registration_service import (
+    AccountRegistrationService,
+)
+from models.account_reconciliation_result import (
+    AccountReconciliationResult,
+)
 from models.import_result import ImportResult
+from repositories.account_repo import AccountRepository
 
 from datetime import date
 from datetime import datetime
@@ -237,7 +244,7 @@ def resolve_snapshot_date(
 
 
 def confirm_import(import_type: str, account_name: str,) -> bool:
-    
+
     answer = input(
         f"\nImport {import_type} "
         f"for '{account_name}'? (y/n): "
@@ -260,8 +267,8 @@ def display_results(result: ImportResult) -> None:
     print("Account")
     print("-------")
     print(f"Account           : {result.account_name}")
-    
-    
+
+
     print()
 
     print("Source")
@@ -329,86 +336,147 @@ def confirm_add_account(
 
     return confirmed
 
+
 def resolve_account(
-        account_name: str | None,
-        account_repo,
-    ) -> str:
-        """
-        Resolve the account to use for an import.
+    account_name: str | None,
+    account_repo: AccountRepository,
+) -> str:
+    """
+    Resolve an account using shared reconciliation
+    and registration services.
 
         Case 1:
             --account supplied
 
-            • Verify the account exists in the
-            accounts table.
+            • Check whether the account is active
+              through reconciliation.
 
-            • If not, ask whether it should be
-            added from its YAML configuration.
+            • If pending registration, ask for
+              confirmation before registering it
+              from its YAML configuration.
+
+            • Reconcile again and verify successful
+              registration before proceeding.
 
         Case 2:
             --account omitted
 
-            • Display configured accounts from
-            the accounts table.
+            • Display active reconciled accounts.
 
-            • Return the selected account.
-        """
+            • Prompt the user to select an account.
+    """
 
-        validation = AccountValidationService(account_repo )
+    reconciliation_service: AccountReconciliationService = (
+        AccountReconciliationService(account_repo)
+	)
 
-        #
-        # Case 1
-        #
-        if account_name:
+    reconciliation: AccountReconciliationResult = (
+        reconciliation_service.reconcile()
+	)
 
-            if validation.exists(account_name):
-                return account_name
+    #
+    # Case 1: Explicit account name supplied
+    #
+    if account_name:
 
-            logger.info(f"Account '{account_name}' does not exist.")
+        # Check reconciled active accounts.
+        for match in reconciliation.active_accounts:
 
-            if not confirm_add_account(account_name ):
-                raise SystemExit("Import cancelled.")
+            if (
+                match.database_account.name.lower()
+                == account_name.lower()
+            ):
+                return match.database_account.name
 
-            logger.info(f"Adding account to accounts table as '{account_name}'.")
+        # Check pending registration accounts.
+        pending_config = next(
+            (
+                config
+                for config in reconciliation.pending_registration
+                if config.display_name.lower()
+                == account_name.lower()
+            ),
+            None,
+        )
 
-            validation.add_account(account_name)
+        if pending_config is None:
+            raise ValueError(
+                f"Account '{account_name}' is not an active "
+                "account or a pending YAML-configured account."
+            )
 
-            return account_name
+        logger.info(
+            "Account '%s' is pending registration.",
+            account_name,
+        )
 
-        #
-        # Case 2
-        #
-        accounts = (account_repo.list_accounts())
+        if not confirm_add_account(account_name):
+            raise SystemExit("Import cancelled.")
 
-        if not accounts:
-            raise ValueError("No accounts exist in the database." )
+        registration_service: AccountRegistrationService = (
+            AccountRegistrationService(account_repo)
+        )
 
-        print("\nAvailable Accounts:\n")
+        registration_service.register(pending_config)
 
-        for i, account in enumerate(
-            accounts,
-            start=1,
-        ):
+        # Reconcile again after registration.
+        reconciliation = (
+            reconciliation_service.reconcile()
+        )
 
-            print(f"{i}. {account.name}" )
+        for match in reconciliation.active_accounts:
 
-        while True:
+            if (
+                match.database_account.name.lower()
+                == account_name.lower()
+            ):
+                logger.info(
+                    "Account '%s' successfully registered "
+                    "and reconciled.",
+                    match.database_account.name,
+                )
 
-            choice = input("\nSelect account: ")
+                return match.database_account.name
 
-            try:
+        raise RuntimeError(
+            f"Account '{account_name}' was registered but "
+            "could not be verified through reconciliation."
+        )
 
-                index = int(choice) - 1
+    #
+    # Case 2: Account name omitted
+    #
+    accounts = [
+        match.database_account
+        for match in reconciliation.active_accounts
+    ]
 
-            except ValueError:
+    if not accounts:
+        raise ValueError(
+            "No active reconciled accounts are available."
+        )
 
-                print("Please enter a valid number." )
-                continue
+    print("\nAvailable Accounts:\n")
 
-            if index < 0 or index >= len(accounts):
+    for i, account in enumerate(accounts, start=1):
+        print(f"{i}. {account.name}")
 
-                print("Selection out of range. Please choose one of the listed accounts.")
-                
-                continue
+    while True:
 
-            return accounts[index].name    
+        choice = input("\nSelect account: ")
+
+        try:
+            index = int(choice) - 1
+
+        except ValueError:
+            print("Please enter a valid number.")
+            continue
+
+        if index < 0 or index >= len(accounts):
+            print(
+                "Selection out of range. "
+                "Please choose one of the listed accounts."
+            )
+            continue
+
+        return accounts[index].name

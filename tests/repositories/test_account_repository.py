@@ -87,13 +87,15 @@ def test_get_by_account_number_normalizes_input(repository, mock_conn):
         "Fidelity",
     )
 
-    result = repository.get_by_account_number("z322 28042")
+    result = repository.get_by_account_number("z322\t28042\n")
 
     assert result is not None
     assert result.account_number == "Z32228042"
 
-    _, params = cursor.execute.call_args.args
-    assert params == ("z322 28042",)
+    sql, params = cursor.execute.call_args.args
+    assert "REGEXP_REPLACE" in sql
+    assert "UPPER" in sql
+    assert params == ("z322\t28042\n",)
 
 
 def test_get_by_account_number_returns_none_when_missing(

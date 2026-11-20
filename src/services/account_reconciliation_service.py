@@ -1,242 +1,228 @@
 
 """
 Account Reconciliation Service
-===============================
-
-Module
-------
-src/services/account_reconciliation_service.py
+=============================
 
 Purpose
 -------
-Reconciles account configurations stored in YAML files with account
+Reconciles account configurations maintained in YAML with account
 records stored in the CycleGuard PostgreSQL database.
 
-The service establishes a consistent account lifecycle by determining
-which accounts are active, awaiting registration, historical, or
-ambiguous because of duplicate account numbers.
+The service establishes a consistent view of account identity and
+lifecycle across CycleGuard applications, ensuring that accounts
+are correctly matched before being used in portfolio analysis,
+drift detection, or deployment workflows.
 
-Account Identity
-----------------
-Account identity is determined by normalized account number, not by
-account name or display name.
+How It Works
+------------
+1. Configuration Loading
+   Loads all account configurations through AccountConfigLoader
+   from the configured account YAML directory.
 
-Normalization rules:
-    - Remove all whitespace.
-    - Convert alphabetic characters to uppercase.
-    - Preserve punctuation, including hyphens.
-    - Treat None or blank values as invalid account identifiers.
+2. Database Retrieval
+   Retrieves existing account records through AccountRepository.
 
-Account Lifecycle
+3. Account Number Normalization
+   Normalizes account numbers before comparison by:
+       - Removing all whitespace.
+       - Converting alphabetic characters to uppercase.
+       - Preserving punctuation, including hyphens.
+
+   Account names and display names are not used as identity keys.
+
+4. Account Grouping
+   Groups YAML configurations and database records independently
+   by their normalized account numbers.
+
+5. Duplicate Detection
+   Identifies normalized account numbers appearing more than
+   once among YAML configurations.
+
+   PostgreSQL independently enforces normalized account-number
+   uniqueness for database records.
+
+   Duplicate YAML identities are considered ambiguous and
+   excluded from normal lifecycle classifications.
+
+6. Account Classification
+   Compares the unique normalized account numbers across both
+   sources and classifies accounts into four categories:
+
+       ACTIVE
+           Exactly one YAML configuration and one database
+           record share the same normalized account number.
+
+       PENDING REGISTRATION
+           A YAML configuration exists without a matching
+           database account record.
+
+       HISTORICAL / INACTIVE
+           A database account record exists without a matching
+           YAML configuration.
+
+       DUPLICATE / AMBIGUOUS
+           A YAML account number occurs more than once and
+           cannot be safely classified.
+
+7. Reconciliation Results
+   Returns an AccountReconciliationResult containing the
+   classified accounts and duplicate information for use
+   by calling applications.
+
+Algorithms
+---------
+Account Identity Normalization
+    N(account_number) = uppercase(account_number with all
+    whitespace removed)
+
+    Punctuation is preserved. Blank or missing account
+    numbers are invalid.
+
+Set-Based Reconciliation
+    Let Y be the set of unique normalized account numbers
+    from YAML configurations.
+
+    Let D be the set of unique normalized account numbers
+    from database records.
+
+    Active accounts:
+        Y ∩ D
+
+    Pending registration:
+        Y - D
+
+    Historical / inactive:
+        D - Y
+
+Duplicate Detection
+    YAML configurations are grouped by normalized account
+    number before classification.
+
+    Any YAML account number with a group size greater
+    than one is marked ambiguous and excluded from
+    normal classification.
+
+    PostgreSQL independently enforces normalized
+    account-number uniqueness for database records.
+
+    This prevents ambiguous YAML configurations from
+    being incorrectly activated or registered.
+
+CycleGuard Architecture
+----------------------
+Account Reconciliation Service is a domain service within
+the CycleGuard service layer.
+
+    AccountConfigLoader
+           |
+           v
+    YAML Account Configurations
+           |
+           +-------------------------+
+                                     |
+                                     v
+                         Account Reconciliation
+                                Service
+                                     ^
+                                     |
+           +-------------------------+
+           |
+    AccountRepository
+           |
+           v
+    PostgreSQL Accounts Table
+
+
+The service depends on AccountConfigLoader and
+AccountRepository for data retrieval. It does not directly
+implement YAML parsing, SQL queries, or database connection
+management.
+
+Integration Points
 -----------------
-1. ACTIVE
-   A valid YAML configuration and exactly one database record share
-   the same normalized account number.
+The reconciliation service provides a shared account lifecycle
+and identity mechanism for:
 
-   Active accounts are eligible for normal CycleGuard account workflows.
+    CLI
+        Reports account status and requires explicit
+        authorization for registration.
 
-2. PENDING REGISTRATION
-   A valid YAML configuration exists, but no matching database record
-   exists.
+    Standalone Drift Detection Dashboard
+        Determines which accounts are eligible for
+        drift detection.
 
-   Registration requires explicit authorization through the calling
-   application. Accounts must never be registered automatically.
+    Main CycleGuard Dashboard
+        Validates account identity before account-specific
+        portfolio aggregation and deployment workflows.
 
-3. HISTORICAL / INACTIVE
-   A database record exists, but no matching YAML configuration exists.
+    Other Account-Based Services
+        Can consume reconciliation results without
+        duplicating account matching logic.
 
-   Historical records and their associated portfolio history must be
-   preserved. The service must never automatically delete database
-   accounts.
+Responsibilities and Boundaries
+---------------------------
+The service is responsible for:
+    - Matching account configurations to database records.
+    - Determining account lifecycle status.
+    - Detecting ambiguous account identities.
+    - Providing structured reconciliation results.
 
-4. DUPLICATE / AMBIGUOUS
-   A normalized account number appears more than once in either the
-   YAML configurations or database records.
-
-   Ambiguous accounts are excluded from normal lifecycle classifications.
-   They must be resolved before activation or registration.
-
-Responsibilities
-----------------
-- Load all valid YAML account configurations.
-- Retrieve existing database account records.
-- Normalize account numbers consistently.
-- Match YAML configurations to database records.
-- Identify active, pending, historical, and duplicate accounts.
-- Return a structured reconciliation report.
-- Log reconciliation activity and operational errors.
-
-Non-Responsibilities
---------------------
-This service does not:
-    - Create or modify YAML account configurations.
+The service does not:
+    - Create or modify YAML configurations.
     - Automatically register pending accounts.
     - Delete historical database accounts.
-    - Delete or modify portfolio snapshots, positions, or transactions.
     - Import financial institution files.
-    - Execute trades or modify portfolio allocations.
-    - Perform drift calculations.
+    - Create portfolio snapshots or modify positions.
+    - Calculate portfolio drift or deployment recommendations.
+    - Execute trades.
 
-Registration Authorization
---------------------------
-Account registration is a separate, explicitly authorized operation.
-
-Calling applications are responsible for obtaining user authorization:
-    - Streamlit applications require an explicit confirmation action.
-    - CLI registration requires an explicit authorization argument.
-
-Registration must recheck database account numbers immediately before
-insertion. Database-level uniqueness protection is also required to
-protect against concurrent registration attempts.
-
-Architecture and SOLID Principles
----------------------------------
-The service follows these design principles:
-
-Single Responsibility:
-    Handles account reconciliation and lifecycle classification.
-
-Open/Closed:
-    Uses structured result objects that can be extended without
-    changing repository behavior.
-
-Liskov Substitution:
-    Depends on the behavior of injected loader and repository
-    dependencies rather than requiring specific concrete implementations.
-
-Interface Segregation:
-    Uses existing loader and repository methods without expanding
-    their interfaces unnecessarily.
-
-Dependency Inversion:
-    Receives the account repository and configuration loader through
-    constructor injection.
-
-Dependencies
-------------
-- AccountConfigLoader
-- AccountRepository
-- Account model
-- Python dataclasses
-- Project logging utility
-
-Exceptions
-----------
-AccountReconciliationServiceError:
-    Raised when configuration loading, database retrieval, or
-    reconciliation cannot complete reliably.
-
-Source-level exceptions are preserved as the original exception cause.
-
-Logging
--------
-Uses the CycleGuard logging framework.
-
-Logs include:
-    - Reconciliation start and completion.
-    - Number of YAML and database records examined.
-    - Account lifecycle classification counts.
-    - Duplicate account detection.
-    - Configuration and database failures.
-
-Account numbers and other unnecessary sensitive information must not
-be included in log messages.
-
-Data Safety
------------
+Data Integrity
+-------------
 Reconciliation is read-only.
 
-A failed or incomplete configuration/database read must not produce
-a misleading reconciliation report.
+A successful reconciliation requires both configuration
+loading and database retrieval to complete successfully.
 
-Historical database records are preserved.
+Invalid or incomplete source data must not result in
+a partial or misleading reconciliation report.
 
-Duplicate or ambiguous account identities must not be activated or
-registered automatically.
+Historical database records and their associated portfolio
+history are preserved.
 
-Usage
------
-    service = AccountReconciliationService(
-        account_repo=account_repository,
-        loader=AccountConfigLoader(),
-    )
-
-    result = service.reconcile()
-
-    active_accounts = result.active_accounts
-    pending_accounts = result.pending_registration
-    historical_accounts = result.historical_accounts
-    duplicate_accounts = result.duplicate_accounts
-
-Testing
--------
-Unit tests are maintained in:
-
-    tests/services/test_account_reconciliation_service.py
-
-Tests should cover:
-    - Account-number normalization.
-    - All lifecycle classifications.
-    - Duplicate detection in YAML and database records.
-    - Missing or invalid account numbers.
-    - Configuration and database retrieval failures.
-    - Logging and exception propagation.
-    - Registration authorization and duplicate protection.
-
-Status
-------
-Initial implementation: Read-only reconciliation.
-
-Registration and application integrations are implemented separately
-after reconciliation behavior and database uniqueness safeguards
-have been verified.
+Duplicate account identities must be resolved before
+normal account workflows can safely proceed.
 """
 
-from dataclasses import dataclass, field
-from typing import Any
+
+from dataclasses import dataclass
+from typing import TypeVar
 
 from core.logger import get_logger
 from config.account_config_loader import AccountConfigLoader
+from models.account_match import AccountMatch
+from models.account_duplicate import AccountDuplicate
+from models.account_reconciliation_result import (
+    AccountReconciliationResult,
+)
+from models.account import Account
+from models.account_config import AccountConfig
+from repositories.account_repo import AccountRepository
+
 
 logger = get_logger(__name__)
+
+_AccountRecord = TypeVar(
+    "_AccountRecord",
+    Account,
+    AccountConfig,
+)
 
 
 class AccountReconciliationServiceError(Exception):
     """Raised when account reconciliation cannot complete."""
 
 
-@dataclass(slots=True)
-class AccountMatch:
-    """A YAML configuration matched to a database account."""
-
-    database_account: Any
-    account_config: Any
-
-
-@dataclass(slots=True)
-class AccountDuplicate:
-    """An account number appearing more than once in a source."""
-
-    normalized_account_number: str
-    source: str
-    records: list[Any] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class AccountReconciliationResult:
-    """Complete account reconciliation report."""
-
-    active_accounts: list[AccountMatch] = field(default_factory=list)
-    pending_registration: list[Any] = field(default_factory=list)
-    historical_accounts: list[Any] = field(default_factory=list)
-    duplicate_accounts: list[AccountDuplicate] = field(default_factory=list)
-
-    @property
-    def has_duplicates(self) -> bool:
-        return bool(self.duplicate_accounts)
-
-
-def normalize_account_number(value: Any) -> str:
+def normalize_account_number(value: str | None) -> str:
     """
     Normalize account numbers for consistent matching.
 
@@ -256,9 +242,21 @@ class AccountReconciliationService:
     This service is read-only. It does not register or delete accounts.
     """
 
-    def __init__(self, account_repo, loader=None):
+    def __init__(
+        self,
+        account_repo: AccountRepository,
+        loader: AccountConfigLoader | None = None,
+    ) -> None:
         self._account_repo = account_repo
-        self._loader = loader if loader is not None else AccountConfigLoader()
+        self._loader = (
+            loader
+            if loader is not None
+            else AccountConfigLoader()
+        )
+
+        logger.info(
+            "Account reconciliation service initialized."
+        )
 
     def reconcile(self) -> AccountReconciliationResult:
         """
@@ -302,26 +300,20 @@ class AccountReconciliationService:
 
         result = AccountReconciliationResult()
 
-        duplicate_numbers = set()
+        # Detect duplicate account numbers in YAML configurations.
+        # PostgreSQL independently enforces database account-number uniqueness.
+        ambiguous_numbers: set[str] = set()
 
-        for source_groups, source_name in (
-            (configs_by_number, "YAML"),
-            (database_by_number, "database"),
-        ):
-            for number, records in source_groups.items():
-                if len(records) > 1:
-                    duplicate_numbers.add((source_name, number))
-                    result.duplicate_accounts.append(
-                        AccountDuplicate(
-                            normalized_account_number=number,
-                            source=source_name,
-                            records=records,
-                        )
+        for number, records in configs_by_number.items():
+            if len(records) > 1:
+                ambiguous_numbers.add(number)
+
+                result.duplicate_accounts.append(
+                    AccountDuplicate(
+                        normalized_account_number=number,
+                        records=records,
                     )
-
-        ambiguous_numbers = {
-            number for _, number in duplicate_numbers
-        }
+                )
 
         all_numbers = set(configs_by_number) | set(database_by_number)
 
@@ -362,9 +354,12 @@ class AccountReconciliationService:
         return result
 
     @staticmethod
-    def _group_by_account_number(records, source: str) -> dict[str, list[Any]]:
+    def _group_by_account_number(
+        records: list[_AccountRecord],
+        source: str,
+    ) -> dict[str, list[_AccountRecord]]:
         """Group records by normalized account number."""
-        grouped: dict[str, list[Any]] = {}
+        grouped: dict[str, list[_AccountRecord]] = {}
 
         for record in records:
             number = normalize_account_number(record.account_number)
