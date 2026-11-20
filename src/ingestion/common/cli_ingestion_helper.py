@@ -1,9 +1,5 @@
-from services.account_reconciliation_service import (
-    AccountReconciliationService,
-)
-
-from services.account_registration_service import (
-    AccountRegistrationService,
+from services.account_reconciliation_orchestration_service import (
+    AccountReconciliationOrchestrationService,
 )
 from models.account_reconciliation_result import (
     AccountReconciliationResult,
@@ -366,13 +362,13 @@ def resolve_account(
             • Prompt the user to select an account.
     """
 
-    reconciliation_service: AccountReconciliationService = (
-        AccountReconciliationService(account_repo)
+    orchestration_service: AccountReconciliationOrchestrationService = (
+		AccountReconciliationOrchestrationService(account_repo)
 	)
 
     reconciliation: AccountReconciliationResult = (
-        reconciliation_service.reconcile()
-	)
+        orchestration_service.reconcile()
+    )
 
     #
     # Case 1: Explicit account name supplied
@@ -410,38 +406,25 @@ def resolve_account(
             account_name,
         )
 
-        if not confirm_add_account(account_name):
+        registered_account = (
+            orchestration_service.register_pending_account(
+                pending_config.account_number,
+                lambda config: confirm_add_account(
+                    config.display_name
+                ),
+            )
+        )
+
+        if registered_account is None:
             raise SystemExit("Import cancelled.")
 
-        registration_service: AccountRegistrationService = (
-            AccountRegistrationService(account_repo)
+        logger.info(
+            "Account '%s' successfully registered "
+            "and reconciled.",
+            registered_account.name,
         )
 
-        registration_service.register(pending_config)
-
-        # Reconcile again after registration.
-        reconciliation = (
-            reconciliation_service.reconcile()
-        )
-
-        for match in reconciliation.active_accounts:
-
-            if (
-                match.database_account.name.lower()
-                == account_name.lower()
-            ):
-                logger.info(
-                    "Account '%s' successfully registered "
-                    "and reconciled.",
-                    match.database_account.name,
-                )
-
-                return match.database_account.name
-
-        raise RuntimeError(
-            f"Account '{account_name}' was registered but "
-            "could not be verified through reconciliation."
-        )
+        return registered_account.name
 
     #
     # Case 2: Account name omitted

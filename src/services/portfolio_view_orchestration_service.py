@@ -221,6 +221,10 @@ from repositories.snapshot_repo import SnapshotRepository
 from services.account_reconciliation_service import (
     AccountReconciliationService,
 )
+from services.account_reconciliation_orchestration_service import (
+    AccountReconciliationOrchestrationService,
+)
+from models.account_reconciliation_result import AccountReconciliationResult
 from models.account_config import AccountConfig
 from data.providers.yfinance_data_provider import YFinanceDataProvider
 
@@ -297,12 +301,22 @@ class PortfolioViewOrchestrationService:
         logger.info("Loading active accounts for Portfolio View.")
 
         try:
-            reconciliation_service = AccountReconciliationService(
-                account_repo=self.account_repository,
-                loader=self.config_loader,
+            reconciliation_service: AccountReconciliationService = (
+                AccountReconciliationService(
+                    account_repo=self.account_repository,
+                    loader=self.config_loader,
+                )
+            )
+            orchestration_service: AccountReconciliationOrchestrationService = (
+                AccountReconciliationOrchestrationService(
+                    account_repo=self.account_repository,
+                    reconciliation_service=reconciliation_service,
+                )
             )
 
-            reconciliation_result = reconciliation_service.reconcile()
+            reconciliation_result: AccountReconciliationResult = (
+                orchestration_service.reconcile()
+            )
 
             accounts = [
                 PortfolioAccountView(

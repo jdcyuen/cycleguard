@@ -32,8 +32,11 @@ from core.logger import get_logger, setup_logging
 from database.connection import DBConnection
 from repositories.account_repo import AccountRepository
 from repositories.snapshot_repo import SnapshotRepository
+from services.account_reconciliation_orchestration_service import (
+    AccountReconciliationOrchestrationService,
+    AccountReconciliationOrchestrationError,
+)
 from services.account_reconciliation_service import (
-    AccountReconciliationService,
     AccountReconciliationServiceError,
 )
 from services.drift_detection_orchestration_service import (
@@ -136,9 +139,11 @@ def main():
                 snapshot_repository,
             )
 
-            reconciliation_service = AccountReconciliationService(
-                account_repository
-            )
+            reconciliation_service: AccountReconciliationOrchestrationService = (
+				AccountReconciliationOrchestrationService(
+					account_repository
+				)
+			)
             reconciliation = reconciliation_service.reconcile()
 
             # Report accounts that require attention.
@@ -216,7 +221,10 @@ def main():
 
         return 0
 
-    except AccountReconciliationServiceError as exc:
+    except (
+        AccountReconciliationOrchestrationError,
+        AccountReconciliationServiceError,
+    ) as exc:
         logger.exception("Account reconciliation failed.")
         print(
             f"Account reconciliation failed: {exc}",

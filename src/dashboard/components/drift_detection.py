@@ -74,15 +74,12 @@ from services.drift_detection_orchestration_service import (
     DriftDetectionOrchestrationService,
 )
 from services.account_reconciliation_service import (
-    AccountReconciliationService,
     AccountReconciliationServiceError,
     normalize_account_number,
 )
-from services.account_registration_service import (
-    AccountRegistrationService,
-    AccountRegistrationError,
-    AccountRegistrationValidationError,
-    AccountRegistrationConflictError,
+from services.account_reconciliation_orchestration_service import (
+    AccountReconciliationOrchestrationService,
+    AccountReconciliationOrchestrationError,
 )
 
 logger = get_logger(__name__)
@@ -228,7 +225,7 @@ def _build_grid(rows: list[dict[str, Any]], account_id: Any) -> None:
         wrapText=False,
         autoHeight=False,
     )
-	
+
     builder.configure_column(
         "Position",
         width=240,
@@ -370,7 +367,7 @@ def _build_grid(rows: list[dict[str, Any]], account_id: Any) -> None:
         fit_columns_on_grid_load=False,
         key=f"drift_detection_grid_{account_id}",
     )
-	
+
 def _render_pending_account_registration(
     pending_accounts: list[Any],
     account_repository: AccountRepository,
@@ -424,8 +421,10 @@ def _render_pending_account_registration(
                 use_container_width=True,
                 key="confirm_register_all_accounts",
             ):
-                registration_service = AccountRegistrationService(
-                    account_repository
+                orchestration_service = (
+                    AccountReconciliationOrchestrationService(
+                        account_repository
+                    )
                 )
 
                 successful = []
@@ -438,26 +437,26 @@ def _render_pending_account_registration(
                     )
 
                     try:
-                        registration_service.register(account_config)
-                        successful.append(display_name)
+                        registered_account = (
+                            orchestration_service.register_pending_account(
+                                account_config.account_number,
+                                lambda config: True,
+                            )
+                        )
 
-                    except AccountRegistrationError as exc:
-                        logger.warning(
-                            "Account registration rejected for %s: %s",
+                        if registered_account is None:
+                            failed.append(
+                                f"{display_name}: Registration was not approved."
+                            )
+                        else:
+                            successful.append(display_name)
+
+                    except Exception as exc:
+                        logger.exception(
+                            "Account registration failed for %s",
                             display_name,
-                            exc,
                         )
                         failed.append(f"{display_name}: {exc}")
-
-                    except Exception:
-                        logger.exception(
-                            "Unexpected registration failure for %s",
-                            display_name,
-                        )
-                        failed.append(
-                            f"{display_name}: Unexpected error. "
-                            "Check application logs."
-                        )
 
                 messages = []
 
@@ -510,8 +509,10 @@ def render_drift_detection(
         )
 
         try:
-            reconciliation_service = AccountReconciliationService(
-                account_repository
+            reconciliation_service = (
+                AccountReconciliationOrchestrationService(
+                    account_repository
+                )
             )
             reconciliation = reconciliation_service.reconcile()
 
@@ -526,7 +527,10 @@ def render_drift_detection(
                 for match in reconciliation.active_accounts
             ]
 
-        except AccountReconciliationServiceError as exc:
+        except (
+            AccountReconciliationOrchestrationError,
+            AccountReconciliationServiceError,
+        ) as exc:
             logger.exception(
                 "Account reconciliation failed in Drift Detection"
             )
@@ -534,6 +538,7 @@ def render_drift_detection(
                 f"Account reconciliation failed: {exc}"
             )
             return
+
         except Exception:
             logger.exception(
                 "Unable to initialize the Drift Detection panel"
@@ -542,7 +547,7 @@ def render_drift_detection(
                 "Drift Detection could not load account information. "
                 "Check the application logs for details."
             )
-            return			
+            return
 
         if reconciliation.historical_accounts:
             st.caption(
@@ -567,7 +572,7 @@ def render_drift_detection(
             reconciliation.pending_registration,
             account_repository,
         )
-		
+
         if not matches:
             st.warning(
                 "No database accounts match an account_number in the YAML "
@@ -607,7 +612,7 @@ def render_drift_detection(
             key="drift_detection_account_selector",
             width=dropdown_width,
         )
-        
+
         database_account, account_config = labels[selected_label]
         account_id = getattr(database_account, "id", None)
 
