@@ -122,7 +122,7 @@ def test_evaluate_returns_deployment_evaluation(
 
     assert result is expected_decision
 
-def test_evaluate_caps_deployment_at_configured_event_limit(
+def test_evaluate_does_not_apply_obsolete_event_deployment_cap(
     account,
     account_repository,
     snapshot_repository,
@@ -161,9 +161,7 @@ def test_evaluate_caps_deployment_at_configured_event_limit(
         deployment_amount=Decimal("0"),
     )
 
-    policy = CashDeploymentPolicy(
-        max_deployment_per_event=Decimal("0.15"),
-    )
+    policy: CashDeploymentPolicy = CashDeploymentPolicy()
 
     service = DeploymentOrchestrationService(
         portfolio_service=portfolio_service,
@@ -184,8 +182,8 @@ def test_evaluate_caps_deployment_at_configured_event_limit(
     )
 
     assert result.action == "DEPLOY"
-    assert result.deployment_amount == Decimal("150000")
-    assert result.deployment_pct == Decimal("0.5")
+    assert result.deployment_amount == Decimal("300000")
+    assert result.deployment_pct == Decimal("1.0")
 
 def test_evaluate_gets_available_capital_from_portfolio_service(
     account,
@@ -497,7 +495,7 @@ def test_evaluate_passes_defensive_surplus_for_partial_regime_deployment(
 
     portfolio_service.get_bucket_allocation.return_value = {
         "defensive": MagicMock(
-            market_value=Decimal("250000"),
+            market_value=Decimal("125000"),
             target_weight=Decimal("0.15"),
             drift_value=Decimal("100000"),
         )
@@ -512,8 +510,8 @@ def test_evaluate_passes_defensive_surplus_for_partial_regime_deployment(
 
     expected_decision = DeploymentEvaluation(
         action="DEPLOY",
-        deployment_pct=Decimal("0.50"),
-        deployment_amount=Decimal("50000"),
+        deployment_pct=Decimal("1.50"),
+        deployment_amount=Decimal("150000"),
     )
 
     regime_deployment_engine.evaluate.return_value = expected_decision
@@ -535,7 +533,9 @@ def test_evaluate_passes_defensive_surplus_for_partial_regime_deployment(
         market_data={"test": "data"},
     )
 
-    assert result is expected_decision
+    assert result.action == "DEPLOY"
+    assert result.deployment_amount == Decimal("125000")
+    assert result.deployment_pct == Decimal("1.25")
 
     regime_deployment_engine.evaluate.assert_called_once_with(
         {
@@ -1032,8 +1032,8 @@ def test_evaluate_passes_crash_drawdown_and_capital_to_crash_engine(
 
     crash_deployment_engine.evaluate.return_value = DeploymentEvaluation(
         action="DEPLOY",
-        deployment_pct=Decimal("0.05"),
-        deployment_amount=Decimal("3750"),
+        deployment_pct=Decimal("0.20"),
+        deployment_amount=Decimal("200000"),
     )
 
     service = DeploymentOrchestrationService(
@@ -1048,14 +1048,18 @@ def test_evaluate_passes_crash_drawdown_and_capital_to_crash_engine(
         snapshot_repository=snapshot_repository,
     )
 
-    service.evaluate(
+    result: DeploymentEvaluation = service.evaluate(
         snapshot_id=456,
         market_data={"test": "data"},
     )
 
+    assert result.action == "DEPLOY"
+    assert result.deployment_amount == Decimal("175000")
+    assert result.deployment_pct == Decimal("0.175")
+
     crash_deployment_engine.evaluate.assert_called_once_with(
         Decimal("-0.20"),
-        available_capital,
+        Decimal("1000000"),
     )
 
 def test_allocate_deployment_passes_portfolio_data_to_allocation_engine(
@@ -1370,7 +1374,7 @@ def test_evaluate_blocks_deployment_when_snapshot_lookup_fails(
     regime_engine.evaluate.assert_not_called()
     crash_manager.run.assert_not_called()
 
-def test_evaluate_caps_deployment_at_configured_event_limit(
+def test_evaluate_does_not_apply_obsolete_event_deployment_cap(
     account,
     account_repository,
     snapshot_repository,
@@ -1402,9 +1406,7 @@ def test_evaluate_caps_deployment_at_configured_event_limit(
         deployment_amount=Decimal("300000"),
     )
 
-    policy = CashDeploymentPolicy(
-        max_deployment_per_event=Decimal("0.15"),
-    )
+    policy: CashDeploymentPolicy = CashDeploymentPolicy()
 
     service = DeploymentOrchestrationService(
         portfolio_service=portfolio_service,
@@ -1425,7 +1427,6 @@ def test_evaluate_caps_deployment_at_configured_event_limit(
     )
 
     assert result.action == "DEPLOY"
-    assert result.deployment_amount == Decimal("150000")
-    assert result.deployment_pct == Decimal("0.5")
-
+    assert result.deployment_amount == Decimal("300000")
+    assert result.deployment_pct == Decimal("1.0")
 

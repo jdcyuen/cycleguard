@@ -1,6 +1,7 @@
 import logging
 from decimal import Decimal
 from models.deployment_evaluation import DeploymentEvaluation
+from models.bucket_allocation import BucketAllocation
 
 from engine.deployment.crash_deployment_engine import CrashDeploymentEngine
 from engine.regime.regime_engine import RegimeEngine
@@ -186,46 +187,76 @@ class DeploymentOrchestrationService:
 
         
 
-        # 2. Get deployable capital from defensive bucket surplus
-        bucket_allocations = self.portfolio_service.get_bucket_allocation(snapshot_id)    
-        defensive_allocation = bucket_allocations.get("defensive")
+        # 2. Retrieve portfolio and bucket allocation values.
+        total_portfolio_value: Decimal = (
+            self.portfolio_service.get_portfolio_value(
+                snapshot_id
+            )
+        )
 
-        available_capital = (
+        bucket_allocations: dict[str, BucketAllocation] = (
+            self.portfolio_service.get_bucket_allocation(
+                snapshot_id
+            )
+        )
+
+        defensive_allocation: BucketAllocation | None = (
+            bucket_allocations.get("defensive")
+        )
+
+        # Regime deployment uses positive Defensive surplus
+        # relative to its allocation target.
+        regime_available_capital: Decimal = (
             max(
                 defensive_allocation.drift_value,
                 Decimal("0"),
             )
-            if defensive_allocation
+            if defensive_allocation is not None
             else Decimal("0")
         )
 
-        # 3. Determine the current market regime
+        # Cash policy uses actual Defensive market value.
+        defensive_cash_available: Decimal = (
+            max(
+                defensive_allocation.market_value,
+                Decimal("0"),
+            )
+            if defensive_allocation is not None
+            else Decimal("0")
+        )
+
+        # 3. Determine the current market regime.
         regime_result = self.regime_engine.evaluate(
             market_data
         )
 
-        # 4. Determine regime-based deployment
+        # 4. Determine regime-based deployment.
         regime_decision = (
             self.regime_deployment_engine.evaluate(
                 regime_result,
-                available_capital,
+                regime_available_capital,
             )
         )
-        # 5. Determine whether a crash is occurring
+
+        # 5. Determine whether a crash is occurring.
         crash_result = self.crash_manager.run()
 
-        # 6. Determine crash-based deployment
+        # 6. Determine crash-based deployment.
+        # Crash percentages are based on total portfolio value.
         crash_decision = (
             self.crash_deployment_engine.evaluate(
                 crash_result["drawdown"],
-                available_capital,
+                total_portfolio_value,
             )
         )
         
-                # 7. Select the winning deployment decision.
+        # 7. Select the winning deployment decision.
         # Crash deployment always has priority.
         if crash_decision.action == "DEPLOY":
             selected_decision = crash_decision
+            selected_sizing_basis: Decimal = (
+                total_portfolio_value
+            )
 
         # 8. Suppress normal regime deployment when disabled.
         elif not self.account.settings.enable_dynamic_deployment:
@@ -238,19 +269,19 @@ class DeploymentOrchestrationService:
 
         else:
             selected_decision = regime_decision
+            selected_sizing_basis = regime_available_capital
 
         # 9. Apply the cash deployment policy to proposed deployments.
         if selected_decision.action != "DEPLOY":
             return selected_decision
 
-        portfolio_value = self.portfolio_service.get_portfolio_value(
-            snapshot_id
-        )
-
-        approved_amount = self.cash_deployment_policy.approve(
-            proposed_amount=selected_decision.deployment_amount,
-            available_defensive_capital=available_capital,
-            portfolio_value=portfolio_value,
+        # Approve the proposed deployment using actual Defensive
+        # bucket market value after preserving the required reserve.
+        approved_amount: Decimal = (
+            self.cash_deployment_policy.approve(
+                proposed_amount=selected_decision.deployment_amount,
+                available_defensive_capital=defensive_cash_available,
+            )
         )
 
         # Preserve the original decision when the policy does not
@@ -267,11 +298,11 @@ class DeploymentOrchestrationService:
                 source=selected_decision.source,
             )
 
-        # The percentage is relative to the available defensive surplus,
-        # consistent with the deployment engines.
-        approved_pct = (
-            approved_amount / available_capital
-            if available_capital > Decimal("0")
+        # Recalculate the percentage using the sizing basis
+        # of the selected deployment engine.
+        approved_pct: Decimal = (
+            approved_amount / selected_sizing_basis
+            if selected_sizing_basis > Decimal("0")
             else Decimal("0")
         )
 

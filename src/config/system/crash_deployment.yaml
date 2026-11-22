@@ -2,13 +2,18 @@
 # CycleGuard Crash Deployment System
 # Shared execution rules across ALL accounts
 #
-#Crash level	Market drawdown				Deploy % of available capital
+#Crash level	Market drawdown				Deploy % of total portfolio value
 #Level 1		−10%						3%
 #Level 2		−20%						5%
 #Level 3		−30%						8%
 #Level 4		−40%						9%
 # =========================
 
+# Crash Deployment Policy
+#
+# Crash deployment percentages are calculated against total portfolio value,
+# not the Defensive bucket value. The Defensive bucket limits how much cash
+# can actually be deployed after preserving the required reserve.
 levels:
 
   level_1:
@@ -38,15 +43,21 @@ execution_rules:
     - "equity_growth"
     - "high_beta"
 
-  max_deployment_per_event: 0.15
-  
+#  max_deployment_per_event: 0.15
+
   # =========================
-  # Controls whether multiple crash-deployment levels can be combined or stacked.
+  # Controls whether multiple crash-deployment levels can be combined or stacked. Stacking means adding multiple triggered deployment levels together instead of using just one. In simple terms, stacking means
+  # combining deployments rather than selecting just the highest triggered level.
+  #
+  #   Think of it this way:
+  #     - No stacking: At a 30% market decline, use only Level 3's 8%.
+  #     - Stacking: At a 30% market decline, add Level 1 (3%) + Level 2 (5%) + Level 3 (8%) = 16%.
+  #
   # false — no stacking: A deeper drawdown selects the applicable level rather than adding the percentages from all earlier levels. For example, at −30%, the deployment would be 8%, not \(3\%+5\%+8\%=16\%\).
   # true — stacking allowed: Could permit successive levels to accumulate, potentially deploying 16% by Level 3, if the implementation defines stacking that way.
   # =========================
   allow_stacking: false
-  
+
   # =========================
   # Intended to require confirmation of a market cycle before a crash deployment is allowed.
   # true: Intended to require confirmation.

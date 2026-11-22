@@ -171,15 +171,10 @@ portfolio_service = PortfolioAggregationService(
 
 deployment_config = regime_config.get("deployment", {})
 
-crash_execution_rules = config.get(
-    "crash_deployment", {}
-).get("execution_rules", {})
-
-cash_deployment_policy = CashDeploymentPolicy(
-    max_deployment_per_event=Decimal(
-        str(crash_execution_rules.get("max_deployment_per_event", 0.15))
-    ),
-)
+# Initialize the cash deployment policy.
+# Deployment limits are enforced by the deployment engines and
+# available defensive capital, not by an additional event cap.
+cash_deployment_policy: CashDeploymentPolicy = CashDeploymentPolicy()
 
 deployment_policy = {
     regime: value
