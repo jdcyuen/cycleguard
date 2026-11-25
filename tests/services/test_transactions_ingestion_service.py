@@ -170,6 +170,7 @@ def test_persist_success():
     assert transaction.import_history_id == 123
     assert transaction.action == "BUY"
     assert transaction.amount == 1000
+    assert transaction.purpose == ""
 
 
 def test_import_type():
@@ -240,6 +241,7 @@ def test_to_transaction_creates_transaction():
         settlement_date="2026-01-02",
         action="BUY",
         trade_type="TRADE",
+        purpose="RMD",
         price=100,
         quantity=5,
         commission=0,
@@ -259,6 +261,7 @@ def test_to_transaction_creates_transaction():
     assert transaction.account_id == 1
     assert transaction.security_id == 99
     assert transaction.action == "BUY"
+    assert transaction.purpose == "RMD"
     assert transaction.quantity == 5
     assert transaction.amount == 500
 
@@ -358,6 +361,7 @@ def test_persist_inserts_cash_transaction_without_security():
                 "settlement_date": "2026-01-01",
                 "action": "DIVIDEND",
                 "trade_type": "CASH",
+                "purpose": float("nan"),
                 "price": None,
                 "quantity": None,
                 "commission": None,
@@ -384,6 +388,7 @@ def test_persist_inserts_cash_transaction_without_security():
     assert transaction.security_id is None
     assert transaction.action == "DIVIDEND"
     assert transaction.import_history_id == 123
+    assert transaction.purpose == ""
 
 
 def test_persist_skips_duplicate_transaction():

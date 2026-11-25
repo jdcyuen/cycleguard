@@ -331,7 +331,8 @@ CREATE TABLE cycleguard.transactions (
     amount numeric(20,2) NOT NULL,
     cash_balance numeric(20,2),
     created_at timestamp without time zone DEFAULT now(),
-    import_history_id integer
+    import_history_id integer,
+    purpose text DEFAULT ''::text NOT NULL
 );
 
 

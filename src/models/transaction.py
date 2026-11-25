@@ -21,6 +21,7 @@ class Transaction:
 
     action: str = ""
     trade_type: str = ""
+    purpose: str = ""
 
     price: Decimal = Decimal("0")
     quantity: Decimal = Decimal("0")

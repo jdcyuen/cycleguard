@@ -24,6 +24,7 @@ class TransactionsCSVLoader( BaseCsvLoader[Transaction]):
         "Symbol": "symbol",
         "Description": "description",
         "Type": "trade_type",
+        "Purpose": "purpose",
         "Price ($)": "price",
         "Quantity": "quantity",
         "Commission ($)": "commission",

@@ -19,3 +19,55 @@ actions:
 
   - match: "NORMAL DISTR PARTIAL"
     normalized: "DISTRIBUTION"
+
+  - match: "LIQUIDATION LIQ PAYOUT"
+    normalized: "DISTRIBUTION"
+
+purposes:
+  - value: RMD
+    description: "Required Minimum Distribution"
+
+  - value: ROTH_CONVERSION
+    description: "Traditional IRA to Roth IRA conversion"
+
+  - value: BOND_MATURITY
+    description: "Bond or Treasury maturity"
+
+  - value: DIVIDEND
+    description: "Dividend income"
+
+  - value: CAPITAL_GAIN
+    description: "Capital gains distribution"
+
+  - value: CONTRIBUTION
+    description: "Account contribution"
+
+  - value: WITHDRAWAL
+    description: "General account withdrawal"
+
+  - value: CRASH_DEPLOYMENT
+    description: "Investment deployment during a market decline"
+
+  - value: TACTICAL_DEPLOYMENT
+    description: "Strategic investment deployment"
+
+  - value: REBALANCE
+    description: "Portfolio rebalancing"
+
+  - value: TAX_PAYMENT
+    description: "Tax payment or withholding"
+
+  - value: FEE
+    description: "Account or investment fee"
+
+  - value: INTEREST_INCOME
+    description: "Interest income"
+
+  - value: TRANSFER
+    description: "Transfer between accounts"
+
+  - value: CORRECTION
+    description: "Brokerage correction or adjustment"
+
+  - value: OTHER
+    description: "Other transaction purpose"

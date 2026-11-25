@@ -176,7 +176,8 @@ def test_transactions_ingestion_end_to_end():
                 """
                 SELECT
                     id,
-                    security_id
+                    security_id,
+                    purpose
                 FROM cycleguard.transactions
                 WHERE import_history_id = %s
                 """,
@@ -188,6 +189,8 @@ def test_transactions_ingestion_end_to_end():
         assert len(transaction_rows) == result.rows_imported
 
         assert len(transaction_rows) > 0
+        assert any(row[2] == "RMD" for row in transaction_rows)
+        assert any(row[2] == "" for row in transaction_rows)
 
         # Capture security IDs so the test can clean up securities
         # created by security resolution.

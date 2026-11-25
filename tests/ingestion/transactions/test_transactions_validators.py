@@ -319,3 +319,62 @@ def test_validate_multiple_unknown_actions(
         validator.validate(
             dataframe
         )
+
+
+def test_validate_purpose_case_insensitive(validator):
+
+    dataframe = pd.DataFrame({
+        "run_date": [pd.Timestamp("2024-01-01")],
+        "action": ["DISTRIBUTION"],
+        "trade_type": ["Trade"],
+        "amount": [1000],
+        "purpose": ["rmd"],
+    })
+
+    validator.validate(dataframe)
+
+    assert dataframe.loc[0, "purpose"] == "RMD"
+
+
+def test_validate_purpose_with_whitespace(validator):
+
+    dataframe = pd.DataFrame({
+        "run_date": [pd.Timestamp("2024-01-01")],
+        "action": ["DISTRIBUTION"],
+        "trade_type": ["Trade"],
+        "amount": [1000],
+        "purpose": ["  rmd  "],
+    })
+
+    validator.validate(dataframe)
+
+    assert dataframe.loc[0, "purpose"] == "RMD"
+
+
+def test_validate_invalid_purpose(validator):
+
+    dataframe = pd.DataFrame({
+        "run_date": [pd.Timestamp("2024-01-01")],
+        "action": ["DISTRIBUTION"],
+        "trade_type": ["Trade"],
+        "amount": [1000],
+        "purpose": ["INVALID_PURPOSE"],
+    })
+
+    with pytest.raises(ValueError, match="Invalid purpose"):
+        validator.validate(dataframe)
+
+
+def test_validate_blank_purpose(validator):
+
+    dataframe = pd.DataFrame({
+        "run_date": [pd.Timestamp("2024-01-01")],
+        "action": ["DISTRIBUTION"],
+        "trade_type": ["Trade"],
+        "amount": [1000],
+        "purpose": ["   "],
+    })
+
+    validator.validate(dataframe)
+
+    assert dataframe.loc[0, "purpose"] == ""

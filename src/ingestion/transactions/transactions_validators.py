@@ -27,8 +27,49 @@ class TransactionsValidator:
         self._validate_columns(dataframe)
         self._validate_required_fields(dataframe)
         self._validate_actions(dataframe)
+        self._validate_purposes(dataframe)
 
         logger.info("Transactions validation successful")
+
+    def _validate_purposes(
+        self,
+        dataframe: pd.DataFrame,
+    ) -> None:
+
+        if "purpose" not in dataframe.columns:
+            return
+
+        config: dict = get_config()
+        definitions: list[dict] = config["system"]["action_map"]["purposes"]
+
+        valid_purposes: dict[str, str] = {
+            item["value"].casefold(): item["value"]
+            for item in definitions
+        }
+
+        purposes: pd.Series = (
+            dataframe["purpose"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        invalid: pd.Series = (
+            purposes.ne("")
+            & ~purposes.str.casefold().isin(valid_purposes)
+        )
+
+        if invalid.any():
+            raise ValueError(
+                f"Invalid purpose value(s): "
+                f"{purposes[invalid].unique().tolist()}"
+            )
+
+        dataframe["purpose"] = (
+            purposes.str.casefold()
+            .map(valid_purposes)
+            .fillna("")
+        )
 
     def _validate_not_empty(
         self,

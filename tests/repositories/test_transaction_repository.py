@@ -151,6 +151,7 @@ def test_insert_transaction_success(
             settlement_date="2026-06-18",
             action="BUY",
             trade_type="TRADE",
+            purpose="RMD",
             price=100.00,
             quantity=5,
             commission=1.00,
@@ -165,9 +166,88 @@ def test_insert_transaction_success(
     assert result.account_id == 1
     assert result.security_id == 10
     assert result.action == "BUY"
+    assert result.purpose == "RMD"
 
     cursor.execute.assert_called_once()
 
+def test_get_by_id_returns_transaction_with_purpose(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchone.return_value = (
+        123,                 # id
+        456,                 # import_history_id
+        1,                   # account_id
+        10,                  # security_id
+        "2026-06-17",        # run_date
+        "2026-06-18",        # settlement_date
+        "DISTRIBUTION",      # action
+        "CASH",              # trade_type
+        "RMD",               # purpose
+        100.00,              # price
+        5,                   # quantity
+        0.00,                # commission
+        0.00,                # fees
+        0.00,                # accrued_interest
+        500.00,              # amount
+        10000.00,            # cash_balance
+    )
+
+    result = repository.get_by_id(123)
+
+    assert isinstance(result, Transaction)
+    assert result.id == 123
+    assert result.action == "DISTRIBUTION"
+    assert result.trade_type == "CASH"
+    assert result.purpose == "RMD"
+
+    cursor.execute.assert_called_once()
+
+def test_list_for_account_returns_transactions_with_purpose(
+    repository,
+    mock_conn,
+):
+    cursor = (
+        mock_conn.cursor.return_value
+        .__enter__.return_value
+    )
+
+    cursor.fetchall.return_value = [
+        (
+            123,
+            456,
+            1,
+            10,
+            "2026-06-17",
+            "2026-06-18",
+            "DISTRIBUTION",
+            "CASH",
+            "RMD",
+            100.00,
+            5,
+            0.00,
+            0.00,
+            0.00,
+            500.00,
+            10000.00,
+        )
+    ]
+
+    results = repository.list_for_account(1)
+
+    assert len(results) == 1
+    assert isinstance(results[0], Transaction)
+    assert results[0].id == 123
+    assert results[0].action == "DISTRIBUTION"
+    assert results[0].trade_type == "CASH"
+    assert results[0].purpose == "RMD"
+
+    cursor.execute.assert_called_once()
 
 def test_exists_returns_true_when_transaction_exists(
     repository,

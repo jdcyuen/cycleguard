@@ -179,6 +179,13 @@ class TransactionsIngestionService(BaseIngestionService):
         Convert a cleaned DataFrame row into a Transaction object.
         """
 
+        purpose_value: object = getattr(row, "purpose", "")
+        purpose: str = (
+            ""
+            if pd.isna(purpose_value)
+            else str(purpose_value).strip()
+        )
+
         transaction = Transaction(
             account_id=account_id,
             security_id=security_id,
@@ -186,6 +193,7 @@ class TransactionsIngestionService(BaseIngestionService):
             settlement_date=self._null_if_na(row.settlement_date),
             action=self._null_if_na(row.action),
             trade_type=self._null_if_na(row.trade_type),
+            purpose=purpose,
             price=self._null_if_na(row.price),
             quantity=self._null_if_na(row.quantity),
             commission=self._null_if_na(row.commission),

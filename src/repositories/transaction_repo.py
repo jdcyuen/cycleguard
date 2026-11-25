@@ -88,6 +88,7 @@ class TransactionRepository:
                     transaction.settlement_date,
                     transaction.action,
                     transaction.trade_type,
+                    transaction.purpose,
                     transaction.price,
                     transaction.quantity,
                     transaction.commission,
@@ -110,6 +111,7 @@ class TransactionRepository:
                         settlement_date,
                         action,
                         trade_type,
+                        purpose,
                         price,
                         quantity,
                         commission,
@@ -120,8 +122,8 @@ class TransactionRepository:
                     )
                     VALUES
                     (
-                        %s,%s, %s, %s, %s,
-                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s
                     )
                     RETURNING id
@@ -134,6 +136,7 @@ class TransactionRepository:
                         transaction.settlement_date,
                         transaction.action,
                         transaction.trade_type,
+                        transaction.purpose,
                         transaction.price,
                         transaction.quantity,
                         transaction.commission,
@@ -159,6 +162,7 @@ class TransactionRepository:
                 settlement_date=transaction.settlement_date,
                 action=transaction.action,
                 trade_type=transaction.trade_type,
+                purpose=transaction.purpose,
                 price=transaction.price,
                 quantity=transaction.quantity,
                 commission=transaction.commission,
@@ -300,6 +304,7 @@ class TransactionRepository:
                         settlement_date,
                         action,
                         trade_type,
+                        purpose,
                         price,
                         quantity,
                         commission,
@@ -338,13 +343,14 @@ class TransactionRepository:
                     settlement_date=row[5],
                     action=row[6],
                     trade_type=row[7],
-                    price=row[8],
-                    quantity=row[9],
-                    commission=row[10],
-                    fees=row[11],
-                    accrued_interest=row[12],
-                    amount=row[13],
-                    cash_balance=row[14],
+                    purpose=row[8],
+                    price=row[9],
+                    quantity=row[10],
+                    commission=row[11],
+                    fees=row[12],
+                    accrued_interest=row[13],
+                    amount=row[14],
+                    cash_balance=row[15],
                 )
 
         except psycopg.Error as exc:
@@ -388,6 +394,7 @@ class TransactionRepository:
                         settlement_date,
                         action,
                         trade_type,
+                        purpose,
                         price,
                         quantity,
                         commission,
@@ -419,13 +426,14 @@ class TransactionRepository:
                         settlement_date=row[5],
                         action=row[6],
                         trade_type=row[7],
-                        price=row[8],
-                        quantity=row[9],
-                        commission=row[10],
-                        fees=row[11],
-                        accrued_interest=row[12],
-                        amount=row[13],
-                        cash_balance=row[14],
+                        purpose=row[8],
+                        price=row[9],
+                        quantity=row[10],
+                        commission=row[11],
+                        fees=row[12],
+                        accrued_interest=row[13],
+                        amount=row[14],
+                        cash_balance=row[15],
                     )
                     for row in rows
                 ]
