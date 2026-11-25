@@ -46,11 +46,13 @@ class TransactionsCSVLoader( BaseCsvLoader[Transaction]):
         if not isinstance(action, str):
             action = str(action)
 
-        action = action.strip().upper()
+        action = action.strip()
+        normalized_action: str = action.casefold()
 
         for rule in self.action_map:
+            match_value: str = rule["match"].strip().casefold()
 
-            if rule["match"] in action:
+            if match_value in normalized_action:
 
                 logger.debug(
                     "Normalized action '%s' -> '%s'",

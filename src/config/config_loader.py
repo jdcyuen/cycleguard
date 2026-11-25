@@ -4,6 +4,7 @@ from typing import Any, Dict
 from pathlib import Path
 
 from core.logger import get_logger
+from config.action_map_validator import validate_action_map
 from config.bucket_target_validator import (
     BucketTargetValidationError,
     validate_bucket_security_targets,
@@ -76,8 +77,16 @@ class ConfigLoader:
 
         for file in os.listdir(system_dir):
             if file.endswith(".yaml"):
-                key = file.replace(".yaml", "")
-                system[key] = self._load_yaml(os.path.join(system_dir, file))
+                key: str = file.replace(".yaml", "")
+                config_path: str = os.path.join(system_dir, file)
+                config_data: Any = self._load_yaml(config_path)
+
+                # Validate the transaction action map before making it
+                # available to the rest of CycleGuard.
+                if key == "action_map":
+                    validate_action_map(config_data)
+
+                system[key] = config_data
 
         return system
 

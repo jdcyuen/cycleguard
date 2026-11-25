@@ -12,6 +12,53 @@ def loader():
     return TransactionsCSVLoader(action_map=[])
 
 
+@pytest.mark.parametrize(
+    "action",
+    [
+        "LIQUIDATION LIQ PAYOUT",
+        "liquidation liq payout",
+        "Liquidation Liq Payout",
+        "  liquidation liq payout  ",
+    ],
+)
+def test_normalize_action_case_insensitive(action: str) -> None:
+    """Match configured action descriptions regardless of capitalization."""
+    action_map: list[dict[str, str]] = [
+        {
+            "match": "LIQUIDATION LIQ PAYOUT",
+            "normalized": "DISTRIBUTION",
+        }
+    ]
+    loader: TransactionsCSVLoader = TransactionsCSVLoader(
+        action_map=action_map
+    )
+
+    assert loader.normalize_action(action) == "DISTRIBUTION"
+
+
+def test_normalize_action_preserves_unmatched_action() -> None:
+    """Preserve the original text when no configured rule matches."""
+    loader: TransactionsCSVLoader = TransactionsCSVLoader(
+        action_map=[
+            {
+                "match": "LIQUIDATION LIQ PAYOUT",
+                "normalized": "DISTRIBUTION",
+            }
+        ]
+    )
+
+    action: str = "  Other Transaction  "
+
+    assert loader.normalize_action(action) == "Other Transaction"
+
+
+def test_normalize_action_returns_none_for_missing_action() -> None:
+    """Return None when the source action is missing."""
+    loader: TransactionsCSVLoader = TransactionsCSVLoader(action_map=[])
+
+    assert loader.normalize_action(None) is None
+
+
 def test_load_valid_csv(
     loader,
     tmp_path,
