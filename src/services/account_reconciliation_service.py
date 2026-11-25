@@ -193,8 +193,6 @@ Duplicate account identities must be resolved before
 normal account workflows can safely proceed.
 """
 
-
-from dataclasses import dataclass
 from typing import TypeVar
 
 from core.logger import get_logger
@@ -247,8 +245,8 @@ class AccountReconciliationService:
         account_repo: AccountRepository,
         loader: AccountConfigLoader | None = None,
     ) -> None:
-        self._account_repo = account_repo
-        self._loader = (
+        self._account_repo: AccountRepository = account_repo
+        self._loader: AccountConfigLoader = (
             loader
             if loader is not None
             else AccountConfigLoader()
@@ -268,7 +266,7 @@ class AccountReconciliationService:
         logger.info("Starting account reconciliation.")
 
         try:
-            configurations = self._loader.load()
+            configurations: list[AccountConfig] = self._loader.load()
         except Exception as exc:
             logger.exception("Failed to load account configurations.")
             raise AccountReconciliationServiceError(
@@ -276,7 +274,9 @@ class AccountReconciliationService:
             ) from exc
 
         try:
-            database_accounts = self._account_repo.list_accounts()
+            database_accounts: list[Account] = (
+                self._account_repo.list_accounts()
+            )
         except Exception as exc:
             logger.exception("Failed to load database accounts.")
             raise AccountReconciliationServiceError(
@@ -289,16 +289,22 @@ class AccountReconciliationService:
             len(database_accounts),
         )
 
-        configs_by_number = self._group_by_account_number(
-            configurations,
-            source="YAML",
+        configs_by_number: dict[str, list[AccountConfig]] = (
+            self._group_by_account_number(
+                configurations,
+                source="YAML",
+            )
         )
-        database_by_number = self._group_by_account_number(
-            database_accounts,
-            source="database",
+        database_by_number: dict[str, list[Account]] = (
+            self._group_by_account_number(
+                database_accounts,
+                source="database",
+            )
         )
 
-        result = AccountReconciliationResult()
+        result: AccountReconciliationResult = (
+            AccountReconciliationResult()
+        )
 
         # Detect duplicate account numbers in YAML configurations.
         # PostgreSQL independently enforces database account-number uniqueness.
@@ -315,15 +321,21 @@ class AccountReconciliationService:
                     )
                 )
 
-        all_numbers = set(configs_by_number) | set(database_by_number)
-
+        all_numbers: set[str] = (
+            set(configs_by_number) | set(database_by_number)
+        )
         for number in all_numbers:
             if number in ambiguous_numbers:
                 continue
 
-            configs = configs_by_number.get(number, [])
-            database_records = database_by_number.get(number, [])
-
+            configs: list[AccountConfig] = configs_by_number.get(
+                number,
+                [],
+            )
+            database_records: list[Account] = database_by_number.get(
+                number,
+                [],
+            )
             if configs and database_records:
                 result.active_accounts.append(
                     AccountMatch(
@@ -362,7 +374,7 @@ class AccountReconciliationService:
         grouped: dict[str, list[_AccountRecord]] = {}
 
         for record in records:
-            number = normalize_account_number(record.account_number)
+            number: str = normalize_account_number(record.account_number)
 
             if not number:
                 logger.error(

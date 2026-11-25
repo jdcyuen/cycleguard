@@ -69,9 +69,15 @@ This service does not:
     - Perform account matching independently of reconciliation.
 """
 
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from core.logger import get_logger
+
+from models.account_reconciliation_result import AccountReconciliationResult
+from models.account import Account
+from models.account_config import AccountConfig
+from models.account_match import AccountMatch
+from repositories.account_repo import AccountRepository
 
 from services.account_reconciliation_service import (
     AccountReconciliationService,
@@ -123,20 +129,20 @@ class AccountReconciliationOrchestrationService:
 
     def __init__(
         self,
-        account_repo,
-        reconciliation_service=None,
-        registration_service=None,
-    ):
+        account_repo: AccountRepository,
+        reconciliation_service: Optional[AccountReconciliationService] = None,
+        registration_service: Optional[AccountRegistrationService] = None,
+    ) -> None:
         if account_repo is None:
             raise ValueError("An account repository is required.")
 
-        self._reconciliation_service = (
+        self._reconciliation_service: AccountReconciliationService = (
             reconciliation_service
             if reconciliation_service is not None
             else AccountReconciliationService(account_repo)
         )
 
-        self._registration_service = (
+        self._registration_service: AccountRegistrationService = (
             registration_service
             if registration_service is not None
             else AccountRegistrationService(account_repo)
@@ -146,7 +152,7 @@ class AccountReconciliationOrchestrationService:
             "Account reconciliation orchestration service initialized."
         )
 
-    def reconcile(self):
+    def reconcile(self) -> AccountReconciliationResult:
         """
         Return the current account reconciliation result.
 
@@ -159,7 +165,9 @@ class AccountReconciliationOrchestrationService:
         logger.info("Starting account reconciliation orchestration.")
 
         try:
-            result = self._reconciliation_service.reconcile()
+            result: AccountReconciliationResult = (
+                self._reconciliation_service.reconcile()
+            )
 
             logger.info(
                 "Account reconciliation completed: "
@@ -190,8 +198,8 @@ class AccountReconciliationOrchestrationService:
     def register_pending_account(
         self,
         account_number: str,
-        confirmation_callback: Callable[[Any], bool],
-    ) -> Optional[Any]:
+        confirmation_callback: Callable[[AccountConfig], bool],
+    ) -> Optional[Account]:
         """
         Register a pending YAML-backed account after explicit approval.
 
@@ -211,7 +219,7 @@ class AccountReconciliationOrchestrationService:
             None when registration is declined.
         """
 
-        normalized_number = normalize_account_number(account_number)
+        normalized_number: str = normalize_account_number(account_number)
 
         if not normalized_number:
             raise AccountRegistrationEligibilityError(
@@ -228,7 +236,7 @@ class AccountReconciliationOrchestrationService:
             normalized_number,
         )
 
-        result = self.reconcile()
+        result: AccountReconciliationResult = self.reconcile()
 
         if result.has_duplicates:
             logger.error(
@@ -243,7 +251,7 @@ class AccountReconciliationOrchestrationService:
                 "account identities must be resolved first."
             )
 
-        matching_pending = [
+        matching_pending: list[AccountConfig] = [
             config
             for config in result.pending_registration
             if normalize_account_number(config.account_number)
@@ -263,7 +271,7 @@ class AccountReconciliationOrchestrationService:
                 "eligible pending YAML configuration."
             )
 
-        account_config = matching_pending[0]
+        account_config: AccountConfig = matching_pending[0]
 
         logger.info(
             "Account %s is eligible for registration using "
@@ -273,7 +281,7 @@ class AccountReconciliationOrchestrationService:
         )
 
         try:
-            approved = confirmation_callback(account_config)
+            approved: bool = confirmation_callback(account_config)
 
         except Exception as exc:
             logger.exception(
@@ -309,7 +317,7 @@ class AccountReconciliationOrchestrationService:
         )
 
         try:
-            registered_account = self._registration_service.register(
+            registered_account: Account = self._registration_service.register(
                 account_config
             )
 
@@ -336,7 +344,7 @@ class AccountReconciliationOrchestrationService:
             normalized_number,
         )
 
-        verification_result = self.reconcile()
+        verification_result: AccountReconciliationResult = self.reconcile()
 
         if verification_result.has_duplicates:
             logger.error(
@@ -350,7 +358,7 @@ class AccountReconciliationOrchestrationService:
                 "duplicate account identities."
             )
 
-        matching_active = [
+        matching_active: list[AccountMatch] = [
             match
             for match in verification_result.active_accounts
             if normalize_account_number(

@@ -68,6 +68,7 @@ from typing import Protocol, Optional
 import psycopg2
 
 from core.logger import get_logger
+from models.account_config import AccountConfig
 from models.account import Account
 from services.account_reconciliation_service import (
     normalize_account_number,
@@ -118,7 +119,7 @@ class AccountRegistrationService:
                 "An account repository is required."
             )
 
-        self.account_repository = account_repository
+        self.account_repository: AccountRepositoryProtocol = account_repository
 
         logger.debug(
             "AccountRegistrationService initialized."
@@ -126,7 +127,7 @@ class AccountRegistrationService:
 
     def register(
         self,
-        account_config,
+        account_config: AccountConfig,
     ) -> Account:
         """
         Register an account after explicit authorization by the caller.
@@ -139,9 +140,10 @@ class AccountRegistrationService:
             "Account registration requested."
         )
 
-        account_number, display_name, institution = (
+        registration_details: tuple[str, str, str] = (
             self._validate_configuration(account_config)
         )
+        account_number, display_name, institution = registration_details
 
         logger.info(
             "Validating registration for account '%s' at '%s'.",
@@ -151,14 +153,14 @@ class AccountRegistrationService:
 
         self._check_for_existing_account(account_number)
 
-        account = Account(
+        account: Account = Account(
             account_number=account_number,
             name=display_name,
             institution=institution,
         )
 
         try:
-            created_account = self.account_repository.create(
+            created_account: Account = self.account_repository.create(
                 account
             )
 
@@ -202,7 +204,7 @@ class AccountRegistrationService:
 
     def _validate_configuration(
         self,
-        account_config,
+        account_config: AccountConfig,
     ) -> tuple[str, str, str]:
         """Validate and normalize registration configuration."""
 
@@ -215,19 +217,19 @@ class AccountRegistrationService:
                 "Account configuration is required."
             )
 
-        account_number = normalize_account_number(
+        account_number: str = normalize_account_number(
             getattr(account_config, "account_number", None)
         )
 
-        display_name = (
+        display_name: str = (
             getattr(account_config, "display_name", None) or ""
         ).strip()
 
-        institution = (
+        institution: str = (
             getattr(account_config, "institution", None) or ""
         ).strip()
 
-        missing_fields = []
+        missing_fields: list[str] = []
 
         if not account_number:
             missing_fields.append("account number")
@@ -265,7 +267,7 @@ class AccountRegistrationService:
         """Reject an account number that already exists."""
 
         try:
-            existing_account = (
+            existing_account: Optional[Account] = (
                 self.account_repository.get_by_account_number(
                     account_number
                 )
@@ -301,8 +303,8 @@ class AccountRegistrationService:
     ) -> bool:
         """Inspect chained exceptions for a PostgreSQL unique violation."""
 
-        current_exception = exception
-        visited = set()
+        current_exception: Optional[BaseException] = exception
+        visited: set[int] = set()
 
         while current_exception is not None:
             if id(current_exception) in visited:
